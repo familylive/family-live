@@ -14,7 +14,7 @@ const io = new Server(server, {
   cors: { origin: '*', methods: ['GET', 'POST'] }
 });
 
-const JWT_SECRET = 'family-app-secret-key-2026';
+const JWT_SECRET = process.env.JWT_SECRET || 'family-app-secret-key-2026';
 const PORT = process.env.PORT || 3000;
 
 // Middleware
