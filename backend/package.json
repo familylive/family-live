@@ -1,21 +1,19 @@
 {
-  "name": "family-app-backend",
+  "name": "family-live",
   "version": "1.0.0",
-  "description": "تطبيق العائلة - باك إند",
+  "description": "تطبيق العائلة - Family Live",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "build": "npm install"
   },
   "dependencies": {
-    "bcryptjs": "^2.4.3",
-    "better-sqlite3": "^11.0.0",
-    "cors": "^2.8.5",
     "express": "^4.18.2",
-    "jsonwebtoken": "^9.0.2",
-    "nodemailer": "^6.9.8",
+    "sql.js": "^1.10.2",
     "socket.io": "^4.7.4",
-    "sql.js": "^1.14.1",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2",
+    "cors": "^2.8.5",
     "uuid": "^9.0.0"
   }
 }
