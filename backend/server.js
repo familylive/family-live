@@ -574,6 +574,29 @@ async function seedData() {
 // =============== START SERVER ===============
 
 seedData().then(() => {
+  // Create default user if not exists
+  try {
+    const existing = db.getUserByEmail('abdrit9@gmail.com');
+    if (!existing) {
+      // Generate premium codes
+      db.generatePremiumCode();
+      db.generatePremiumCode();
+      // Get the first code
+      const codes = db.getDb().exec("SELECT code FROM subscription_codes WHERE used = 0 AND type = 'premium' LIMIT 1");
+      let code = 'AAAAAAAA';
+      if (codes && codes.length > 0 && codes[0].values && codes[0].values.length > 0) {
+        code = codes[0].values[0][0];
+      }
+      const hashedPassword = bcrypt.hashSync('123456', 10);
+      const user = db.createUser('عبدالله', 'abdrit9@gmail.com', hashedPassword, null, 'founder');
+      const family = db.createFamily('عائلتي', code);
+      if (family && user) {
+        db.updateFamilyFounder(family.id, user.id);
+        console.log('✅ Created default user and family');
+      }
+    }
+  } catch(e) { console.log('Seed error:', e.message); }
+  
   server.listen(PORT, '0.0.0.0', () => {
     console.log(`🌙 تطبيق العائلة يعمل على المنفذ ${PORT}`);
     console.log(`📱 افتح المتصفح: http://localhost:${PORT}`);
