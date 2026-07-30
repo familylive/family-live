@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken');
 const path = require('path');
 const http = require('http');
 const { Server } = require('socket.io');
+const { v4: uuidv4 } = require('uuid');
 const db = require('./db');
 
 const app = express();
@@ -19,6 +20,16 @@ const PORT = process.env.PORT || 3000;
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// No-cache headers for frontend files
+app.use((req, res, next) => {
+  if (req.path.endsWith('.html') || req.path.endsWith('.js') || req.path.endsWith('.css')) {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  }
+  next();
+});
 
 // Serve static frontend files
 app.use(express.static(path.join(__dirname, '..', 'frontend')));
@@ -56,6 +67,12 @@ app.post('/api/auth/register', (req, res) => {
 
   // If subscription code provided, it's a founder creating a family
   if (subscriptionCode && familyName) {
+    // Check if user already has a family
+    const existingUser = db.getUserByEmail(email);
+    if (existingUser && existingUser.family_id) {
+      return res.status(400).json({ error: 'لديك عائلة بالفعل. يمكنك إنشاء عائلة واحدة فقط.' });
+    }
+    
     const validCode = db.validateSubscriptionCode(subscriptionCode);
     if (!validCode) {
       return res.status(400).json({ error: 'رمز الاشتراك غير صالح أو مستخدم مسبقاً' });
@@ -161,6 +178,84 @@ app.get('/api/auth/verify', authMiddleware, (req, res) => {
   const user = db.getUserById(req.user.id);
   if (!user) return res.status(404).json({ error: 'المستخدم غير موجود' });
   res.json({ user, family: user.family_id ? db.getFamily(user.family_id) : null });
+});
+
+// =============== CODES ROUTES ===============
+
+// Get available premium codes
+app.get('/api/codes/available', authMiddleware, (req, res) => {
+  const codes = db.getAvailablePremiumCodes();
+  res.json({ codes });
+});
+
+// Purchase a premium code
+app.post('/api/codes/purchase', authMiddleware, (req, res) => {
+  const { code } = req.body;
+  if (!code) return res.status(400).json({ error: 'الرمز مطلوب' });
+  const result = db.purchaseCode(req.user.id, code);
+  if (!result) return res.status(400).json({ error: 'الرمز غير متاح للشراء' });
+  res.json({ message: 'تم شراء الرمز المميز بنجاح بقيمة 200 ريال ✅', code: result });
+});
+
+// Generate premium code
+app.post('/api/codes/generate-premium', (req, res) => {
+  const code = db.generatePremiumCode();
+  res.json({ code, message: 'تم إنشاء رمز مميز: ' + code });
+});
+
+// Get user's purchased codes
+app.get('/api/codes/my', authMiddleware, (req, res) => {
+  const codes = db.getUserCodes(req.user.id);
+  res.json({ codes });
+});
+
+// Forgot password
+app.post('/api/auth/forgot-password', (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'البريد الإلكتروني مطلوب' });
+  const user = db.getUserByEmail(email);
+  if (!user) return res.status(404).json({ error: 'البريد غير مسجل' });
+  const resetToken = require('uuid').v4();
+  res.json({ message: 'تم إرسال رابط إعادة تعيين كلمة المرور', devToken: resetToken });
+});
+
+// Reset password
+app.post('/api/auth/reset-password', (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) return res.status(400).json({ error: 'البريد وكلمة المرور مطلوبان' });
+  const user = db.getUserByEmail(email);
+  if (!user) return res.status(404).json({ error: 'البريد غير مسجل' });
+  const hashedPassword = bcrypt.hashSync(password, 10);
+  db.updatePassword(email, hashedPassword);
+  res.json({ message: 'تم تغيير كلمة المرور بنجاح ✅' });
+});
+
+// Get all codes (admin)
+app.get('/api/codes/admin/all', authMiddleware, (req, res) => {
+  const d = db.getDb();
+  try {
+    const result = d.exec("SELECT code, type, price, purchased_by, used FROM subscription_codes ORDER BY type DESC, code ASC");
+    const codes = [];
+    if (result && result.length > 0) {
+      const cols = result[0].columns;
+      result[0].values.forEach(row => {
+        const obj = {};
+        cols.forEach((col, i) => obj[col] = row[i]);
+        codes.push(obj);
+      });
+    }
+    res.json({ codes });
+  } catch(e) {
+    res.json({ codes: [] });
+  }
+});
+
+// Update code price (admin)
+app.post('/api/codes/admin/update-price', authMiddleware, (req, res) => {
+  const { code, price } = req.body;
+  if (!code || price === undefined) return res.status(400).json({ error: 'الرمز والسعر مطلوبان' });
+  db.updatePrice(code, parseInt(price));
+  res.json({ message: '✅ تم تحديث السعر', code, price: parseInt(price) });
 });
 
 // =============== FAMILY ROUTES ===============

@@ -120,7 +120,20 @@ function initDb() {
       code TEXT PRIMARY KEY,
       used INTEGER DEFAULT 0,
       family_id TEXT,
+      type TEXT NOT NULL DEFAULT 'free' CHECK(type IN ('free', 'premium')),
+      price INTEGER DEFAULT 0,
+      purchased_by TEXT,
       created_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+  db.run(`
+    CREATE TABLE IF NOT EXISTS user_codes (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      code TEXT NOT NULL,
+      type TEXT NOT NULL DEFAULT 'free',
+      purchase_date TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id)
     )
   `);
 }
@@ -313,20 +326,71 @@ function getFamilyLeaderboard(familyId) {
   `, [familyId]);
 }
 
-function generateSubscriptionCodes(count = 1) {
+function generateSubscriptionCodes(count = 5) {
   const codes = [];
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   for (let i = 0; i < count; i++) {
-    const code = uuidv4().substring(0, 8).toUpperCase();
+    let code = '';
+    for (let j = 0; j < 8; j++) code += chars[Math.floor(Math.random() * chars.length)];
     try {
-      run('INSERT OR IGNORE INTO subscription_codes (code) VALUES (?)', [code]);
+      run('INSERT OR IGNORE INTO subscription_codes (code, type, price) VALUES (?, ?, ?)', [code, 'free', 0]);
       codes.push(code);
     } catch(e) { /* ignore duplicates */ }
   }
   return codes;
 }
 
+function generatePremiumCode() {
+  // All English letters A-Z repeated 8 times + digits 0-9 repeated 8 times
+  const patterns = [];
+  for (let i = 0; i < 26; i++) {
+    patterns.push(String.fromCharCode(65 + i).repeat(8));
+  }
+  for (let i = 0; i < 10; i++) {
+    patterns.push(String(i).repeat(8));
+  }
+  
+  for (const pattern of patterns) {
+    const existing = queryOne('SELECT * FROM subscription_codes WHERE code = ?', [pattern]);
+    if (!existing) {
+      run("INSERT INTO subscription_codes (code, type, price) VALUES (?, 'premium', 200)", [pattern]);
+      return pattern;
+    }
+  }
+  return 'NONE';
+}
+
+function getAvailablePremiumCodes() {
+  return queryAll("SELECT * FROM subscription_codes WHERE type = 'premium' AND (used = 0 OR used IS NULL) AND purchased_by IS NULL");
+}
+
+function purchaseCode(userId, code) {
+  const c = queryOne("SELECT * FROM subscription_codes WHERE code = ? AND type = 'premium' AND (used = 0 OR used IS NULL) AND purchased_by IS NULL", [code]);
+  if (!c) return null;
+  run('UPDATE subscription_codes SET purchased_by = ?, used = 1 WHERE code = ?', [userId, code]);
+  run('INSERT OR IGNORE INTO user_codes (id, user_id, code, type) VALUES (?, ?, ?, ?)', [uuidv4(), userId, code, 'premium']);
+  return queryOne('SELECT * FROM subscription_codes WHERE code = ?', [code]);
+}
+
+function getUserCodes(userId) {
+  return queryAll('SELECT * FROM user_codes WHERE user_id = ? ORDER BY purchase_date DESC', [userId]);
+}
+
+function userHasFamily(userId) {
+  const user = queryOne('SELECT family_id, role FROM users WHERE id = ?', [userId]);
+  return user && user.family_id && user.role === 'founder';
+}
+
+function updatePassword(email, newPassword) {
+  run('UPDATE users SET password = ? WHERE email = ?', [newPassword, email]);
+}
+
 function updateFamilyFounder(familyId, userId) {
   run('UPDATE families SET founder_id = ? WHERE id = ?', [userId, familyId]);
+}
+
+function updatePrice(code, price) {
+  run('UPDATE subscription_codes SET price = ? WHERE code = ?', [price, code]);
 }
 
 module.exports = {
@@ -338,4 +402,6 @@ module.exports = {
   createChallenge, respondToChallenge, completeChallenge,
   getFamilyChallenges, getPendingChallenges, getFamilyLeaderboard,
   generateSubscriptionCodes, updateFamilyFounder,
+  generatePremiumCode, getAvailablePremiumCodes, purchaseCode, getUserCodes, userHasFamily, updatePassword,
+  updatePrice,
 };

@@ -14,7 +14,7 @@
 <link rel="stylesheet" href="/styles.css">
 <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
 <script src="/i18n.js"></script>
-<script src="/app.js"></script>
+<script src="/app.js?v=2"></script>
 </head>
 <body>
 <!-- Splash Screen -->
@@ -64,6 +64,9 @@
       <div class="menu-nav-item" data-page="family" onclick="navigateTo('family');toggleMenu()">
         <span class="nav-icon">👨‍👩‍👧‍👦</span> العائلة
       </div>
+      <div class="menu-nav-item" id="menu-join-family" data-page="register" onclick="navigateTo('register');toggleMenu();switchRegTab('join')" style="display:none">
+        <span class="nav-icon">🤝</span> انضمام لعائلة
+      </div>
       <div class="menu-nav-item" data-page="diwaniya" onclick="navigateTo('diwaniya');toggleMenu()">
         <span class="nav-icon">🕌</span> الديوانية
       </div>
@@ -76,6 +79,9 @@
       </div>
       <div class="menu-nav-item" data-page="leaderboard" onclick="navigateTo('leaderboard');toggleMenu()">
         <span class="nav-icon">🏅</span> قادة النقاط
+      </div>
+      <div class="menu-nav-item" data-page="codes" onclick="navigateTo('codes');toggleMenu()">
+        <span class="nav-icon">🔑</span> رموزي
       </div>
     </div>
     <div class="menu-footer">
@@ -95,17 +101,18 @@
       <div class="auth-logo">👪</div>
       <div class="auth-welcome">مرحباً بعودتك</div>
       <div class="auth-desc">سجل الدخول للتواصل مع عائلتك</div>
-      <div class="auth-box">
+      <form novalidate><div class="auth-box">
         <div class="form-group">
           <label>البريد الإلكتروني</label>
-          <input class="form-input" id="login-email" type="text" inputmode="email" placeholder="example@email.com" dir="ltr" autocomplete="email">
+          <input class="form-input" id="login-email" type="text" inputmode="email" placeholder="example@email.com" dir="ltr" autocomplete="off">
         </div>
         <div class="form-group">
           <label>كلمة المرور</label>
-          <input class="form-input" id="login-password" type="password" placeholder="••••••••" dir="ltr" autocomplete="current-password">
+          <input class="form-input" id="login-password" type="password" placeholder="••••••••" dir="ltr" autocomplete="off">
         </div>
-        <button class="btn btn-primary btn-full" onclick="login()">دخول</button>
+        <button class="btn btn-primary btn-full" onclick="login()" type="button">دخول</button>
         <div class="auth-divider">أو</div>
+        <div class="pricing-nav-link" onclick="navigateTo('pricing')">💎 ميز عائلتك</div>
         <div class="auth-link">ليس لديك حساب؟ <span onclick="showAuth('register')">سجل الآن</span></div>
       </div>
     </div>
@@ -115,7 +122,7 @@
       <div class="auth-logo">👪</div>
       <div class="auth-welcome">انضم لعائلتك</div>
       <div class="auth-desc">أنشئ حسابك وابدأ الرحلة</div>
-      <div class="auth-box">
+      <form novalidate><div class="auth-box">
         <!-- Register Tabs -->
         <div class="reg-tabs">
           <button class="reg-tab active" data-tab="found" onclick="switchRegTab('found')">تأسيس عائلة</button>
@@ -138,17 +145,17 @@
           </div>
           <div class="form-group">
             <label>البريد الإلكتروني</label>
-            <input class="form-input" id="reg-found-email" type="text" inputmode="email" placeholder="example@email.com" dir="ltr" autocomplete="email">
+            <input class="form-input" id="reg-found-email" type="text" inputmode="email" placeholder="example@email.com" dir="ltr" autocomplete="off">
           </div>
           <div class="form-group">
             <label>رقم الجوال</label>
-            <input class="form-input" id="reg-found-phone" type="text" inputmode="tel" placeholder="05xxxxxxxx" dir="ltr" autocomplete="tel">
+            <input class="form-input" id="reg-found-phone" type="text" inputmode="tel" placeholder="05xxxxxxxx" dir="ltr" autocomplete="off">
           </div>
           <div class="form-group">
             <label>كلمة المرور</label>
-            <input class="form-input" id="reg-found-password" type="password" placeholder="••••••••" dir="ltr" autocomplete="new-password">
+            <input class="form-input" id="reg-found-password" type="password" placeholder="••••••••" dir="ltr" autocomplete="off">
           </div>
-          <button class="btn btn-primary btn-full" onclick="registerFound()">تأسيس العائلة</button>
+          <button class="btn btn-primary btn-full" onclick="registerFound()" type="button">تأسيس العائلة</button>
         </div>
 
         <!-- Join Family Form -->
@@ -163,16 +170,75 @@
           </div>
           <div class="form-group">
             <label>البريد الإلكتروني</label>
-            <input class="form-input" id="reg-join-email" type="text" inputmode="email" placeholder="example@email.com" dir="ltr" autocomplete="email">
+            <input class="form-input" id="reg-join-email" type="text" inputmode="email" placeholder="example@email.com" dir="ltr" autocomplete="off">
           </div>
           <div class="form-group">
             <label>كلمة المرور</label>
-            <input class="form-input" id="reg-join-password" type="password" placeholder="••••••••" dir="ltr" autocomplete="new-password">
+            <input class="form-input" id="reg-join-password" type="password" placeholder="••••••••" dir="ltr" autocomplete="off">
           </div>
-          <button class="btn btn-primary btn-full" onclick="registerJoin()">انضمام</button>
+          <button class="btn btn-primary btn-full" onclick="registerJoin()" type="button">انضمام</button>
         </div>
 
         <div class="auth-link">لديك حساب بالفعل؟ <span onclick="showAuth('login')">تسجيل دخول</span></div>
+      </div>
+    </div>
+
+    <!-- Pricing Page - ميز عائلتك -->
+    <div id="page-pricing" class="page-content auth-page">
+      <div class="auth-logo">💎</div>
+      <div class="auth-welcome">ميز عائلتك</div>
+      <div class="auth-desc">بطاقات رموز مميزة لعائلتك بسعر رمزي</div>
+      
+      <div class="pricing-cards">
+        <div class="pricing-card">
+          <div class="pricing-type">🎁 مجاني</div>
+          <div class="pricing-code-example">0X7K9M2F</div>
+          <div class="pricing-price">0 ريال</div>
+          <ul class="pricing-features">
+            <li>✅ رمز عشوائي 8 أحرف</li>
+            <li>✅ تأسيس عائلة واحدة</li>
+            <li>✅ الديوانية والمحادثة</li>
+            <li>✅ الألعاب والتحديات</li>
+          </ul>
+          <button class="btn btn-primary btn-full" onclick="handlePricingAction('free')">ابدأ مجاناً</button>
+        </div>
+        
+        <div class="pricing-card premium">
+          <div class="pricing-type">💎 مميز</div>
+          <div class="pricing-code-example">AAAAAAAA</div>
+          <div class="pricing-price"><span class="price-amount" id="pricing-premium-price">200</span> ريال</div>
+          <ul class="pricing-features">
+            <li>✅ رمز مميز 8 أحرف متكررة</li>
+            <li>✅ تأسيس عائلة واحدة</li>
+            <li>✅ الديوانية والمحادثة</li>
+            <li>✅ الألعاب والتحديات</li>
+            <li>💎 رمز سهل الحفظ والتميز</li>
+          </ul>
+          <button class="btn btn-accent btn-full" onclick="handlePricingAction('premium')">اشتري الآن</button>
+        </div>
+
+        <div class="pricing-card">
+          <div class="pricing-type">👑 مخصص</div>
+          <div class="pricing-code-example">FAMILY88</div>
+          <div class="pricing-price">500 ريال</div>
+          <ul class="pricing-features">
+            <li>✅ رمز مخصص من اختيارك</li>
+            <li>✅ تأسيس عائلة واحدة</li>
+            <li>✅ جميع الميزات السابقة</li>
+            <li>👑 رمز فريد لعائلتك</li>
+            <li>📞 دعم فني مباشر</li>
+          </ul>
+          <button class="btn btn-primary btn-full" onclick="handlePricingAction('custom')">تواصل معنا</button>
+        </div>
+      </div>
+      
+      <div class="auth-box" id="pricing-auth-note" style="text-align:center;margin-top:16px">
+        <p style="color:var(--text-secondary);font-size:14px">
+          👋 لديك حساب بالفعل؟ <span class="auth-link-inline" onclick="showAuth('login')">تسجيل دخول</span>
+        </p>
+        <p style="color:var(--text-muted);font-size:13px;margin-top:4px">
+          🔒 لا تحتاج حساب للمشاهدة. سجل مجاناً للشراء.
+        </p>
       </div>
     </div>
 
@@ -185,9 +251,15 @@
 
       <!-- Welcome Card -->
       <div class="card card-glow" id="welcome-card">
-        <div class="card-title">👋 مرحباً <span id="dashboard-user-name">!</span></div>
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <span style="font-size:14px;color:var(--text-secondary)">نقاطك</span>
+        <div class="welcome-header">
+          <div class="welcome-avatar" id="welcome-avatar">👤</div>
+          <div class="welcome-text">
+            <div class="card-title" id="dashboard-greeting">👋 مرحباً <span id="dashboard-user-name">!</span></div>
+            <div class="welcome-family" id="welcome-family"></div>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+          <span style="font-size:14px;color:var(--text-secondary)">⭐ نقاطك</span>
           <span style="font-size:32px;font-weight:900;color:var(--gold)" id="dashboard-points">0</span>
         </div>
       </div>
@@ -360,6 +432,36 @@
       </div>
     </div>
 
+    <!-- Codes Page -->
+    <div id="page-codes" class="page-content">
+      <div class="page-title">🔑 الرموز المميزة</div>
+      <div class="page-subtitle">إدارة رموز الاشتراك المميزة</div>
+      
+      <div class="card" id="premium-codes-section">
+        <div class="card-title">💎 رموز مميزة متاحة</div>
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">رمز مميز = 8 أحرف متكررة (مثل AAAAAAAA). السعر: قابل للتعديل</p>
+        <div class="premium-codes-grid" id="premium-codes-list">
+          <div class="empty-state"><div class="empty-text">لا توجد رموز متاحة حالياً</div></div>
+        </div>
+        <button class="btn btn-accent btn-full" onclick="generateNewPremiumCode()" style="margin-top:10px">🔄 توليد رمز مميز جديد</button>
+      </div>
+
+      <div class="card">
+        <div class="card-title">📋 رموزي المشتراة</div>
+        <div id="my-codes-list">
+          <div class="empty-state"><div class="empty-text">لا توجد رموز مشتراة</div></div>
+        </div>
+      </div>
+
+      <!-- Admin: All Codes with Price Editor -->
+      <div class="card" id="admin-codes-section">
+        <div class="card-title">⚙️ إدارة جميع الرموز <span style="font-size:12px;color:var(--text-muted)">(تعديل الأسعار)</span></div>
+        <div id="all-codes-admin">
+          <div class="empty-state"><div class="empty-text">جاري التحميل...</div></div>
+        </div>
+      </div>
+    </div>
+
   </main>
 </div>
 
@@ -388,10 +490,13 @@ function navigateTo(pageName) {
   const navItem = document.querySelector('.menu-nav-item[data-page="' + pageName + '"]');
   if (page) page.classList.add('active');
   if (navItem) navItem.classList.add('active');
-  const titles = { dashboard:'\u0627\u0644\u0631\u0626\u064a\u0633\u064a\u0629', family:'\u0627\u0644\u0639\u0627\u0626\u0644\u0629', diwaniya:'\u0627\u0644\u062f\u064a\u0648\u0627\u0646\u064a\u0629', games:'\u0627\u0644\u0623\u0644\u0639\u0627\u0628', challenges:'\u0627\u0644\u062a\u062d\u062f\u064a\u0627\u062a', leaderboard:'\u0642\u0627\u062f\u0629 \u0627\u0644\u0646\u0642\u0627\u0637', login:'\u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644', register:'\u0625\u0646\u0634\u0627\u0621 \u062d\u0633\u0627\u0628' };
+  const titles = { dashboard:'الرئيسية', family:'العائلة', diwaniya:'الديوانية', games:'الألعاب', challenges:'التحديات', leaderboard:'قادة النقاط', codes:'رموزي', login:'تسجيل الدخول', register:'إنشاء حساب' };
   const titleEl = document.getElementById('header-title-text');
   if (titleEl && titles[pageName]) titleEl.textContent = titles[pageName];
   toggleHeaderVisibility(pageName);
+  
+  // Load page-specific data
+  if (pageName === 'codes' && state.isLoggedIn) loadCodesPage();
 }
 
 function toggleHeaderVisibility(pageName) {
@@ -412,10 +517,99 @@ async function toggleLang() {
   await i18n.switch(newLang);
   const btn = document.getElementById('lang-toggle');
   if (btn) btn.textContent = newLang === 'ar' ? '🇸🇦' : '🇺🇸';
-  // Update all dynamic content then refresh page data
   document.querySelector('.splash-title').textContent = i18n.t('app.title');
   document.querySelector('.splash-subtitle').textContent = i18n.t('app.subtitle');
   if (state.isLoggedIn) navigateTo(document.querySelector('.page-content.active')?.id?.replace('page-','') || 'dashboard');
+}
+
+// ==================== CODES MANAGEMENT ====================
+async function loadCodesPage() {
+  try {
+    const [avail, my, allCodes] = await Promise.all([
+      api('GET', '/api/codes/available'),
+      api('GET', '/api/codes/my'),
+      api('GET', '/api/codes/admin/all'),
+    ]);
+    
+    const availList = document.getElementById('premium-codes-list');
+    if (avail.codes?.length) {
+      availList.innerHTML = avail.codes.map(c =>
+        '<div class="premium-code-card">' +
+          '<div class="premium-code-value">' + c.code + '</div>' +
+          '<div class="premium-code-price">' + (c.price || 200) + ' ريال</div>' +
+          '<button class="btn btn-sm btn-accent" onclick="purchaseCode(\'' + c.code + '\')">شراء</button>' +
+        '</div>'
+      ).join('');
+    } else {
+      availList.innerHTML = '<div class="empty-state"><div class="empty-text">لا توجد رموز متاحة حالياً</div></div>';
+    }
+    
+    const myList = document.getElementById('my-codes-list');
+    if (my.codes?.length) {
+      myList.innerHTML = my.codes.map(c =>
+        '<div class="premium-code-card owned">' +
+          '<div class="premium-code-value">' + c.code + '</div>' +
+          '<div class="premium-code-type">' + (c.type === 'premium' ? '💎 مميز' : '🎁 مجاني') + '</div>' +
+          '<div class="premium-code-date">' + (c.purchase_date || '') + '</div>' +
+        '</div>'
+      ).join('');
+    } else {
+      myList.innerHTML = '<div class="empty-state"><div class="empty-text">لا توجد رموز مشتراة</div></div>';
+    }
+    
+    // Admin: all codes with price editor
+    const adminDiv = document.getElementById('all-codes-admin');
+    if (allCodes.codes?.length) {
+      adminDiv.innerHTML = '<table class="admin-codes-table"><thead><tr><th>الرمز</th><th>النوع</th><th>الحالة</th><th>السعر (ريال)</th><th>تعديل</th></tr></thead><tbody>' +
+        allCodes.codes.map(c => {
+          const status = c.purchased_by ? 'مباع' : (c.used ? 'مستخدم' : 'متاح');
+          return '<tr>' +
+            '<td class="code-cell">' + c.code + '</td>' +
+            '<td>' + (c.type === 'premium' ? '💎 مميز' : '🎁 مجاني') + '</td>' +
+            '<td>' + status + '</td>' +
+            '<td><input type="number" class="price-input" id="price-' + c.code + '" value="' + (c.price || 0) + '" min="0"></td>' +
+            '<td><button class="btn btn-sm" onclick="updateCodePrice(\'' + c.code + '\')">💾 حفظ</button></td>' +
+            '</tr>';
+        }).join('') + '</tbody></table>';
+    } else {
+      adminDiv.innerHTML = '<div class="empty-state"><div class="empty-text">لا توجد رموز</div></div>';
+    }
+  } catch(e) {
+    console.error('Codes load error:', e);
+  }
+}
+
+async function updateCodePrice(code) {
+  const input = document.getElementById('price-' + code);
+  const price = parseInt(input.value);
+  if (isNaN(price) || price < 0) return showToast('السعر غير صالح', 'error');
+  try {
+    await api('POST', '/api/codes/admin/update-price', { code, price });
+    showToast('✅ تم تحديث سعر ' + code + ' إلى ' + price + ' ريال', 'success');
+  } catch(e) {
+    showToast(e.message || 'فشل', 'error');
+  }
+}
+
+async function generateNewPremiumCode() {
+  try {
+    const result = await api('POST', '/api/codes/generate-premium', {});
+    showToast('💎 تم توليد رمز مميز: ' + result.code, 'success');
+    loadCodesPage();
+  } catch(e) {
+    showToast(e.message || 'فشل التوليد', 'error');
+  }
+}
+
+async function purchaseCode(code) {
+  if (!confirm('شراء الرمز ' + code + ' بقيمة 200 ريال؟')) return;
+  try {
+    const result = await api('POST', '/api/codes/purchase', { code });
+    showToast('✅ ' + result.message, 'success');
+    loadCodesPage();
+  } catch(e) {
+    showToast(e.message || 'فشل الشراء', 'error');
+  }
 }
 
 function toggleMenu() {
@@ -432,6 +626,23 @@ function switchRegTab(tab) {
   document.getElementById(`reg-form-${tab}`)?.classList.add('active');
 }
 
+function handlePricingAction(type) {
+  if (state.isLoggedIn) {
+    if (type === 'free') {
+      navigateTo('register');
+      switchRegTab('found');
+    } else if (type === 'premium') {
+      navigateTo('codes');
+    } else if (type === 'custom') {
+      showToast('📞 تواصل معنا على البريد الإلكتروني', 'success');
+    }
+  } else {
+    // Not logged in - redirect to register
+    showToast('📝 سجل حساب مجاني أولاً', 'success');
+    setTimeout(() => navigateTo('register'), 800);
+  }
+}
+
 // ==================== TOAST ====================
 function showToast(message, type) {
   const toast = document.getElementById('toast');
@@ -442,5 +653,6 @@ function showToast(message, type) {
   clearTimeout(toast._hideTimeout);
   toast._hideTimeout = setTimeout(() => toast.classList.remove('show'), 2500);
 }
-</script>/body>
+</script>
+</body>
 </html>

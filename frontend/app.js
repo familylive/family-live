@@ -7,39 +7,65 @@ async function api(method, path, body = null) {
   const token = localStorage.getItem('token');
   if (token) opts.headers['Authorization'] = `Bearer ${token}`;
   if (body) opts.body = JSON.stringify(body);
-  const res = await fetch(`${API_BASE}${path}`, opts);
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'خطأ في الاتصال');
-  return data;
+  
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+  opts.signal = controller.signal;
+  
+  try {
+    const res = await fetch(`${API_BASE}${path}`, opts);
+    clearTimeout(timeoutId);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'خطأ في الاتصال');
+    return data;
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') throw new Error('انتهت مهلة الاتصال، تحقق من اتصالك');
+    if (err.message === 'Failed to fetch') throw new Error('تعذر الاتصال بالخادم، حاول مرة أخرى');
+    throw err;
+  }
 }
 
 // ==================== INIT ====================
-(function() {
-  window.addEventListener = function() {};
-  window.onload = function() {
-    setTimeout(() => {
-      const splash = document.getElementById('splash-screen');
-      if (!splash) return;
-      splash.classList.add('hide');
-      setTimeout(async () => {
-        document.getElementById('app').classList.add('visible');
-        splash.style.display = 'none';
-        const token = localStorage.getItem('token');
-        if (token) {
-          try {
-            const { user, family } = await api('GET', '/api/auth/verify');
-            await loadApp(user, family);
-          } catch(e) {
-            localStorage.removeItem('token');
-            showAuth('login');
-          }
-        } else {
-          showAuth('login');
-        }
-      }, 600);
-    }, 1200);
-  };
-  window.dispatchEvent(new Event('load'));
+(async function init() {
+  // Check for auto-login token in URL (query param or hash)
+  const params = new URLSearchParams(window.location.search);
+  const hash = window.location.hash;
+  let token = params.get('token') || (hash.startsWith('#token=') ? hash.replace('#token=', '') : null);
+  
+  if (token) {
+    localStorage.setItem('token', token);
+    // Clean URL after saving token
+    if (window.history.replaceState) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+    try {
+      const { user, family } = await api('GET', '/api/auth/verify');
+      await loadApp(user, family);
+      return;
+    } catch(e) { localStorage.removeItem('token'); }
+  }
+  
+  // Wait for splash, then check auth
+  await new Promise(r => setTimeout(r, 1500));
+  const splash = document.getElementById('splash-screen');
+  if (splash) splash.classList.add('hide');
+  await new Promise(r => setTimeout(r, 600));
+  document.getElementById('app').classList.add('visible');
+  if (splash) splash.style.display = 'none';
+  
+  const savedToken = localStorage.getItem('token');
+  if (savedToken) {
+    try {
+      const { user, family } = await api('GET', '/api/auth/verify');
+      await loadApp(user, family);
+    } catch(e) {
+      localStorage.removeItem('token');
+      showAuth('login');
+    }
+  } else {
+    showAuth('login');
+  }
 })();
 
 // ==================== AUTH ====================
@@ -155,6 +181,26 @@ function updateAllUI() {
   document.getElementById('menu-avatar').textContent = state.user?.avatar || '👤';
   document.getElementById('points-display').textContent = state.points || 0;
   document.getElementById('family-badge').textContent = state.family?.name || 'العائلة';
+
+  // Welcome greeting
+  const greeting = document.getElementById('dashboard-greeting');
+  const familyName = document.getElementById('welcome-family');
+  const avatar = document.getElementById('welcome-avatar');
+  if (avatar) avatar.textContent = state.user?.avatar || state.user?.name?.charAt(0) || '👤';
+  
+  if (state.family) {
+    if (greeting) greeting.textContent = '👋 مرحباً بك ' + (state.user?.name || '') + ' 🏡';
+    if (familyName) familyName.textContent = 'في عائلة ' + state.family.name;
+  } else if (state.isLoggedIn) {
+    if (greeting) greeting.textContent = '👋 مرحباً بك ' + (state.user?.name || '') + ' 🆕';
+    if (familyName) familyName.textContent = 'أنت جديد، استكشف التطبيق أو انضم لعائلة';
+  }
+
+  // Show/hide join family menu option
+  const joinMenu = document.getElementById('menu-join-family');
+  if (joinMenu) {
+    joinMenu.style.display = state.isLoggedIn && !state.family ? 'flex' : 'none';
+  }
 
   const inviteSection = document.getElementById('invite-section');
   const diwCtrl = document.getElementById('diwaniya-controls-card');
