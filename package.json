@@ -1,0 +1,13 @@
+{
+  "name": "family-live",
+  "version": "1.0.0",
+  "description": "تطبيق العائلة - Family Live",
+  "scripts": {
+    "start": "cd backend && node server.js",
+    "build": "cd backend && npm install",
+    "postinstall": "cd backend && npm install"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
