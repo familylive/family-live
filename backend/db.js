@@ -1,0 +1,341 @@
+const initSqlJs = require('sql.js');
+const path = require('path');
+const fs = require('fs');
+const { v4: uuidv4 } = require('uuid');
+
+const DB_PATH = path.join(__dirname, 'family_app.db');
+let db;
+let SQL;
+
+async function getDb() {
+  if (!db) {
+    SQL = await initSqlJs();
+    
+    if (fs.existsSync(DB_PATH)) {
+      const buffer = fs.readFileSync(DB_PATH);
+      db = new SQL.Database(buffer);
+    } else {
+      db = new SQL.Database();
+    }
+    
+    db.run('PRAGMA foreign_keys = ON');
+    initDb();
+    saveDb();
+  }
+  return db;
+}
+
+function saveDb() {
+  const data = db.export();
+  const buffer = Buffer.from(data);
+  fs.writeFileSync(DB_PATH, buffer);
+}
+
+function initDb() {
+  db.run(`
+    CREATE TABLE IF NOT EXISTS families (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      subscription_code TEXT NOT NULL UNIQUE,
+      founder_id TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+  db.run(`
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      email TEXT NOT NULL UNIQUE,
+      password TEXT NOT NULL,
+      phone TEXT,
+      family_id TEXT,
+      role TEXT NOT NULL DEFAULT 'member' CHECK(role IN ('founder', 'member')),
+      avatar TEXT DEFAULT '👤',
+      points INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (family_id) REFERENCES families(id)
+    )
+  `);
+  db.run(`
+    CREATE TABLE IF NOT EXISTS invitations (
+      id TEXT PRIMARY KEY,
+      family_id TEXT NOT NULL,
+      email TEXT NOT NULL,
+      invited_by TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'accepted', 'rejected', 'expired')),
+      token TEXT NOT NULL UNIQUE,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (family_id) REFERENCES families(id),
+      FOREIGN KEY (invited_by) REFERENCES users(id)
+    )
+  `);
+  db.run(`
+    CREATE TABLE IF NOT EXISTS diwaniya_sessions (
+      id TEXT PRIMARY KEY,
+      family_id TEXT NOT NULL,
+      opened_by TEXT NOT NULL,
+      opened_at TEXT DEFAULT (datetime('now')),
+      closed_at TEXT,
+      duration_minutes INTEGER NOT NULL DEFAULT 30,
+      status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open', 'closed')),
+      topic TEXT,
+      mode TEXT NOT NULL DEFAULT 'text' CHECK(mode IN ('text', 'audio', 'both')),
+      FOREIGN KEY (family_id) REFERENCES families(id),
+      FOREIGN KEY (opened_by) REFERENCES users(id)
+    )
+  `);
+  db.run(`
+    CREATE TABLE IF NOT EXISTS diwaniya_messages (
+      id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      message TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (session_id) REFERENCES diwaniya_sessions(id),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  `);
+  db.run(`
+    CREATE TABLE IF NOT EXISTS challenges (
+      id TEXT PRIMARY KEY,
+      family_id TEXT NOT NULL,
+      game_type TEXT NOT NULL CHECK(game_type IN ('ludo', 'carrom', 'quiz', 'memory')),
+      challenger_id TEXT NOT NULL,
+      opponent_id TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'accepted', 'rejected', 'completed', 'cancelled')),
+      winner_id TEXT,
+      points INTEGER DEFAULT 10,
+      challenger_score INTEGER DEFAULT 0,
+      opponent_score INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      completed_at TEXT,
+      FOREIGN KEY (family_id) REFERENCES families(id),
+      FOREIGN KEY (challenger_id) REFERENCES users(id),
+      FOREIGN KEY (opponent_id) REFERENCES users(id),
+      FOREIGN KEY (winner_id) REFERENCES users(id)
+    )
+  `);
+  db.run(`
+    CREATE TABLE IF NOT EXISTS subscription_codes (
+      code TEXT PRIMARY KEY,
+      used INTEGER DEFAULT 0,
+      family_id TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+}
+
+// Helper to run a query and return objects
+function queryAll(sql, params = []) {
+  const stmt = db.prepare(sql);
+  if (params.length > 0) stmt.bind(params);
+  const results = [];
+  while (stmt.step()) {
+    results.push(stmt.getAsObject());
+  }
+  stmt.free();
+  return results;
+}
+
+function queryOne(sql, params = []) {
+  const results = queryAll(sql, params);
+  return results.length > 0 ? results[0] : null;
+}
+
+function run(sql, params = []) {
+  db.run(sql, params);
+  saveDb();
+}
+
+// User functions
+function createUser(name, email, password, familyId, role = 'member') {
+  const id = uuidv4();
+  run('INSERT INTO users (id, name, email, password, family_id, role) VALUES (?, ?, ?, ?, ?, ?)', [id, name, email, password, familyId, role]);
+  return queryOne('SELECT id, name, email, family_id, role, points, avatar, created_at FROM users WHERE id = ?', [id]);
+}
+
+function getUserByEmail(email) {
+  return queryOne('SELECT * FROM users WHERE email = ?', [email]);
+}
+
+function getUserById(id) {
+  return queryOne('SELECT id, name, email, phone, family_id, role, avatar, points, created_at FROM users WHERE id = ?', [id]);
+}
+
+function getFamilyMembers(familyId) {
+  return queryAll('SELECT id, name, email, role, avatar, points FROM users WHERE family_id = ? ORDER BY role DESC, points DESC', [familyId]);
+}
+
+// Family functions
+function createFamily(name, subscriptionCode) {
+  const id = uuidv4();
+  const code = queryOne('SELECT * FROM subscription_codes WHERE code = ? AND (used = 0 OR used IS NULL)', [subscriptionCode]);
+  if (!code) return null;
+  run('INSERT INTO families (id, name, subscription_code) VALUES (?, ?, ?)', [id, name, subscriptionCode]);
+  run("UPDATE subscription_codes SET used = 1, family_id = ? WHERE code = ?", [id, subscriptionCode]);
+  return queryOne('SELECT * FROM families WHERE id = ?', [id]);
+}
+
+function getFamily(id) {
+  return queryOne('SELECT * FROM families WHERE id = ?', [id]);
+}
+
+function validateSubscriptionCode(code) {
+  return queryOne('SELECT * FROM subscription_codes WHERE code = ? AND (used = 0 OR used IS NULL)', [code]);
+}
+
+// Invitation functions
+function createInvitation(familyId, email, invitedBy) {
+  const id = uuidv4();
+  const token = uuidv4();
+  const existing = queryOne('SELECT * FROM invitations WHERE family_id = ? AND email = ? AND status = ?', [familyId, email, 'pending']);
+  if (existing) return null;
+  run('INSERT INTO invitations (id, family_id, email, invited_by, token) VALUES (?, ?, ?, ?, ?)', [id, familyId, email, invitedBy, token]);
+  return queryOne('SELECT * FROM invitations WHERE id = ?', [id]);
+}
+
+function getInvitationsByFamily(familyId) {
+  return queryAll(
+    'SELECT i.*, u.name as invited_by_name FROM invitations i JOIN users u ON i.invited_by = u.id WHERE i.family_id = ? ORDER BY i.created_at DESC',
+    [familyId]
+  );
+}
+
+function getInvitationByToken(token) {
+  return queryOne('SELECT * FROM invitations WHERE token = ? AND status = ?', [token, 'pending']);
+}
+
+function acceptInvitation(token, userId) {
+  const inv = queryOne('SELECT * FROM invitations WHERE token = ? AND status = ?', [token, 'pending']);
+  if (!inv) return null;
+  run('UPDATE invitations SET status = ? WHERE id = ?', ['accepted', inv.id]);
+  run('UPDATE users SET family_id = ? WHERE id = ?', [inv.family_id, userId]);
+  return inv;
+}
+
+// Diwaniya functions
+function openDiwaniya(familyId, userId, durationMinutes, topic = '', mode = 'text') {
+  const today = new Date().toISOString().split('T')[0];
+  const existingSessions = queryAll("SELECT * FROM diwaniya_sessions WHERE family_id = ? AND opened_at LIKE ? AND status = 'closed'", [familyId, today + '%']);
+  const totalMinutes = existingSessions.reduce((sum, s) => sum + s.duration_minutes, 0);
+  const maxDaily = 60;
+  if (totalMinutes + durationMinutes > maxDaily) {
+    return { error: 'المدة الإجمالية لليوم لا تتجاوز ساعة. المتبقي: ' + (maxDaily - totalMinutes) + ' دقيقة' };
+  }
+  const id = uuidv4();
+  run("INSERT INTO diwaniya_sessions (id, family_id, opened_by, duration_minutes, status, topic, mode) VALUES (?, ?, ?, ?, 'open', ?, ?)", [id, familyId, userId, durationMinutes, topic, mode]);
+  return queryOne('SELECT * FROM diwaniya_sessions WHERE id = ?', [id]);
+}
+
+function closeDiwaniya(sessionId) {
+  const session = queryOne("SELECT * FROM diwaniya_sessions WHERE id = ? AND status = 'open'", [sessionId]);
+  if (!session) return null;
+  run("UPDATE diwaniya_sessions SET status = 'closed', closed_at = datetime('now') WHERE id = ?", [sessionId]);
+  return queryOne('SELECT * FROM diwaniya_sessions WHERE id = ?', [sessionId]);
+}
+
+function getActiveDiwaniya(familyId) {
+  return queryOne("SELECT * FROM diwaniya_sessions WHERE family_id = ? AND status = 'open' ORDER BY opened_at DESC LIMIT 1", [familyId]);
+}
+
+function getDiwaniyaHistory(familyId) {
+  return queryAll('SELECT ds.*, u.name as opened_by_name FROM diwaniya_sessions ds JOIN users u ON ds.opened_by = u.id WHERE ds.family_id = ? ORDER BY ds.opened_at DESC LIMIT 20', [familyId]);
+}
+
+function addDiwaniyaMessage(sessionId, userId, message) {
+  const id = uuidv4();
+  run('INSERT INTO diwaniya_messages (id, session_id, user_id, message) VALUES (?, ?, ?, ?)', [id, sessionId, userId, message]);
+  return queryOne('SELECT dm.*, u.name as user_name, u.avatar FROM diwaniya_messages dm JOIN users u ON dm.user_id = u.id WHERE dm.id = ?', [id]);
+}
+
+function getDiwaniyaMessages(sessionId) {
+  return queryAll('SELECT dm.*, u.name as user_name, u.avatar FROM diwaniya_messages dm JOIN users u ON dm.user_id = u.id WHERE dm.session_id = ? ORDER BY dm.created_at ASC', [sessionId]);
+}
+
+// Challenge functions
+function createChallenge(familyId, gameType, challengerId, opponentId, points = 10) {
+  const id = uuidv4();
+  run('INSERT INTO challenges (id, family_id, game_type, challenger_id, opponent_id, points) VALUES (?, ?, ?, ?, ?, ?)', [id, familyId, gameType, challengerId, opponentId, points]);
+  return getChallengeById(id);
+}
+
+function getChallengeById(id) {
+  return queryOne(
+    'SELECT c.*, u1.name as challenger_name, u2.name as opponent_name FROM challenges c JOIN users u1 ON c.challenger_id = u1.id JOIN users u2 ON c.opponent_id = u2.id WHERE c.id = ?',
+    [id]
+  );
+}
+
+function respondToChallenge(challengeId, userId, accept) {
+  const challenge = queryOne("SELECT * FROM challenges WHERE id = ? AND status = 'pending'", [challengeId]);
+  if (!challenge || challenge.opponent_id !== userId) return null;
+  const status = accept ? 'accepted' : 'rejected';
+  run('UPDATE challenges SET status = ? WHERE id = ?', [status, challengeId]);
+  return getChallengeById(challengeId);
+}
+
+function completeChallenge(challengeId, winnerId, challengerScore, opponentScore) {
+  const challenge = queryOne("SELECT * FROM challenges WHERE id = ? AND status = 'accepted'", [challengeId]);
+  if (!challenge) return null;
+  run("UPDATE challenges SET status = 'completed', winner_id = ?, challenger_score = ?, opponent_score = ?, completed_at = datetime('now') WHERE id = ?",
+    [winnerId, challengerScore, opponentScore, challengeId]);
+  if (winnerId) {
+    run('UPDATE users SET points = points + ? WHERE id = ?', [challenge.points, winnerId]);
+    const loserId = winnerId === challenge.challenger_id ? challenge.opponent_id : challenge.challenger_id;
+    run('UPDATE users SET points = points + ? WHERE id = ?', [Math.floor(challenge.points / 2), loserId]);
+  }
+  return queryOne(
+    'SELECT c.*, u1.name as challenger_name, u2.name as opponent_name, uw.name as winner_name FROM challenges c JOIN users u1 ON c.challenger_id = u1.id JOIN users u2 ON c.opponent_id = u2.id LEFT JOIN users uw ON c.winner_id = uw.id WHERE c.id = ?',
+    [challengeId]
+  );
+}
+
+function getFamilyChallenges(familyId) {
+  return queryAll(
+    'SELECT c.*, u1.name as challenger_name, u2.name as opponent_name, uw.name as winner_name FROM challenges c JOIN users u1 ON c.challenger_id = u1.id JOIN users u2 ON c.opponent_id = u2.id LEFT JOIN users uw ON c.winner_id = uw.id WHERE c.family_id = ? ORDER BY c.created_at DESC LIMIT 50',
+    [familyId]
+  );
+}
+
+function getPendingChallenges(userId) {
+  return queryAll(
+    "SELECT c.*, u1.name as challenger_name, u2.name as opponent_name FROM challenges c JOIN users u1 ON c.challenger_id = u1.id JOIN users u2 ON c.opponent_id = u2.id WHERE c.opponent_id = ? AND c.status = 'pending' ORDER BY c.created_at DESC",
+    [userId]
+  );
+}
+
+function getFamilyLeaderboard(familyId) {
+  return queryAll(`
+    SELECT id, name, avatar, points, role,
+      (SELECT COUNT(*) FROM challenges WHERE (challenger_id = users.id OR opponent_id = users.id) AND winner_id = users.id) as wins,
+      (SELECT COUNT(*) FROM challenges WHERE (challenger_id = users.id OR opponent_id = users.id) AND status = 'completed') as total_games
+    FROM users WHERE family_id = ? ORDER BY points DESC
+  `, [familyId]);
+}
+
+function generateSubscriptionCodes(count = 1) {
+  const codes = [];
+  for (let i = 0; i < count; i++) {
+    const code = uuidv4().substring(0, 8).toUpperCase();
+    try {
+      run('INSERT OR IGNORE INTO subscription_codes (code) VALUES (?)', [code]);
+      codes.push(code);
+    } catch(e) { /* ignore duplicates */ }
+  }
+  return codes;
+}
+
+function updateFamilyFounder(familyId, userId) {
+  run('UPDATE families SET founder_id = ? WHERE id = ?', [userId, familyId]);
+}
+
+module.exports = {
+  getDb, createUser, getUserByEmail, getUserById, getFamilyMembers,
+  createFamily, getFamily, validateSubscriptionCode,
+  createInvitation, getInvitationsByFamily, getInvitationByToken, acceptInvitation,
+  openDiwaniya, closeDiwaniya, getActiveDiwaniya, getDiwaniyaHistory,
+  addDiwaniyaMessage, getDiwaniyaMessages,
+  createChallenge, respondToChallenge, completeChallenge,
+  getFamilyChallenges, getPendingChallenges, getFamilyLeaderboard,
+  generateSubscriptionCodes, updateFamilyFounder,
+};

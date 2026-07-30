@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#1a1a2e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="العائلة">
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<title>العائلة</title>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+<script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+<script src="/i18n.js"></script>
+<script src="/app.js"></script>
+</head>
+<body>
+<!-- Splash Screen -->
+<div id="splash-screen">
+  <div class="splash-icon">👪</div>
+  <div class="splash-title">العائلة</div>
+  <div class="splash-subtitle">تواصل عائلتنا في كل مكان</div>
+  <div class="splash-loader"><div class="splash-loader-bar"></div></div>
+</div>
+
+<!-- Toast Notification -->
+<div id="toast" class="toast"></div>
+
+<!-- App Shell -->
+<div id="app">
+
+  <!-- Header -->
+  <header class="header" id="app-header">
+    <button class="menu-btn" onclick="toggleMenu()" aria-label="القائمة">☰</button>
+    <div class="header-title">
+      <span id="header-title-text">العائلة</span>
+      <span class="family-badge" id="family-badge">العائلة</span>
+    </div>
+    <div class="header-points" id="header-points">
+      <span class="points-icon">⭐</span>
+      <span id="points-display">0</span>
+    </div>
+    <button class="lang-btn" id="lang-toggle" onclick="toggleLang()" title="تغيير اللغة">🇸🇦</button>
+  </header>
+
+  <!-- Side Menu Overlay -->
+  <div class="menu-overlay" id="menu-overlay" onclick="toggleMenu()"></div>
+
+  <!-- Side Menu -->
+  <nav class="side-menu" id="side-menu">
+    <div class="menu-header">
+      <div class="menu-avatar" id="menu-avatar">👤</div>
+      <div class="menu-user-info">
+        <div class="menu-user-name" id="menu-user-name">الاسم</div>
+        <div class="menu-user-role" id="menu-user-role">عضو</div>
+      </div>
+    </div>
+    <div class="menu-nav">
+      <div class="menu-nav-item" data-page="dashboard" onclick="navigateTo('dashboard');toggleMenu()">
+        <span class="nav-icon">📊</span> الرئيسية
+      </div>
+      <div class="menu-nav-item" data-page="family" onclick="navigateTo('family');toggleMenu()">
+        <span class="nav-icon">👨‍👩‍👧‍👦</span> العائلة
+      </div>
+      <div class="menu-nav-item" data-page="diwaniya" onclick="navigateTo('diwaniya');toggleMenu()">
+        <span class="nav-icon">🕌</span> الديوانية
+      </div>
+      <div class="menu-nav-item" data-page="games" onclick="navigateTo('games');toggleMenu()">
+        <span class="nav-icon">🎮</span> الألعاب
+        <span class="nav-badge" id="game-challenge-badge" style="display:none">!</span>
+      </div>
+      <div class="menu-nav-item" data-page="challenges" onclick="navigateTo('challenges');toggleMenu()">
+        <span class="nav-icon">🏆</span> التحديات
+      </div>
+      <div class="menu-nav-item" data-page="leaderboard" onclick="navigateTo('leaderboard');toggleMenu()">
+        <span class="nav-icon">🏅</span> قادة النقاط
+      </div>
+    </div>
+    <div class="menu-footer">
+      <button class="logout-btn" onclick="logout()">
+        تسجيل الخروج ←
+      </button>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="main-content">
+
+    <!-- ==================== AUTH PAGES ==================== -->
+
+    <!-- Login Page -->
+    <div id="page-login" class="page-content auth-page active">
+      <div class="auth-logo">👪</div>
+      <div class="auth-welcome">مرحباً بعودتك</div>
+      <div class="auth-desc">سجل الدخول للتواصل مع عائلتك</div>
+      <div class="auth-box">
+        <div class="form-group">
+          <label>البريد الإلكتروني</label>
+          <input class="form-input" id="login-email" type="text" inputmode="email" placeholder="example@email.com" dir="ltr" autocomplete="email">
+        </div>
+        <div class="form-group">
+          <label>كلمة المرور</label>
+          <input class="form-input" id="login-password" type="password" placeholder="••••••••" dir="ltr" autocomplete="current-password">
+        </div>
+        <button class="btn btn-primary btn-full" onclick="login()">دخول</button>
+        <div class="auth-divider">أو</div>
+        <div class="auth-link">ليس لديك حساب؟ <span onclick="showAuth('register')">سجل الآن</span></div>
+      </div>
+    </div>
+
+    <!-- Register Page -->
+    <div id="page-register" class="page-content auth-page">
+      <div class="auth-logo">👪</div>
+      <div class="auth-welcome">انضم لعائلتك</div>
+      <div class="auth-desc">أنشئ حسابك وابدأ الرحلة</div>
+      <div class="auth-box">
+        <!-- Register Tabs -->
+        <div class="reg-tabs">
+          <button class="reg-tab active" data-tab="found" onclick="switchRegTab('found')">تأسيس عائلة</button>
+          <button class="reg-tab" data-tab="join" onclick="switchRegTab('join')">انضمام لعائلة</button>
+        </div>
+
+        <!-- Found Family Form -->
+        <div class="reg-form active" id="reg-form-found">
+          <div class="form-group">
+            <label>اسم العائلة</label>
+            <input class="form-input" id="reg-family-name" type="text" placeholder="العائلة الكريمة">
+          </div>
+          <div class="form-group">
+            <label>رمز الاشتراك</label>
+            <input class="form-input" id="reg-sub-code" type="text" placeholder="XXXX-XXXX" dir="ltr">
+          </div>
+          <div class="form-group">
+            <label>الاسم</label>
+            <input class="form-input" id="reg-found-name" type="text" placeholder="اسمك الكامل">
+          </div>
+          <div class="form-group">
+            <label>البريد الإلكتروني</label>
+            <input class="form-input" id="reg-found-email" type="text" inputmode="email" placeholder="example@email.com" dir="ltr" autocomplete="email">
+          </div>
+          <div class="form-group">
+            <label>رقم الجوال</label>
+            <input class="form-input" id="reg-found-phone" type="text" inputmode="tel" placeholder="05xxxxxxxx" dir="ltr" autocomplete="tel">
+          </div>
+          <div class="form-group">
+            <label>كلمة المرور</label>
+            <input class="form-input" id="reg-found-password" type="password" placeholder="••••••••" dir="ltr" autocomplete="new-password">
+          </div>
+          <button class="btn btn-primary btn-full" onclick="registerFound()">تأسيس العائلة</button>
+        </div>
+
+        <!-- Join Family Form -->
+        <div class="reg-form" id="reg-form-join">
+          <div class="form-group">
+            <label>رمز الدعوة</label>
+            <input class="form-input" id="reg-invite-token" type="text" placeholder="أدخل رمز الدعوة" dir="ltr">
+          </div>
+          <div class="form-group">
+            <label>الاسم</label>
+            <input class="form-input" id="reg-join-name" type="text" placeholder="اسمك الكامل">
+          </div>
+          <div class="form-group">
+            <label>البريد الإلكتروني</label>
+            <input class="form-input" id="reg-join-email" type="text" inputmode="email" placeholder="example@email.com" dir="ltr" autocomplete="email">
+          </div>
+          <div class="form-group">
+            <label>كلمة المرور</label>
+            <input class="form-input" id="reg-join-password" type="password" placeholder="••••••••" dir="ltr" autocomplete="new-password">
+          </div>
+          <button class="btn btn-primary btn-full" onclick="registerJoin()">انضمام</button>
+        </div>
+
+        <div class="auth-link">لديك حساب بالفعل؟ <span onclick="showAuth('login')">تسجيل دخول</span></div>
+      </div>
+    </div>
+
+    <!-- ==================== MAIN APP PAGES ==================== -->
+
+    <!-- Dashboard Page -->
+    <div id="page-dashboard" class="page-content">
+      <div class="page-title">الرئيسية</div>
+      <div class="page-subtitle">نشاط عائلتك اليوم</div>
+
+      <!-- Welcome Card -->
+      <div class="card card-glow" id="welcome-card">
+        <div class="card-title">👋 مرحباً <span id="dashboard-user-name">!</span></div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:14px;color:var(--text-secondary)">نقاطك</span>
+          <span style="font-size:32px;font-weight:900;color:var(--gold)" id="dashboard-points">0</span>
+        </div>
+      </div>
+
+      <!-- Stats Grid -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value" id="stat-members">0</div>
+          <div class="stat-label">الأعضاء</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="stat-challenges">0</div>
+          <div class="stat-label">التحديات</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="stat-diwaniya">متوقفة</div>
+          <div class="stat-label">الديوانية</div>
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="card">
+        <div class="card-title">⭐ إجراءات سريعة</div>
+        <div class="quick-grid">
+          <div class="quick-item" onclick="navigateTo('diwaniya')">
+            <div class="quick-icon">🕌</div>
+            <div class="quick-label">الديوانية</div>
+          </div>
+          <div class="quick-item" onclick="navigateTo('games')">
+            <div class="quick-icon">🎮</div>
+            <div class="quick-label">الألعاب</div>
+          </div>
+          <div class="quick-item" onclick="navigateTo('family')">
+            <div class="quick-icon">👨‍👩‍👧‍👦</div>
+            <div class="quick-label">العائلة</div>
+          </div>
+          <div class="quick-item" onclick="navigateTo('leaderboard')">
+            <div class="quick-icon">🏅</div>
+            <div class="quick-label">المتصدرون</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent Challenges -->
+      <div class="card">
+        <div class="card-title">🏆 آخر التحديات</div>
+        <div id="recent-challenges-list">
+          <div class="empty-state"><div class="empty-text">لا توجد تحديات بعد</div></div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+    <!-- Family Page -->
+    <div id="page-family" class="page-content">
+      <div class="page-title">العائلة</div>
+      <div class="page-subtitle">أفراد عائلتك وإدارة الدعوات</div>
+      <div class="card" id="family-founder-card">
+        <div class="card-title">👑 المؤسس</div>
+        <div style="display:flex;align-items:center;gap:12px">
+          <div class="member-avatar" id="founder-avatar" style="width:48px;height:48px;font-size:20px">👤</div>
+          <div><div class="member-name" id="founder-name" style="font-size:16px">الاسم</div><span class="member-role-tag">المؤسس</span></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">👥 الأعضاء (<span id="members-count">0</span>)</div>
+        <div id="members-list"><div class="empty-state"><div class="empty-text">لا يوجد أعضاء بعد</div></div></div>
+      </div>
+      <div class="card" id="invite-section" style="display:none">
+        <div class="card-title">📨 دعوة أعضاء جدد</div>
+        <div id="invite-inputs"><div class="invite-input-group"><input class="form-input" type="text" inputmode="email" placeholder="example@email.com" dir="ltr"></div></div>
+        <button class="btn btn-secondary btn-sm" onclick="addInviteInput()" style="margin-bottom:10px">+ إضافة بريد آخر</button>
+        <button class="btn btn-primary btn-full" onclick="sendInvites()">إرسال الدعوات</button>
+      </div>
+      <div class="card">
+        <div class="card-title">📬 الدعوات المرسلة</div>
+        <div id="invitations-list"><div class="empty-state"><div class="empty-text">لا توجد دعوات مرسلة</div></div></div>
+      </div>
+    </div>
+
+    <!-- Diwaniya Page -->
+    <div id="page-diwaniya" class="page-content">
+      <div class="page-title">الديوانية</div>
+      <div class="page-subtitle">مجلس العائلة الافتراضي</div>
+      <div class="card" id="diwaniya-controls-card">
+        <div class="card-title">🎛️ التحكم</div>
+        <div class="diwaniya-controls">
+          <select class="form-input" id="diwaniya-duration">
+            <option value="15">15 دقيقة</option><option value="30" selected>30 دقيقة</option>
+            <option value="45">45 دقيقة</option><option value="60">60 دقيقة</option>
+          </select>
+          <input class="form-input" id="diwaniya-topic" type="text" placeholder="موضوع الجلسة (اختياري)" style="flex:1">
+          <select class="form-input" id="diwaniya-mode">
+            <option value="text">✍️ كتابي فقط</option>
+            <option value="audio">🎤 صوتي فقط</option>
+            <option value="both" selected>📝🎤 كتابي + صوتي</option>
+          </select>
+          <button class="btn btn-primary" id="diwaniya-toggle-btn" onclick="toggleDiwaniya()">🔓 فتح الديوانية</button>
+        </div>
+      </div>
+      <div class="timer-display idle" id="timer-display">
+        <div class="timer-num" id="timer-num">--:--</div>
+        <div class="timer-label">الديوانية مغلقة</div>
+      </div>
+      <div class="card">
+        <div class="card-title">💬 المحادثة</div>
+        <div id="live-audio-section" class="live-audio-section" style="display:none">
+          <div class="call-controls" id="call-controls" style="display:none">
+            <div class="call-participants" id="call-participants">
+              <div class="call-participant"><span class="call-dot"></span> أنت</div>
+            </div>
+            <div class="call-timer" id="call-timer">00:00</div>
+          </div>
+          <button class="btn btn-accent btn-full" id="join-audio-btn" onclick="joinLiveAudio()">🎤 انضم للمكالمة الصوتية</button>
+        </div>
+        <div class="chat-room" id="chat-room"><div class="empty-state"><div class="empty-text">افتح الديوانية لبدء المحادثة</div></div></div>
+        <div class="chat-input">
+          <input class="form-input" id="chat-input-field" type="text" placeholder="اكتب رسالتك..." disabled>
+          <button class="btn btn-primary" id="chat-send-btn" onclick="sendChat()" disabled>إرسال</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">📜 جلسات سابقة</div>
+        <div id="session-history"><div class="empty-state"><div class="empty-text">لا توجد جلسات سابقة</div></div></div>
+      </div>
+    </div>
+
+    <!-- Games Page -->
+    <div id="page-games" class="page-content">
+      <div class="page-title">🎮 الألعاب</div>
+      <div class="page-subtitle">اختر لعبتك وتحدى عائلتك</div>
+      <div class="games-grid">
+        <div class="game-card" onclick="startGame('ludo')"><div class="game-emoji">🎲</div><div class="game-name">لودو</div><div class="game-players">2-4 لاعبين</div></div>
+        <div class="game-card" onclick="startGame('carrom')"><div class="game-emoji">🎯</div><div class="game-name">كاروم</div><div class="game-players">2-4 لاعبين</div></div>
+        <div class="game-card" onclick="startGame('quiz')"><div class="game-emoji">🧠</div><div class="game-name">مسابقة</div><div class="game-players">2-8 لاعبين</div></div>
+        <div class="game-card" onclick="startGame('memory')"><div class="game-emoji">🃏</div><div class="game-name">الذاكرة</div><div class="game-players">2-4 لاعبين</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">⚔️ تحدٍ جديد</div>
+        <div class="form-group"><label>نوع اللعبة</label><select class="form-input" id="challenge-game-type"><option value="ludo">🎲 لودو</option><option value="carrom">🎯 كاروم</option><option value="quiz">🧠 مسابقة</option><option value="memory">🃏 الذاكرة</option></select></div>
+        <div class="form-group"><label>الخصم</label><select class="form-input" id="challenge-opponent"><option value="">اختر عضواً</option></select></div>
+        <div class="form-group"><label>نقاط التحدي</label><input class="form-input" id="challenge-points" type="number" value="10" min="1" max="100"></div>
+        <button class="btn btn-primary btn-full" onclick="sendChallenge()">إرسال التحدي</button>
+      </div>
+      <div class="card">
+        <div class="card-title">⏳ تحديات معلقة</div>
+        <div id="pending-challenges-list"><div class="empty-state"><div class="empty-text">لا توجد تحديات معلقة</div></div></div>
+      </div>
+    </div>
+
+    <!-- Challenges Page -->
+    <div id="page-challenges" class="page-content">
+      <div class="page-title">🏆 التحديات</div>
+      <div class="page-subtitle">سجل التحديات كاملاً</div>
+      <div class="card">
+        <div class="card-title">📋 جميع التحديات</div>
+        <div id="all-challenges-table"><div class="empty-state"><div class="empty-text">لا توجد تحديات بعد</div></div></div>
+      </div>
+    </div>
+
+    <!-- Leaderboard Page -->
+    <div id="page-leaderboard" class="page-content">
+      <div class="page-title">🏅 قادة النقاط</div>
+      <div class="page-subtitle">أكثر الأعضاء نشاطاً وتفاعلاً</div>
+      <div class="card">
+        <table class="leaderboard-table">
+          <thead><tr><th>#</th><th>اللاعب</th><th>النقاط</th><th>الفوز</th><th>الألعاب</th></tr></thead>
+          <tbody id="leaderboard-body"><tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px">لا توجد بيانات بعد</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+// ==================== APP STATE ====================
+const state = {
+  user: null, family: null, isFounder: false, points: 0, isLoggedIn: false,
+  diwaniyaOpen: false, diwaniyaTimer: null, diwaniyaRemaining: 0,
+  activeSession: null,
+  members: [], challenges: [], pendingChallenges: [], invites: [], leaderboard: []
+};
+
+// ==================== SPLASH ====================
+window.addEventListener('load', () => {
+  setTimeout(() => {
+    const splash = document.getElementById('splash-screen');
+    if (splash) splash.classList.add('hide');
+  }, 1500);
+});
+
+// ==================== NAVIGATION ====================
+function navigateTo(pageName) {
+  document.querySelectorAll('.page-content').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.menu-nav-item').forEach(i => i.classList.remove('active'));
+  const page = document.getElementById('page-' + pageName);
+  const navItem = document.querySelector('.menu-nav-item[data-page="' + pageName + '"]');
+  if (page) page.classList.add('active');
+  if (navItem) navItem.classList.add('active');
+  const titles = { dashboard:'\u0627\u0644\u0631\u0626\u064a\u0633\u064a\u0629', family:'\u0627\u0644\u0639\u0627\u0626\u0644\u0629', diwaniya:'\u0627\u0644\u062f\u064a\u0648\u0627\u0646\u064a\u0629', games:'\u0627\u0644\u0623\u0644\u0639\u0627\u0628', challenges:'\u0627\u0644\u062a\u062d\u062f\u064a\u0627\u062a', leaderboard:'\u0642\u0627\u062f\u0629 \u0627\u0644\u0646\u0642\u0627\u0637', login:'\u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644', register:'\u0625\u0646\u0634\u0627\u0621 \u062d\u0633\u0627\u0628' };
+  const titleEl = document.getElementById('header-title-text');
+  if (titleEl && titles[pageName]) titleEl.textContent = titles[pageName];
+  toggleHeaderVisibility(pageName);
+}
+
+function toggleHeaderVisibility(pageName) {
+  const header = document.getElementById('app-header');
+  if (pageName === 'login' || pageName === 'register') {
+    if (header) header.style.display = 'none';
+    document.querySelector('.main-content').style.paddingTop = '0';
+  } else {
+    if (header) header.style.display = 'flex';
+    document.querySelector('.main-content').style.paddingTop = 'var(--header-h)';
+  }
+}
+
+function showAuth(page) { navigateTo(page); }
+
+async function toggleLang() {
+  const newLang = i18n.lang === 'ar' ? 'en' : 'ar';
+  await i18n.switch(newLang);
+  const btn = document.getElementById('lang-toggle');
+  if (btn) btn.textContent = newLang === 'ar' ? '🇸🇦' : '🇺🇸';
+  // Update all dynamic content then refresh page data
+  document.querySelector('.splash-title').textContent = i18n.t('app.title');
+  document.querySelector('.splash-subtitle').textContent = i18n.t('app.subtitle');
+  if (state.isLoggedIn) navigateTo(document.querySelector('.page-content.active')?.id?.replace('page-','') || 'dashboard');
+}
+
+function toggleMenu() {
+  const menu = document.getElementById('side-menu');
+  const overlay = document.getElementById('menu-overlay');
+  if (menu) menu.classList.toggle('open');
+  if (overlay) overlay.classList.toggle('open');
+}
+
+function switchRegTab(tab) {
+  document.querySelectorAll('.reg-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.reg-form').forEach(f => f.classList.remove('active'));
+  document.querySelector(`.reg-tab[data-tab="${tab}"]`)?.classList.add('active');
+  document.getElementById(`reg-form-${tab}`)?.classList.add('active');
+}
+
+// ==================== TOAST ====================
+function showToast(message, type) {
+  const toast = document.getElementById('toast');
+  if (!toast) return;
+  toast.textContent = message;
+  toast.className = 'toast' + (type ? ' ' + type : '');
+  toast.classList.add('show');
+  clearTimeout(toast._hideTimeout);
+  toast._hideTimeout = setTimeout(() => toast.classList.remove('show'), 2500);
+}
+</script>/body>
+</html>
