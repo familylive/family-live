@@ -9,6 +9,3 @@ services:
     buildCommand: cd backend && npm install
     startCommand: cd backend && node server.js
     healthCheckPath: /
-    envVarGroups:
-      - key: node_version
-        value: 18
