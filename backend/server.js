@@ -22,7 +22,7 @@ app.use(cors());
 app.use(express.json({ limit: '5mb' }));
 
 // No-cache headers for frontend files
-app.use((req, res, next) => {
+app.use(async (req, res, next) => {
   if (req.path.endsWith('.html') || req.path.endsWith('.js') || req.path.endsWith('.css')) {
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.setHeader('Pragma', 'no-cache');
@@ -50,7 +50,7 @@ function authMiddleware(req, res, next) {
 // =============== AUTH ROUTES ===============
 
 // Register
-app.post('/api/auth/register', (req, res) => {
+app.post('/api/auth/register', async (req, res) => {
   const { name, email, password, subscriptionCode, familyName } = req.body;
   
   if (!name || !email || !password) {
@@ -58,7 +58,7 @@ app.post('/api/auth/register', (req, res) => {
   }
 
   // Check if user exists
-  const existing = db.getUserByEmail(email);
+  const existing = await db.getUserByEmail(email);
   if (existing) {
     return res.status(400).json({ error: 'البريد الإلكتروني مسجل مسبقاً' });
   }
@@ -73,17 +73,17 @@ app.post('/api/auth/register', (req, res) => {
       return res.status(400).json({ error: 'لديك عائلة بالفعل. يمكنك إنشاء عائلة واحدة فقط.' });
     }
     
-    const validCode = db.validateSubscriptionCode(subscriptionCode);
+    const validCode = await db.validateSubscriptionCode(subscriptionCode);
     if (!validCode) {
       return res.status(400).json({ error: 'رمز الاشتراك غير صالح أو مستخدم مسبقاً' });
     }
     
-    const family = db.createFamily(familyName, subscriptionCode);
+    const family = await db.createFamily(familyName, subscriptionCode);
     if (!family) {
       return res.status(400).json({ error: 'فشل في إنشاء العائلة' });
     }
     
-    const user = db.createUser(name, email, hashedPassword, family.id, 'founder');
+    const user = await db.createUser(name, email, hashedPassword, family.id, 'founder');
     // Update family with founder
     db.updateFamilyFounder(family.id, user.id);
     
@@ -102,25 +102,25 @@ app.post('/api/auth/register', (req, res) => {
 });
 
 // Register via invitation
-app.post('/api/auth/register-invited', (req, res) => {
+app.post('/api/auth/register-invited', async (req, res) => {
   const { name, email, password, token } = req.body;
   
   if (!name || !email || !password || !token) {
     return res.status(400).json({ error: 'يرجى تعبئة جميع الحقول' });
   }
 
-  const invitation = db.getInvitationByToken(token);
+  const invitation = await db.getInvitationByToken(token);
   if (!invitation) {
     return res.status(400).json({ error: 'الدعوة غير صالحة أو منتهية' });
   }
 
-  const existing = db.getUserByEmail(email);
+  const existing = await db.getUserByEmail(email);
   if (existing) {
     return res.status(400).json({ error: 'البريد الإلكتروني مسجل مسبقاً' });
   }
 
   const hashedPassword = bcrypt.hashSync(password, 10);
-  const user = db.createUser(name, email, hashedPassword, invitation.family_id, 'member');
+  const user = await db.createUser(name, email, hashedPassword, invitation.family_id, 'member');
   
   // Accept invitation
   db.acceptInvitation(token, user.id);
@@ -135,14 +135,14 @@ app.post('/api/auth/register-invited', (req, res) => {
 });
 
 // Login
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body;
   
   if (!email || !password) {
     return res.status(400).json({ error: 'يرجى إدخال البريد وكلمة المرور' });
   }
 
-  const user = db.getUserByEmail(email);
+  const user = await db.getUserByEmail(email);
   if (!user) {
     return res.status(400).json({ error: 'البريد غير مسجل' });
   }
@@ -152,7 +152,7 @@ app.post('/api/auth/login', (req, res) => {
   }
   
   // Check active ban
-  const activeBan = db.getActiveBan(user.id);
+  const activeBan = await db.getActiveBan(user.id);
   if (activeBan) {
     return res.status(403).json({ banned: true, reason: activeBan.reason, banned_until: activeBan.banned_until });
   }
@@ -180,8 +180,8 @@ app.post('/api/auth/login', (req, res) => {
 });
 
 // Verify token
-app.get('/api/auth/verify', authMiddleware, (req, res) => {
-  const user = db.getUserById(req.user.id);
+app.get('/api/auth/verify', authMiddleware, async (req, res) => {
+  const user = await db.getUserById(req.user.id);
   if (!user) return res.status(404).json({ error: 'المستخدم غير موجود' });
   db.updateLastSeen(req.user.id);
   res.json({ user, family: user.family_id ? db.getFamily(user.family_id) : null });
@@ -190,13 +190,13 @@ app.get('/api/auth/verify', authMiddleware, (req, res) => {
 // =============== CODES ROUTES ===============
 
 // Get available premium codes
-app.get('/api/codes/available', authMiddleware, (req, res) => {
-  const codes = db.getAvailablePremiumCodes();
+app.get('/api/codes/available', authMiddleware, async (req, res) => {
+  const codes = await db.getAvailablePremiumCodes();
   res.json({ codes });
 });
 
 // Purchase a premium code
-app.post('/api/codes/purchase', authMiddleware, (req, res) => {
+app.post('/api/codes/purchase', authMiddleware, async (req, res) => {
   const { code } = req.body;
   if (!code) return res.status(400).json({ error: 'الرمز مطلوب' });
   const result = db.purchaseCode(req.user.id, code);
@@ -220,7 +220,7 @@ app.get('/api/codes/my', authMiddleware, async (req, res) => {
 app.post('/api/auth/forgot-password', async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: 'البريد الإلكتروني مطلوب' });
-  const user = db.getUserByEmail(email);
+  const user = await db.getUserByEmail(email);
   if (!user) return res.status(404).json({ error: 'البريد غير مسجل' });
   const resetToken = require('uuid').v4();
   res.json({ message: 'تم إرسال رابط إعادة تعيين كلمة المرور', devToken: resetToken });
@@ -230,7 +230,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
 app.post('/api/auth/reset-password', async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'البريد وكلمة المرور مطلوبان' });
-  const user = db.getUserByEmail(email);
+  const user = await db.getUserByEmail(email);
   if (!user) return res.status(404).json({ error: 'البريد غير مسجل' });
   const hashedPassword = bcrypt.hashSync(password, 10);
   db.updatePassword(email, hashedPassword);
@@ -362,7 +362,7 @@ app.post('/api/admin/ads/add', authMiddleware, adminOrModerator, (req, res) => {
 });
 
 // Admin: update ad
-app.post('/api/admin/ads/update', authMiddleware, adminOrModerator, (req, res) => {
+app.post('/api/admin/ads/update', authMiddleware, adminOrModerator, async (req, res) => {
   const { id, title, image_url, link_url, status } = req.body;
   if (!id) return res.status(400).json({ error: 'معرف الإعلان مطلوب' });
   const ad = db.updateAd(id, title, image_url || '', link_url || '', status || 'active');
@@ -370,7 +370,7 @@ app.post('/api/admin/ads/update', authMiddleware, adminOrModerator, (req, res) =
 });
 
 // Admin: delete ad
-app.post('/api/admin/ads/delete', authMiddleware, adminOrModerator, (req, res) => {
+app.post('/api/admin/ads/delete', authMiddleware, adminOrModerator, async (req, res) => {
   const { id } = req.body;
   if (!id) return res.status(400).json({ error: 'معرف الإعلان مطلوب' });
   db.deleteAd(id);
@@ -459,7 +459,7 @@ app.post('/api/profile/switch-family', authMiddleware, async (req, res) => {
   const exists = families.find(f => f.family_id === familyId);
   if (!exists) return res.status(400).json({ error: 'أنت غير مشترك في هذه العائلة' });
   
-  const family = db.getFamily(familyId);
+  const family = await db.getFamily(familyId);
   if (!family || family.status === 'inactive') return res.status(400).json({ error: 'العائلة غير متاحة' });
   
   db.setCurrentFamily(req.user.id, familyId);
@@ -524,7 +524,7 @@ app.post('/api/family/join-by-code', authMiddleware, async (req, res) => {
   const joinPrice = parseInt(db.getSetting('join_family_price', '20'));
   
   // Already in this family?
-  const existing = db.getUserFamilies(req.user.id).find(f => f.family_id === family.id);
+  const existing = await db.getUserFamilies(req.user.id).find(f => f.family_id === family.id);
   if (existing) return res.status(400).json({ error: 'أنت بالفعل في هذه العائلة' });
   
   if (count >= 5) return res.status(400).json({ error: 'وصلت للحد الأقصى 5 عوائل' });
@@ -566,12 +566,12 @@ app.post('/api/family/join', authMiddleware, async (req, res) => {
     return res.status(400).json({ error: 'وصلت للحد الأقصى 5 عوائل' });
   }
   
-  const family = db.getFamily(familyId);
+  const family = await db.getFamily(familyId);
   if (!family) return res.status(400).json({ error: 'العائلة غير موجودة' });
   if (family.status === 'inactive') return res.status(400).json({ error: 'العائلة موقوفة' });
   
   // Already in this family?
-  const existing = db.getUserFamilies(req.user.id).find(f => f.family_id === familyId);
+  const existing = await db.getUserFamilies(req.user.id).find(f => f.family_id === familyId);
   if (existing) return res.status(400).json({ error: 'أنت بالفعل في هذه العائلة' });
   
   // 1st family free, 2nd+ requires payment
@@ -602,13 +602,13 @@ app.post('/api/family/join', authMiddleware, async (req, res) => {
 // =============== ANNOUNCEMENTS & LAST SEEN ===============
 
 // Update last seen (call on auth)
-app.get('/api/auth/verify', (req, res, next) => {
+app.get('/api/auth/verify', async (req, res, next) => {
   // Original verify handler runs below - just update last_seen
   next();
 });
 
 // Create announcement (founder)
-app.post('/api/announcements/create', authMiddleware, (req, res) => {
+app.post('/api/announcements/create', authMiddleware, async (req, res) => {
   if (!req.user.familyId) return res.status(400).json({ error: 'لا يوجد عائلة' });
   const { title, content, announceType, targetUserId, eventTime } = req.body;
   if (!title) return res.status(400).json({ error: 'عنوان الإعلان مطلوب' });
@@ -623,14 +623,14 @@ app.post('/api/announcements/create', authMiddleware, (req, res) => {
 });
 
 // Get announcements for current user
-app.get('/api/announcements', authMiddleware, (req, res) => {
+app.get('/api/announcements', authMiddleware, async (req, res) => {
   if (!req.user.familyId) return res.json({ announcements: [] });
   const announcements = db.getAnnouncementsForUser(req.user.familyId, req.user.id);
   res.json({ announcements });
 });
 
 // Delete/dismiss announcement
-app.post('/api/announcements/delete', authMiddleware, (req, res) => {
+app.post('/api/announcements/delete', authMiddleware, async (req, res) => {
   const { id } = req.body;
   db.deleteAnnouncement(id);
   res.json({ message: 'تم' });
@@ -680,14 +680,14 @@ app.post('/api/admin/violations/add', authMiddleware, adminMiddleware, (req, res
 });
 
 // Get all violations (admin)
-app.get('/api/admin/violations', authMiddleware, adminMiddleware, (req, res) => {
+app.get('/api/admin/violations', authMiddleware, adminMiddleware, async (req, res) => {
   const violations = db.getAllViolations();
   const stats = db.getViolationStats();
   res.json({ violations, stats });
 });
 
 // Moderation settings (admin)
-app.get('/api/admin/moderation-settings', authMiddleware, adminMiddleware, (req, res) => {
+app.get('/api/admin/moderation-settings', authMiddleware, adminMiddleware, async (req, res) => {
   res.json(db.getModerationSettings());
 });
 app.post('/api/admin/moderation-settings', authMiddleware, adminMiddleware, async (req, res) => {
@@ -723,7 +723,7 @@ app.get('/api/support-messages', authMiddleware, async (req, res) => {
 
 // Moderator: send predefined message in diwaniya during visit
 app.post('/api/moderator/send-message', authMiddleware, async (req, res) => {
-  const user = db.getUserById(req.user.id);
+  const user = await db.getUserById(req.user.id);
   if (user.role !== 'moderator' && user.role !== 'admin') {
     return res.status(403).json({ error: 'فقط المشرفون' });
   }
@@ -748,26 +748,26 @@ app.post('/api/moderator/send-message', authMiddleware, async (req, res) => {
 });
 
 // Support tickets (users → admin only)
-app.post('/api/support/ticket', authMiddleware, (req, res) => {
+app.post('/api/support/ticket', authMiddleware, async (req, res) => {
   const { subject, message } = req.body;
   if (!message) return res.status(400).json({ error: 'نص الرسالة مطلوب' });
-  const user = db.getUserById(req.user.id);
+  const user = await db.getUserById(req.user.id);
   const ticket = db.createSupportTicket(req.user.id, user.name, subject || 'استفسار', message);
   res.json({ message: '📨 تم إرسال رسالتك للإدارة', ticket });
 });
-app.get('/api/support/my-tickets', authMiddleware, (req, res) => {
+app.get('/api/support/my-tickets', authMiddleware, async (req, res) => {
   res.json({ tickets: db.getMyTickets(req.user.id) });
 });
-app.get('/api/admin/support-tickets', authMiddleware, adminMiddleware, (req, res) => {
+app.get('/api/admin/support-tickets', authMiddleware, adminMiddleware, async (req, res) => {
   res.json({ tickets: db.getSupportTickets() });
 });
-app.post('/api/admin/support-tickets/reply', authMiddleware, adminMiddleware, (req, res) => {
+app.post('/api/admin/support-tickets/reply', authMiddleware, adminMiddleware, async (req, res) => {
   const { ticketId, reply } = req.body;
   if (!ticketId || !reply) return res.status(400).json({ error: 'الرد مطلوب' });
   db.replyTicket(ticketId, reply);
   res.json({ message: '✅ تم إرسال الرد' });
 });
-app.post('/api/admin/support-tickets/close', authMiddleware, adminMiddleware, (req, res) => {
+app.post('/api/admin/support-tickets/close', authMiddleware, adminMiddleware, async (req, res) => {
   const { ticketId } = req.body;
   db.closeTicket(ticketId);
   res.json({ message: 'تم إغلاق التذكرة' });
@@ -776,12 +776,12 @@ app.post('/api/admin/support-tickets/close', authMiddleware, adminMiddleware, (r
 // =============== USERS MANAGEMENT (ADMIN) ===============
 
 // Get all users detailed (admin)
-app.get('/api/admin/users-detailed', authMiddleware, adminMiddleware, (req, res) => {
+app.get('/api/admin/users-detailed', authMiddleware, adminMiddleware, async (req, res) => {
   res.json({ users: db.getAllUsersDetailed() });
 });
 
 // Update user (admin) - edit, promote/demote
-app.post('/api/admin/users/update', authMiddleware, adminMiddleware, (req, res) => {
+app.post('/api/admin/users/update', authMiddleware, adminMiddleware, async (req, res) => {
   const { userId, name, email, whatsapp, phone, role } = req.body;
   if (!userId) return res.status(400).json({ error: 'معرف المستخدم مطلوب' });
   const result = db.updateUserByAdmin(userId, { name, email, whatsapp, phone, role });
@@ -790,7 +790,7 @@ app.post('/api/admin/users/update', authMiddleware, adminMiddleware, (req, res) 
 });
 
 // Delete user (admin)
-app.post('/api/admin/users/delete', authMiddleware, adminMiddleware, (req, res) => {
+app.post('/api/admin/users/delete', authMiddleware, adminMiddleware, async (req, res) => {
   const { userId } = req.body;
   if (!userId) return res.status(400).json({ error: 'معرف المستخدم مطلوب' });
   db.deleteUserByAdmin(userId);
@@ -800,15 +800,15 @@ app.post('/api/admin/users/delete', authMiddleware, adminMiddleware, (req, res) 
 // =============== MODERATOR STARS & TIERS ===============
 
 // Moderator profile (stars, tier, visits, rating)
-app.get('/api/moderator/profile', authMiddleware, (req, res) => {
-  const profile = db.getModeratorProfile(req.user.id);
+app.get('/api/moderator/profile', authMiddleware, async (req, res) => {
+  const profile = await db.getModeratorProfile(req.user.id);
   const tier = profile ? db.getModeratorTier(profile.stars || 0) : 'none';
   res.json({ profile, tier, tierSettings: db.getTierSettings() });
 });
 
 // Award stars on visit exit (every visit = stars)
 // Rate moderator (family members rate 1-5 after moderator exits)
-app.post('/api/moderator/rate', authMiddleware, (req, res) => {
+app.post('/api/moderator/rate', authMiddleware, async (req, res) => {
   const { moderatorId, visitId, rating, comment } = req.body;
   if (!moderatorId || !rating || rating < 1 || rating > 5) {
     return res.status(400).json({ error: 'التقييم من 1 إلى 5 نجوم' });
@@ -821,10 +821,10 @@ app.post('/api/moderator/rate', authMiddleware, (req, res) => {
 });
 
 // Admin: tier settings management
-app.get('/api/admin/tier-settings', authMiddleware, adminMiddleware, (req, res) => {
+app.get('/api/admin/tier-settings', authMiddleware, adminMiddleware, async (req, res) => {
   res.json({ settings: db.getTierSettings() });
 });
-app.post('/api/admin/tier-settings', authMiddleware, adminMiddleware, (req, res) => {
+app.post('/api/admin/tier-settings', authMiddleware, adminMiddleware, async (req, res) => {
   const { black, blue, silver, gold, platinum, stars_per_visit } = req.body;
   if (black) db.setSetting('tier_black', black);
   if (blue) db.setSetting('tier_blue', blue);
@@ -836,7 +836,7 @@ app.post('/api/admin/tier-settings', authMiddleware, adminMiddleware, (req, res)
 });
 
 // Admin: upgrade moderator tier manually
-app.post('/api/admin/moderator/tier', authMiddleware, adminMiddleware, (req, res) => {
+app.post('/api/admin/moderator/tier', authMiddleware, adminMiddleware, async (req, res) => {
   const { userId, tier } = req.body;
   if (!userId || !['none','black','blue','silver','gold','platinum'].includes(tier)) {
     return res.status(400).json({ error: 'بيانات غير صحيحة' });
@@ -850,7 +850,7 @@ app.post('/api/admin/moderator/tier', authMiddleware, adminMiddleware, (req, res
 
 // Moderator: request visit to diwaniya (with reason)
 app.post('/api/moderator/visit/request', authMiddleware, async (req, res) => {
-  const user = db.getUserById(req.user.id);
+  const user = await db.getUserById(req.user.id);
   if (user.role !== 'moderator' && user.role !== 'admin') {
     return res.status(403).json({ error: 'فقط المشرفون يمكنهم طلب الزيارة' });
   }
@@ -858,7 +858,7 @@ app.post('/api/moderator/visit/request', authMiddleware, async (req, res) => {
   if (!familyId || !reason) return res.status(400).json({ error: 'العائلة وسبب الزيارة مطلوبان' });
   const visit = db.requestModeratorVisit(req.user.id, user.name, familyId, reason);
   // Notify the family diwaniya (if active)
-  const active = db.getActiveDiwaniya(familyId);
+  const active = await db.getActiveDiwaniya(familyId);
   if (active) {
     io.to(`family_${familyId}`).emit('moderator_visit_requested', {
       moderatorName: user.name,
@@ -876,7 +876,7 @@ app.post('/api/moderator/visit/enter', authMiddleware, async (req, res) => {
   const visit = db.enterModeratorVisit(visitId);
   if (!visit) return res.status(400).json({ error: 'الزيارة غير موجودة' });
   // Save system message in the active diwaniya
-  const active = db.getActiveDiwaniya(visit.family_id);
+  const active = await db.getActiveDiwaniya(visit.family_id);
   if (active) {
     try { db.addDiwaniyaMessage(active.id, visit.moderator_id, '🕵️ دخل المشرف ' + (visit.moderator_name||'') + ' للزيارة التفقدية (مراقب - لا يشارك)'); } catch(e) {}
   }
@@ -905,12 +905,12 @@ app.post('/api/moderator/visit/enter', authMiddleware, async (req, res) => {
 });
 
 // Moderator: exit + send report
-app.post('/api/moderator/visit/exit', authMiddleware, (req, res) => {
+app.post('/api/moderator/visit/exit', authMiddleware, async (req, res) => {
   const { visitId, report } = req.body;
   const visit = db.exitModeratorVisit(visitId, report);
   if (!visit) return res.status(400).json({ error: 'الزيارة غير موجودة' });
   // Save exit system message
-  const active = db.getActiveDiwaniya(visit.family_id);
+  const active = await db.getActiveDiwaniya(visit.family_id);
   if (active) {
     try { db.addDiwaniyaMessage(active.id, visit.moderator_id, '📋 أنهى المشرف ' + (visit.moderator_name||'') + ' الزيارة التفقدية'); } catch(e) {}
   }
@@ -935,8 +935,8 @@ app.post('/api/moderator/visit/exit', authMiddleware, (req, res) => {
 });
 
 // Moderator: online families with active diwaniya (only these can be visited)
-app.get('/api/moderator/online-families', authMiddleware, (req, res) => {
-  const user = db.getUserById(req.user.id);
+app.get('/api/moderator/online-families', authMiddleware, async (req, res) => {
+  const user = await db.getUserById(req.user.id);
   if (user.role !== 'moderator' && user.role !== 'admin') {
     return res.status(403).json({ error: 'فقط المشرفون' });
   }
@@ -945,26 +945,26 @@ app.get('/api/moderator/online-families', authMiddleware, (req, res) => {
 });
 
 // Moderator: my visits
-app.get('/api/moderator/visits', authMiddleware, (req, res) => {
+app.get('/api/moderator/visits', authMiddleware, async (req, res) => {
   res.json({ visits: db.getModeratorVisitsByUser(req.user.id) });
 });
 
 // Admin: all moderator visits
-app.get('/api/admin/moderator-visits', authMiddleware, adminMiddleware, (req, res) => {
+app.get('/api/admin/moderator-visits', authMiddleware, adminMiddleware, async (req, res) => {
   res.json({ visits: db.getModeratorVisits() });
 });
 
 // =============== AGREEMENTS ROUTES ===============
 
 // Get my agreement status
-app.get('/api/agreements/status', authMiddleware, (req, res) => {
-  const ag = db.getAgreement(req.user.id);
+app.get('/api/agreements/status', authMiddleware, async (req, res) => {
+  const ag = await db.getAgreement(req.user.id);
   res.json({ agreement: ag, canOpenDiwaniya: db.canOpenDiwaniya(req.user.id) });
 });
 
 // Accept agreement (permanent)
-app.post('/api/agreements/accept', authMiddleware, (req, res) => {
-  const user = db.getUserById(req.user.id);
+app.post('/api/agreements/accept', authMiddleware, async (req, res) => {
+  const user = await db.getUserById(req.user.id);
   const role = user && user.can_open_diwaniya == 1 ? 'manager' : (req.user.role === 'founder' ? 'founder' : 'member');
   const ag = db.acceptAgreement(req.user.id, req.user.familyId, role);
   if (ag.agreed == 0) return res.status(403).json({ error: 'لا يمكن تغيير قرار الرفض' });
@@ -972,8 +972,8 @@ app.post('/api/agreements/accept', authMiddleware, (req, res) => {
 });
 
 // Reject agreement (permanent - cannot open diwaniya ever)
-app.post('/api/agreements/reject', authMiddleware, (req, res) => {
-  const user = db.getUserById(req.user.id);
+app.post('/api/agreements/reject', authMiddleware, async (req, res) => {
+  const user = await db.getUserById(req.user.id);
   const role = user && user.can_open_diwaniya == 1 ? 'manager' : (req.user.role === 'founder' ? 'founder' : 'member');
   const ag = db.rejectAgreement(req.user.id, req.user.familyId, role);
   res.json({ message: 'تم تسجيل رفضك - لن تستطيع فتح الديوانية', agreement: ag });
@@ -1109,7 +1109,7 @@ app.post('/api/auctions/bid', authMiddleware, (req, res) => {
 });
 
 // Admin: create auction
-app.post('/api/admin/auctions/create', authMiddleware, adminMiddleware, (req, res) => {
+app.post('/api/admin/auctions/create', authMiddleware, adminMiddleware, async (req, res) => {
   const { code, startingPrice, entryFee, durationMinutes, minIncrement } = req.body;
   if (!code || !startingPrice || !entryFee || !durationMinutes) {
     return res.status(400).json({ error: 'جميع الحقول مطلوبة' });
@@ -1120,19 +1120,19 @@ app.post('/api/admin/auctions/create', authMiddleware, adminMiddleware, (req, re
 });
 
 // Get available codes for auction (admin)
-app.get('/api/admin/auctions/available-codes', authMiddleware, adminMiddleware, (req, res) => {
+app.get('/api/admin/auctions/available-codes', authMiddleware, adminMiddleware, async (req, res) => {
   const codes = db.getAvailableAuctionCodes();
   res.json({ codes });
 });
 
 // Admin: all auctions
-app.get('/api/admin/auctions', authMiddleware, adminMiddleware, (req, res) => {
+app.get('/api/admin/auctions', authMiddleware, adminMiddleware, async (req, res) => {
   const auctions = db.getAllAuctions();
   res.json({ auctions });
 });
 
 // Admin: end auction
-app.post('/api/admin/auctions/end', authMiddleware, adminMiddleware, (req, res) => {
+app.post('/api/admin/auctions/end', authMiddleware, adminMiddleware, async (req, res) => {
   const { auctionId } = req.body;
   const auction = db.endAuction(auctionId);
   if (!auction) return res.status(400).json({ error: 'المزاد غير متاح' });
@@ -1140,7 +1140,7 @@ app.post('/api/admin/auctions/end', authMiddleware, adminMiddleware, (req, res) 
 });
 
 // Admin: confirm payment
-app.post('/api/admin/auctions/confirm-payment', authMiddleware, adminMiddleware, (req, res) => {
+app.post('/api/admin/auctions/confirm-payment', authMiddleware, adminMiddleware, async (req, res) => {
   const { auctionId } = req.body;
   const auction = db.confirmAuctionPayment(auctionId);
   if (!auction) return res.status(400).json({ error: 'المزاد غير موجود' });
@@ -1148,7 +1148,7 @@ app.post('/api/admin/auctions/confirm-payment', authMiddleware, adminMiddleware,
 });
 
 // Admin: cancel auction
-app.post('/api/admin/auctions/cancel', authMiddleware, adminMiddleware, (req, res) => {
+app.post('/api/admin/auctions/cancel', authMiddleware, adminMiddleware, async (req, res) => {
   const { auctionId } = req.body;
   const auction = db.cancelAuction(auctionId);
   if (!auction) return res.status(400).json({ error: 'المزاد غير موجود' });
@@ -1158,9 +1158,9 @@ app.post('/api/admin/auctions/cancel', authMiddleware, adminMiddleware, (req, re
 // =============== FAMILY ROUTES ===============
 
 // Get family info
-app.get('/api/family', authMiddleware, (req, res) => {
+app.get('/api/family', authMiddleware, async (req, res) => {
   if (!req.user.familyId) return res.status(400).json({ error: 'لا يوجد عائلة' });
-  const family = db.getFamily(req.user.familyId);
+  const family = await db.getFamily(req.user.familyId);
   const members = db.getFamilyMembers(req.user.familyId);
   const invitations = db.getInvitationsByFamily(req.user.familyId);
   const founder = db.getUserById(family.founder_id);
@@ -1168,7 +1168,7 @@ app.get('/api/family', authMiddleware, (req, res) => {
 });
 
 // Send invitations
-app.post('/api/family/invite', authMiddleware, (req, res) => {
+app.post('/api/family/invite', authMiddleware, async (req, res) => {
   if (req.user.role !== 'founder') {
     return res.status(403).json({ error: 'فقط مؤسس العائلة يمكنه إرسال الدعوات' });
   }
@@ -1197,7 +1197,7 @@ app.post('/api/family/invite', authMiddleware, (req, res) => {
 });
 
 // Get family invitations
-app.get('/api/family/invitations', authMiddleware, (req, res) => {
+app.get('/api/family/invitations', authMiddleware, async (req, res) => {
   if (!req.user.familyId) return res.status(400).json({ error: 'لا يوجد عائلة' });
   const invitations = db.getInvitationsByFamily(req.user.familyId);
   res.json({ invitations });
@@ -1206,8 +1206,8 @@ app.get('/api/family/invitations', authMiddleware, (req, res) => {
 // =============== DIWANIYA ROUTES ===============
 
 // Open diwaniya
-app.post('/api/diwaniya/open', authMiddleware, (req, res) => {
-  const userFull = db.getUserById(req.user.id);
+app.post('/api/diwaniya/open', authMiddleware, async (req, res) => {
+  const userFull = await db.getUserById(req.user.id);
   const isFounder = req.user.role === 'founder';
   const isManager = userFull && userFull.can_open_diwaniya == 1;
   if (!isFounder && !isManager) {
@@ -1215,7 +1215,7 @@ app.post('/api/diwaniya/open', authMiddleware, (req, res) => {
   }
   
   // Check agreement - rejected users can NEVER open diwaniya
-  const ag = db.getAgreement(req.user.id);
+  const ag = await db.getAgreement(req.user.id);
   if (ag && ag.agreed == 0) {
     return res.status(403).json({ error: '❌ لم توافق على اتفاقية استخدام البرنامج، لا يمكنك فتح الديوانية أبداً' });
   }
@@ -1261,8 +1261,8 @@ app.post('/api/diwaniya/open', authMiddleware, (req, res) => {
 });
 
 // Close diwaniya
-app.post('/api/diwaniya/close/:sessionId', authMiddleware, (req, res) => {
-  const userFull = db.getUserById(req.user.id);
+app.post('/api/diwaniya/close/:sessionId', authMiddleware, async (req, res) => {
+  const userFull = await db.getUserById(req.user.id);
   const isFounder = req.user.role === 'founder';
   const isManager = userFull && userFull.can_open_diwaniya == 1;
   if (!isFounder && !isManager) {
@@ -1277,28 +1277,28 @@ app.post('/api/diwaniya/close/:sessionId', authMiddleware, (req, res) => {
 });
 
 // Get active diwaniya + lockdown status
-app.get('/api/diwaniya/active', authMiddleware, (req, res) => {
+app.get('/api/diwaniya/active', authMiddleware, async (req, res) => {
   if (!req.user.familyId) return res.status(400).json({ error: 'لا يوجد عائلة' });
-  const session = db.getActiveDiwaniya(req.user.familyId);
+  const session = await db.getActiveDiwaniya(req.user.familyId);
   const lock = db.getDiwaniyaLock(req.user.familyId);
   res.json({ session, lock });
 });
 
 // Get diwaniya history
-app.get('/api/diwaniya/history', authMiddleware, (req, res) => {
+app.get('/api/diwaniya/history', authMiddleware, async (req, res) => {
   if (!req.user.familyId) return res.status(400).json({ error: 'لا يوجد عائلة' });
   const history = db.getDiwaniyaHistory(req.user.familyId);
   res.json({ history });
 });
 
 // Get diwaniya messages
-app.get('/api/diwaniya/messages/:sessionId', authMiddleware, (req, res) => {
+app.get('/api/diwaniya/messages/:sessionId', authMiddleware, async (req, res) => {
   const messages = db.getDiwaniyaMessages(req.params.sessionId);
   res.json({ messages });
 });
 
 // Send message to diwaniya (REST fallback)
-app.post('/api/diwaniya/message', authMiddleware, (req, res) => {
+app.post('/api/diwaniya/message', authMiddleware, async (req, res) => {
   const { sessionId, message } = req.body;
   if (!sessionId || !message) return res.status(400).json({ error: 'الرسالة مطلوبة' });
   
@@ -1314,7 +1314,7 @@ app.post('/api/diwaniya/message', authMiddleware, (req, res) => {
     return res.status(400).json({ error: '🚫 تحتوي الرسالة على كلمة ممنوعة، تم حجبها', bannedWord: banned });
   }
   
-  const result = db.addDiwaniyaMessage(sessionId, req.user.id, message);
+  const result = await db.addDiwaniyaMessage(sessionId, req.user.id, message);
   io.to(`session_${sessionId}`).emit('diwaniya_message', result);
   res.json(result);
 });
@@ -1346,7 +1346,7 @@ app.post('/api/challenges/respond/:challengeId', authMiddleware, (req, res) => {
 });
 
 // Complete challenge
-app.post('/api/challenges/complete/:challengeId', authMiddleware, (req, res) => {
+app.post('/api/challenges/complete/:challengeId', authMiddleware, async (req, res) => {
   const { winnerId, challengerScore, opponentScore } = req.body;
   const challenge = db.completeChallenge(req.params.challengeId, winnerId, challengerScore, opponentScore);
   if (!challenge) return res.status(404).json({ error: 'التحدي غير موجود' });
@@ -1359,7 +1359,7 @@ app.post('/api/challenges/complete/:challengeId', authMiddleware, (req, res) => 
 });
 
 // Get family challenges
-app.get('/api/challenges', authMiddleware, (req, res) => {
+app.get('/api/challenges', authMiddleware, async (req, res) => {
   if (!req.user.familyId) return res.status(400).json({ error: 'لا يوجد عائلة' });
   const challenges = db.getFamilyChallenges(req.user.familyId);
   const pending = db.getPendingChallenges(req.user.id);
@@ -1368,7 +1368,7 @@ app.get('/api/challenges', authMiddleware, (req, res) => {
 
 // =============== LEADERBOARD ===============
 
-app.get('/api/leaderboard', authMiddleware, (req, res) => {
+app.get('/api/leaderboard', authMiddleware, async (req, res) => {
   if (!req.user.familyId) return res.status(400).json({ error: 'لا يوجد عائلة' });
   const leaderboard = db.getFamilyLeaderboard(req.user.familyId);
   res.json({ leaderboard });
@@ -1376,7 +1376,7 @@ app.get('/api/leaderboard', authMiddleware, (req, res) => {
 
 // =============== VALIDATE SUBSCRIPTION CODE ===============
 
-app.post('/api/validate-code', (req, res) => {
+app.post('/api/validate-code', async (req, res) => {
   const { code } = req.body;
   if (!code) return res.status(400).json({ error: 'الرمز مطلوب' });
   const valid = db.validateSubscriptionCode(code);
@@ -1388,29 +1388,29 @@ app.post('/api/validate-code', (req, res) => {
 io.on('connection', (socket) => {
   console.log('Socket connected:', socket.id);
 
-  socket.on('join_family', (familyId) => {
+  socket.on('join_family', async (familyId) => {
     socket.join(`family_${familyId}`);
     console.log(`Socket ${socket.id} joined family ${familyId}`);
   });
 
-  socket.on('join_user', (userId) => {
+  socket.on('join_user', async (userId) => {
     socket.userId = userId;
     socket.join(`user_${userId}`);
     onlineUsers.add(userId);
     console.log(`🟢 ${userId} online`);
     // Notify family members that this user is online
-    const user = db.getUserById(userId);
+    const user = await db.getUserById(userId);
     if (user && user.family_id) {
       io.to(`family_${user.family_id}`).emit('user_online', { userId, name: user.name });
     }
   });
 
-  socket.on('join_session', (sessionId) => {
+  socket.on('join_session', async (sessionId) => {
     socket.join(`session_${sessionId}`);
     console.log(`Socket ${socket.id} joined session ${sessionId}`);
   });
 
-  socket.on('diwaniya_message', (data) => {
+  socket.on('diwaniya_message', async (data) => {
     const { sessionId, userId, message } = data;
     // Moderator is observer only
     const sender = db.getUserById(userId);
@@ -1427,10 +1427,10 @@ io.on('connection', (socket) => {
       });
       return;
     }
-    const result = db.addDiwaniyaMessage(sessionId, userId, message);
+    const result = await db.addDiwaniyaMessage(sessionId, userId, message);
     if (result) {
       io.to(`session_${sessionId}`).emit('diwaniya_message', result);
-      const user = db.getUserById(userId);
+      const user = await db.getUserById(userId);
       if (user?.family_id) {
         io.to(`family_${user.family_id}`).emit('diwaniya_activity', {
           sessionId, userName: result.user_name, preview: message.substring(0, 50)
@@ -1439,9 +1439,9 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('diwaniya_audio', (data) => {
+  socket.on('diwaniya_audio', async (data) => {
     const { sessionId, userId, message, audio, audioType } = data;
-    const result = db.addDiwaniyaMessage(sessionId, userId, message);
+    const result = await db.addDiwaniyaMessage(sessionId, userId, message);
     if (result) {
       // Broadcast audio to all in session
       io.to(`session_${sessionId}`).emit('diwaniya_audio', {
@@ -1450,22 +1450,22 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('game_move', (data) => {
+  socket.on('game_move', async (data) => {
     const { challengeId, gameType, move } = data;
     // Forward game moves to the other player
     socket.to(`game_${challengeId}`).emit('game_move', move);
   });
 
-  socket.on('join_game', (challengeId) => {
+  socket.on('join_game', async (challengeId) => {
     socket.join(`game_${challengeId}`);
   });
 
-  socket.on('disconnect', () => {
+  socket.on('disconnect', async () => {
     console.log('Socket disconnected:', socket.id);
     // Remove user from online if they had joined
     if (socket.userId) {
       onlineUsers.delete(socket.userId);
-      const user = db.getUserById(socket.userId);
+      const user = await db.getUserById(socket.userId);
       if (user && user.family_id) {
         io.to(`family_${user.family_id}`).emit('user_offline', { userId: socket.userId });
       }
@@ -1474,7 +1474,7 @@ io.on('connection', (socket) => {
   });
 
   // Family notification (invite all members)
-  socket.on('family_notify', (data) => {
+  socket.on('family_notify', async (data) => {
     const { familyId, message, title } = data;
     io.to(`family_${familyId}`).emit('family_notification', { title: title || '🔔 تنبيه العائلة', message, time: Date.now() });
     console.log(`🔔 Notification sent to family ${familyId}`);
@@ -1483,7 +1483,7 @@ io.on('connection', (socket) => {
   // WebRTC Audio Call Signaling
   const audioRooms = {};
   
-  socket.on('join_audio_call', (data) => {
+  socket.on('join_audio_call', async (data) => {
     const { sessionId, userId, userName, isObserver } = data;
     socket.join(`audio_${sessionId}`);
     
@@ -1515,7 +1515,7 @@ io.on('connection', (socket) => {
     console.log(`${isObserver ? '🕵️ Observer' : '🎤'} ${userName} joined audio call ${sessionId} (${participants.length})`);
   });
   
-  socket.on('leave_audio_call', (data) => {
+  socket.on('leave_audio_call', async (data) => {
     const { sessionId, userId } = data;
     socket.leave(`audio_${sessionId}`);
     
@@ -1528,17 +1528,17 @@ io.on('connection', (socket) => {
     console.log(`🎤 User left audio call ${sessionId}`);
   });
   
-  socket.on('audio_offer', (data) => {
+  socket.on('audio_offer', async (data) => {
     const { to, offer, sessionId, userName } = data;
     io.to(to).emit('audio_offer', { from: socket.id, offer, userName, sessionId });
   });
   
-  socket.on('audio_answer', (data) => {
+  socket.on('audio_answer', async (data) => {
     const { to, answer, sessionId } = data;
     io.to(to).emit('audio_answer', { from: socket.id, answer, sessionId });
   });
   
-  socket.on('audio_ice_candidate', (data) => {
+  socket.on('audio_ice_candidate', async (data) => {
     const { to, candidate, sessionId } = data;
     io.to(to).emit('audio_ice_candidate', { from: socket.id, candidate, sessionId });
   });
