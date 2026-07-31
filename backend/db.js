@@ -389,6 +389,11 @@ function updateFamilyFounder(familyId, userId) {
   run('UPDATE families SET founder_id = ? WHERE id = ?', [userId, familyId]);
 }
 
+function getFirstAvailablePremiumCode() {
+  const r = queryOne("SELECT code FROM subscription_codes WHERE used = 0 AND type = 'premium' LIMIT 1");
+  return r ? r.code : null;
+}
+
 function updatePrice(code, price) {
   run('UPDATE subscription_codes SET price = ? WHERE code = ?', [price, code]);
 }
@@ -403,5 +408,5 @@ module.exports = {
   getFamilyChallenges, getPendingChallenges, getFamilyLeaderboard,
   generateSubscriptionCodes, updateFamilyFounder,
   generatePremiumCode, getAvailablePremiumCodes, purchaseCode, getUserCodes, userHasFamily, updatePassword,
-  updatePrice,
+  updatePrice, getFirstAvailablePremiumCode,
 };

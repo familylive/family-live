@@ -581,16 +581,12 @@ seedData().then(() => {
       // Generate premium codes
       db.generatePremiumCode();
       db.generatePremiumCode();
-      // Get the first code
-      const codes = db.getDb().exec("SELECT code FROM subscription_codes WHERE used = 0 AND type = 'premium' LIMIT 1");
-      let code = 'AAAAAAAA';
-      if (codes && codes.length > 0 && codes[0].values && codes[0].values.length > 0) {
-        code = codes[0].values[0][0];
-      }
+      // Get the first available code
+      const code = db.getFirstAvailablePremiumCode() || 'AAAAAAAA';
       const hashedPassword = bcrypt.hashSync('123456', 10);
-      const user = db.createUser('عبدالله', 'abdrit9@gmail.com', hashedPassword, null, 'founder');
       const family = db.createFamily('عائلتي', code);
-      if (family && user) {
+      if (family) {
+        const user = db.createUser('عبدالله', 'abdrit9@gmail.com', hashedPassword, family.id, 'founder');
         db.updateFamilyFounder(family.id, user.id);
         console.log('✅ Created default user and family');
       }
