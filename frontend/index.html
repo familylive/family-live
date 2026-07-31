@@ -2372,14 +2372,19 @@ let pendingVisit = null;
 
 async function loadModeratorFamilies() {
   try {
-    const { families } = await api('GET', '/api/featured-families');
-    const all = await api('GET', '/api/admin/families');
+    const { families } = await api('GET', '/api/moderator/online-families');
     const select = document.getElementById('moderator-family-select');
+    const statusBox = document.getElementById('moderator-visit-status');
     if (!select) return;
-    const fams = all.families || families || [];
-    select.innerHTML = '<option value="">اختر العائلة...</option>' +
-      fams.map(f => '<option value="' + f.id + '">' + (f.name || '') + '</option>').join('');
-  } catch(e) {}
+    if (!families?.length) {
+      select.innerHTML = '<option value="">لا توجد عوائل متصلة حالياً</option>';
+      if (statusBox) statusBox.innerHTML = '<div style="text-align:center;padding:12px;background:rgba(231,76,60,.06);border-radius:var(--radius-sm);color:var(--text-muted);font-size:13px">🕌 لا توجد ديوانيات مفتوحة حالياً — لا يمكن طلب زيارة</div>';
+      return;
+    }
+    if (statusBox) statusBox.innerHTML = '';
+    select.innerHTML = '<option value="">اختر العائلة المتصلة...</option>' +
+      families.map(f => '<option value="' + f.id + '">🕌 ' + (f.name || '') + ' (ديوانية مفتوحة)</option>').join('');
+  } catch(e) { console.error('Mod families:', e); }
 }
 
 async function requestModeratorVisit() {

@@ -733,6 +733,18 @@ function exitModeratorVisit(visitId, report) {
   run("UPDATE moderator_visits SET status = 'exited', exit_at = datetime('now'), report = ? WHERE id = ?", [report || '', visitId]);
   return queryOne('SELECT * FROM moderator_visits WHERE id = ?', [visitId]);
 }
+function getFamiliesWithActiveDiwaniya() {
+  return queryAll(`
+    SELECT DISTINCT f.id, f.name, f.subscription_code, ds.duration_minutes, ds.opened_at, ds.topic,
+      u.name as founder_name
+    FROM diwaniya_sessions ds
+    JOIN families f ON ds.family_id = f.id
+    LEFT JOIN users u ON f.founder_id = u.id
+    WHERE ds.status = 'open'
+    ORDER BY ds.opened_at DESC
+  `);
+}
+
 function getModeratorVisits() {
   return queryAll('SELECT * FROM moderator_visits ORDER BY requested_at DESC LIMIT 50');
 }

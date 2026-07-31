@@ -818,6 +818,16 @@ app.post('/api/moderator/visit/exit', authMiddleware, (req, res) => {
   res.json({ message: '📋 تم إرسال تقرير الزيارة للإدارة', visit });
 });
 
+// Moderator: online families with active diwaniya (only these can be visited)
+app.get('/api/moderator/online-families', authMiddleware, (req, res) => {
+  const user = db.getUserById(req.user.id);
+  if (user.role !== 'moderator' && user.role !== 'admin') {
+    return res.status(403).json({ error: 'فقط المشرفون' });
+  }
+  const families = db.getFamiliesWithActiveDiwaniya();
+  res.json({ families });
+});
+
 // Moderator: my visits
 app.get('/api/moderator/visits', authMiddleware, (req, res) => {
   res.json({ visits: db.getModeratorVisitsByUser(req.user.id) });
