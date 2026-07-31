@@ -181,7 +181,8 @@ async function loadApp(user, family) {
   } catch (e) { console.error('Load error:', e); }
   updateAllUI();
   connectSocket();
-  navigateTo('dashboard');
+  // Admin goes directly to admin panel
+  navigateTo(user.role === 'admin' ? 'admin' : 'dashboard');
 }
 
 async function refreshData() {

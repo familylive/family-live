@@ -560,6 +560,33 @@
       <div class="page-title">🏷️ مزادات الرموز المميزة</div>
       <div class="page-subtitle">مزاد علني على رموز مميزة - آخر مزايد يفوز</div>
       
+      <div class="card" id="auction-create-card" style="display:none">
+        <div class="card-title">🏷️ فتح مزاد جديد</div>
+        <div class="form-group">
+          <label>رمز الرمز المميز (مثال: AAAAAAAA)</label>
+          <input class="form-input" id="auction-code-2" type="text" dir="ltr" style="letter-spacing:3px;text-transform:uppercase">
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <div class="form-group" style="flex:1;min-width:100px">
+            <label>سعر البداية (ريال)</label>
+            <input class="form-input" id="auction-starting-2" type="number" value="100" min="10">
+          </div>
+          <div class="form-group" style="flex:1;min-width:100px">
+            <label>رسوم الدخول (ريال)</label>
+            <input class="form-input" id="auction-entry-2" type="number" value="50" min="10">
+          </div>
+          <div class="form-group" style="flex:1;min-width:100px">
+            <label>المدة (دقائق)</label>
+            <input class="form-input" id="auction-duration-2" type="number" value="30" min="5">
+          </div>
+          <div class="form-group" style="flex:1;min-width:100px">
+            <label>أقل زيادة (ريال)</label>
+            <input class="form-input" id="auction-increment-2" type="number" value="10" min="5">
+          </div>
+        </div>
+        <button class="btn btn-accent btn-full" onclick="createAuctionFromAuctionsPage()">🏷️ فتح المزاد</button>
+      </div>
+
       <div id="auctions-list">
         <div class="empty-state"><div class="empty-text">لا توجد مزادات حالياً</div></div>
       </div>
@@ -992,6 +1019,10 @@ function showToast(message, type) {
 let auctionTimers = {};
 
 async function loadAuctionsPage() {
+  // Show create auction form for admins
+  const createCard = document.getElementById('auction-create-card');
+  if (createCard) createCard.style.display = state.user?.role === 'admin' ? 'block' : 'none';
+  
   try {
     const { auctions } = await api('GET', '/api/auctions/active');
     const list = document.getElementById('auctions-list');
@@ -1060,6 +1091,21 @@ async function placeBid(auctionId) {
   try {
     const result = await api('POST', '/api/auctions/bid', { auctionId, amount });
     showToast(result.message, 'success');
+    loadAuctionsPage();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function createAuctionFromAuctionsPage() {
+  const code = document.getElementById('auction-code-2').value.trim().toUpperCase();
+  const startingPrice = parseInt(document.getElementById('auction-starting-2').value);
+  const entryFee = parseInt(document.getElementById('auction-entry-2').value);
+  const durationMinutes = parseInt(document.getElementById('auction-duration-2').value);
+  const minIncrement = parseInt(document.getElementById('auction-increment-2').value);
+  if (!code) return showToast('أدخل رمز الرمز المميز', 'error');
+  try {
+    const result = await api('POST', '/api/admin/auctions/create', { code, startingPrice, entryFee, durationMinutes, minIncrement });
+    showToast(result.message, 'success');
+    document.getElementById('auction-code-2').value = '';
     loadAuctionsPage();
   } catch(e) { showToast(e.message, 'error'); }
 }
