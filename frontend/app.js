@@ -446,7 +446,7 @@ function inviteViaWhatsApp() {
   list.innerHTML = withWhatsApp.map(m => {
     const cleanNum = String(m.whatsapp).replace(/[^0-9]/g, '');
     const intl = cleanNum.startsWith('0') ? '966' + cleanNum.slice(1) : cleanNum;
-    const msg = encodeURIComponent('👋 دعوة من مؤسس عائلة ' + (state.family?.name || '') + ' للتواجد في التطبيق\n🔑 رمز العائلة: ' + (state.family?.subscription_code || '') + '\n📞 رقم المؤسس: ' + (state.user?.whatsapp || '') + '\n🔗 https://family-live.onrender.com');
+    const msg = encodeURIComponent('👋 دعوة من مؤسس عائلة ' + (state.family?.name || '') + ' للتواجد في التطبيق\n🔑 رمز العائلة: ' + (state.family?.subscription_code || '') + '\n🔗 https://family-live.onrender.com');
     return '<div class="my-family-item" style="cursor:pointer" onclick="window.open(\'https://wa.me/' + intl + '?text=' + msg + '\', \'_blank\')">' +
       '<span>📱 ' + (m.name || '') + '</span><span style="color:var(--gold)">' + (m.whatsapp || '') + '</span>' +
       '<span class="btn btn-sm btn-accent">إرسال</span></div>';
@@ -454,7 +454,7 @@ function inviteViaWhatsApp() {
 }
 
 function inviteViaWhatsAppShare() {
-  const msg = encodeURIComponent('👋 انضم لعائلة ' + (state.family?.name || '') + ' على تطبيق العائلة\n🔑 رمز العائلة: ' + (state.family?.subscription_code || '') + '\n📞 من المؤسس: ' + (state.user?.whatsapp || state.user?.phone || '') + '\n🔗 https://family-live.onrender.com');
+  const msg = encodeURIComponent('👋 انضم لعائلة ' + (state.family?.name || '') + ' على تطبيق العائلة\n🔑 رمز العائلة: ' + (state.family?.subscription_code || '') + '\n🔗 https://family-live.onrender.com');
   window.open('https://wa.me/?text=' + msg, '_blank');
 }
 
