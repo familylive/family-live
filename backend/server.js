@@ -1157,7 +1157,7 @@ seedData().then(() => {
       db.generatePremiumCode();
       // Get the first available code
       const code = db.getFirstAvailablePremiumCode() || 'AAAAAAAA';
-      const hashedPassword = bcrypt.hashSync('123456', 10);
+      const hashedPassword = bcrypt.hashSync('Koad@055282312', 10);
       const family = db.createFamily('عائلتي', code);
       if (family) {
         const user = db.createUser('عبدالله', 'abdm@live.com', hashedPassword, family.id, 'founder');
