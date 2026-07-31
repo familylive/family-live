@@ -2580,8 +2580,12 @@ async function requestModeratorVisit() {
   } catch(e) { showToast(e.message, 'error'); }
 }
 
+let isEnteringVisit = false;
+
 async function enterModeratorVisit() {
   if (!pendingVisit) return showToast('لا يوجد طلب زيارة', 'error');
+  if (isEnteringVisit) return;
+  isEnteringVisit = true;
   // Find active diwaniya session for this family
   try {
     const { session } = await api('GET', '/api/diwaniya/active');
@@ -2601,6 +2605,7 @@ async function enterModeratorVisit() {
       '<p style="color:var(--danger);font-size:24px;font-weight:900;direction:ltr" id="mod-visit-countdown">02:00</p>' +
       '<p style="font-size:12px;color:var(--text-muted)">سيخرجك النظام تلقائياً</p>' +
       '<button class="btn btn-danger btn-full" style="margin-top:8px" onclick="exitModeratorVisit()">🚪 إنهاء الزيارة</button></div>';
+    isEnteringVisit = false;
     let sec = 120;
     window._modTimer = setInterval(() => {
       sec--;
@@ -2614,21 +2619,35 @@ async function enterModeratorVisit() {
   } catch(e) { showToast(e.message, 'error'); }
 }
 
+let isExitingVisit = false;
+
 async function exitModeratorVisit() {
   if (!pendingVisit) return;
-  const report = prompt('📋 اكتب تقرير الزيارة (يُرسل للإدارة):');
+  if (isExitingVisit) return; // Guard against double prompt
+  isExitingVisit = true;
+  // Clear timer first
+  if (window._modTimer) { clearInterval(window._modTimer); window._modTimer = null; }
+  if (window._enterTimer) { clearInterval(window._enterTimer); window._enterTimer = null; }
+  
+  let report = '';
   try {
-    await api('POST', '/api/moderator/visit/exit', { visitId: pendingVisit.id, report: report || '' });
+    report = prompt('📋 اكتب تقرير الزيارة (يُرسل للإدارة):') || '';
+  } catch(e) { report = ''; }
+  
+  try {
+    await api('POST', '/api/moderator/visit/exit', { visitId: pendingVisit.id, report });
     showToast('📋 تم إرسال التقرير للإدارة', 'success');
-    if (window._modTimer) clearInterval(window._modTimer);
-    pendingVisit = null;
-    activeVisitSession = null;
-    loadModeratorVisitsHistory();
-    const sendBox = document.getElementById('moderator-send-box');
-    if (sendBox) sendBox.style.display = 'none';
-    const status = document.getElementById('moderator-visit-status');
-    if (status) status.innerHTML = '';
-  } catch(e) { showToast(e.message, 'error'); }
+  } catch(e) {
+    showToast(e.message, 'error');
+  }
+  pendingVisit = null;
+  activeVisitSession = null;
+  isExitingVisit = false;
+  loadModeratorVisitsHistory();
+  const sendBox = document.getElementById('moderator-send-box');
+  if (sendBox) sendBox.style.display = 'none';
+  const status = document.getElementById('moderator-visit-status');
+  if (status) status.innerHTML = '';
 }
 
 async function loadModeratorVisitsHistory() {

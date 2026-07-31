@@ -463,6 +463,7 @@ async function toggleDiwaniya() {
     document.querySelector('#timer-display .timer-label').textContent = 'الديوانية مفتوحة - ' + (modeLabel[mode] || mode);
     startDiwaniyaTimer(duration);
     setupChatMode(mode);
+    startMessagePolling();
     if (socket?.connected) socket.emit('join_session', session.id);
     showToast('🕌 فتحت الديوانية!', 'success');
   } catch (e) { showToast(e.message || 'فشل فتح الديوانية', 'error'); }
@@ -489,6 +490,19 @@ function sendChat() {
   } else {
     api('POST', '/api/diwaniya/message', { sessionId: state.activeSession.id, message: text }).catch(() => {});
   }
+}
+
+// Poll diwaniya messages every 4s while open (ensures moderator messages appear)
+function startMessagePolling() {
+  if (state._msgPoll) clearInterval(state._msgPoll);
+  state._msgPoll = setInterval(() => {
+    if (state.diwaniyaOpen && state.activeSession?.id) {
+      loadDiwaniyaMessages(state.activeSession.id);
+    }
+  }, 4000);
+}
+function stopMessagePolling() {
+  if (state._msgPoll) { clearInterval(state._msgPoll); state._msgPoll = null; }
 }
 
 async function loadDiwaniyaMessages(sessionId) {

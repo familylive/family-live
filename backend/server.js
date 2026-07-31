@@ -763,7 +763,10 @@ app.post('/api/moderator/send-message', authMiddleware, (req, res) => {
   const content = row[cols.indexOf('content')];
   const title = row[cols.indexOf('title')];
   
-  // Post as moderator observer message (visible, not chat message)
+  // Save as diwaniya message (persists in chat history)
+  try {
+    db.addDiwaniyaMessage(sessionId, user.id, '🕵️ ' + title + ' — ' + content);
+  } catch(e) {}
   io.to(`session_${sessionId}`).emit('moderator_message', {
     moderatorName: user.name,
     title: title,
@@ -900,6 +903,11 @@ app.post('/api/moderator/visit/enter', authMiddleware, (req, res) => {
   const { visitId } = req.body;
   const visit = db.enterModeratorVisit(visitId);
   if (!visit) return res.status(400).json({ error: 'الزيارة غير موجودة' });
+  // Save system message in the active diwaniya
+  const active = db.getActiveDiwaniya(visit.family_id);
+  if (active) {
+    try { db.addDiwaniyaMessage(active.id, visit.moderator_id, '🕵️ دخل المشرف ' + (visit.moderator_name||'') + ' للزيارة التفقدية (مراقب - لا يشارك)'); } catch(e) {}
+  }
   if (visit.family_id) {
     io.to(`family_${visit.family_id}`).emit('moderator_entered', { moderatorName: visit.moderator_name });
   }
@@ -911,6 +919,11 @@ app.post('/api/moderator/visit/exit', authMiddleware, (req, res) => {
   const { visitId, report } = req.body;
   const visit = db.exitModeratorVisit(visitId, report);
   if (!visit) return res.status(400).json({ error: 'الزيارة غير موجودة' });
+  // Save exit system message
+  const active = db.getActiveDiwaniya(visit.family_id);
+  if (active) {
+    try { db.addDiwaniyaMessage(active.id, visit.moderator_id, '📋 أنهى المشرف ' + (visit.moderator_name||'') + ' الزيارة التفقدية'); } catch(e) {}
+  }
   // Award stars for completed visit
   const starsPerVisit = parseInt(db.getSetting('stars_per_visit', '10'));
   const profile = db.addModeratorStars(visit.moderator_id, starsPerVisit);
