@@ -231,6 +231,11 @@ function updateAllUI() {
   if (state.family) {
     if (greeting) greeting.textContent = '👋 مرحباً بك ' + (state.user?.name || '') + ' 🏡';
     if (familyName) familyName.textContent = 'في عائلة ' + state.family.name;
+    const famCode = document.getElementById('welcome-family-code');
+    if (famCode) {
+      famCode.textContent = '🔑 ' + (state.family.subscription_code || '');
+      famCode.style.display = 'inline-block';
+    }
   } else if (state.user?.role === 'admin') {
     if (greeting) greeting.textContent = '👋 مرحباً بك ' + (state.user?.name || '') + ' ⚙️';
     if (familyName) familyName.textContent = 'لوحة تحكم إدارة التطبيق';

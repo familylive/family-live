@@ -338,13 +338,14 @@
       <div class="page-title">الرئيسية</div>
       <div class="page-subtitle">نشاط عائلتك اليوم</div>
 
-      <!-- Welcome Card -->
+      <!-- User Profile Card -->
       <div class="card card-glow" id="welcome-card">
         <div class="welcome-header">
           <div class="welcome-avatar" id="welcome-avatar">👤</div>
           <div class="welcome-text">
             <div class="card-title" id="dashboard-greeting">👋 مرحباً <span id="dashboard-user-name">!</span></div>
             <div class="welcome-family" id="welcome-family"></div>
+            <div class="welcome-code" id="welcome-family-code" style="display:none"></div>
           </div>
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
@@ -369,9 +370,9 @@
         </div>
       </div>
 
-      <!-- Quick Actions -->
+      <!-- Services (quick actions) -->
       <div class="card">
-        <div class="card-title">⭐ إجراءات سريعة</div>
+        <div class="card-title">⭐ خدماتنا</div>
         <div class="quick-grid">
           <div class="quick-item" onclick="navigateTo('diwaniya')">
             <div class="quick-icon">🕌</div>
@@ -385,10 +386,48 @@
             <div class="quick-icon">👨‍👩‍👧‍👦</div>
             <div class="quick-label">العائلة</div>
           </div>
+          <div class="quick-item" onclick="navigateTo('challenges')">
+            <div class="quick-icon">🏆</div>
+            <div class="quick-label">التحديات</div>
+          </div>
           <div class="quick-item" onclick="navigateTo('leaderboard')">
             <div class="quick-icon">🏅</div>
             <div class="quick-label">المتصدرون</div>
           </div>
+          <div class="quick-item" onclick="navigateTo('codes')">
+            <div class="quick-icon">🔑</div>
+            <div class="quick-label">رموزي</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Packages -->
+      <div class="card">
+        <div class="card-title">💎 باقات الرموز المميزة</div>
+        <div class="pricing-cards compact">
+          <div class="pricing-card">
+            <div class="pricing-type">🎁 مجاني</div>
+            <div class="pricing-price">0 ريال</div>
+            <button class="btn btn-primary btn-full" onclick="navigateTo('codes')">التفاصيل</button>
+          </div>
+          <div class="pricing-card premium">
+            <div class="pricing-type">💎 مميز</div>
+            <div class="pricing-price"><span class="price-amount">200</span> ريال</div>
+            <button class="btn btn-accent btn-full" onclick="navigateTo('codes')">التفاصيل</button>
+          </div>
+          <div class="pricing-card">
+            <div class="pricing-type">👑 مخصص</div>
+            <div class="pricing-price">500 ريال</div>
+            <button class="btn btn-primary btn-full" onclick="navigateTo('codes')">التفاصيل</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Active Auctions -->
+      <div class="card">
+        <div class="card-title">🏷️ مزادات نشطة <button class="btn btn-sm" style="float:left" onclick="navigateTo('auctions')">الكل ←</button></div>
+        <div id="dash-auctions-list">
+          <div class="empty-state"><div class="empty-text">لا توجد مزادات نشطة</div></div>
         </div>
       </div>
 
@@ -400,9 +439,8 @@
         </div>
       </div>
     </div>
-  </main>
-</div>
-    <!-- Family Page -->
+
+<!-- Family Page -->
     <div id="page-family" class="page-content">
       <div class="page-title">العائلة</div>
       <div class="page-subtitle">أفراد عائلتك وإدارة الدعوات</div>
@@ -720,6 +758,7 @@ function navigateTo(pageName) {
   toggleHeaderVisibility(pageName);
   
   // Load page-specific data
+  if (pageName === 'dashboard' && state.isLoggedIn) loadDashboardAuctions();
   if (pageName === 'codes' && state.isLoggedIn) loadCodesPage();
   if (pageName === 'auctions' && state.isLoggedIn) loadAuctionsPage();
   if (pageName === 'admin' && state.user?.role === 'admin') { loadAdminPage(); loadAdminAuctions(); }
@@ -1038,6 +1077,24 @@ function showToast(message, type) {
 <script>
 // ==================== AUCTIONS ====================
 let auctionTimers = {};
+
+async function loadDashboardAuctions() {
+  try {
+    const { auctions } = await api('GET', '/api/auctions/active');
+    const list = document.getElementById('dash-auctions-list');
+    if (!auctions?.length) {
+      list.innerHTML = '<div class="empty-state"><div class="empty-text">لا توجد مزادات نشطة</div></div>';
+      return;
+    }
+    list.innerHTML = auctions.slice(0, 3).map(a =>
+      '<div class="dash-auction-item">' +
+        '<span class="dash-auction-code">🏷️ ' + a.code + '</span>' +
+        '<span class="dash-auction-price">💰 ' + (a.current_price || a.starting_price) + ' ريال</span>' +
+        '<button class="btn btn-sm btn-accent" onclick="navigateTo(\'auctions\')">شارك</button>' +
+      '</div>'
+    ).join('');
+  } catch(e) { console.error('Dash auctions:', e); }
+}
 
 async function loadAuctionsPage() {
   // Show create auction form for admins

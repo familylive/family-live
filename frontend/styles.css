@@ -1124,3 +1124,37 @@ body {
   color: var(--text-muted);
   margin-top: 4px;
 }
+
+/* Dashboard */
+.welcome-code {
+  font-size: 12px;
+  color: var(--gold);
+  font-family: 'Courier New', monospace;
+  letter-spacing: 2px;
+  direction: ltr;
+  margin-top: 2px;
+}
+.pricing-cards.compact .pricing-card {
+  padding: 12px;
+}
+.dash-auction-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-hover);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  margin-bottom: 6px;
+}
+.dash-auction-code {
+  font-weight: 700;
+  font-family: monospace;
+  letter-spacing: 2px;
+  color: var(--gold);
+  flex: 1;
+  direction: ltr;
+}
+.dash-auction-price {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
