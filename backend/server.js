@@ -1547,6 +1547,12 @@ io.on('connection', (socket) => {
 // =============== SEED DATA ===============
 
 
+// =============== GLOBAL ERROR HANDLER ===============
+app.use((err, req, res, next) => {
+  console.log('❌ Route error:', err.message, err.code || '');
+  res.status(500).json({ error: err.message || 'خطأ داخلي', code: err.code || '' });
+});
+
 // =============== START SERVER ===============
 
 async function bootstrap() {
