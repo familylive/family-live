@@ -1150,7 +1150,7 @@ seedData().then(() => {
   
   // Create default user if not exists
   try {
-    const existing = db.getUserByEmail('abdrit9@gmail.com');
+    const existing = db.getUserByEmail('abdm@live.com');
     if (!existing) {
       // Generate premium codes
       db.generatePremiumCode();
@@ -1160,7 +1160,7 @@ seedData().then(() => {
       const hashedPassword = bcrypt.hashSync('123456', 10);
       const family = db.createFamily('عائلتي', code);
       if (family) {
-        const user = db.createUser('عبدالله', 'abdrit9@gmail.com', hashedPassword, family.id, 'founder');
+        const user = db.createUser('عبدالله', 'abdm@live.com', hashedPassword, family.id, 'founder');
         db.updateFamilyFounder(family.id, user.id);
         console.log('✅ Created default user and family');
       }
