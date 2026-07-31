@@ -388,6 +388,31 @@ app.post('/api/profile/leave-family', authMiddleware, (req, res) => {
   res.json({ message: 'تم الخروج من عائلة ' + result.family_name, success: true });
 });
 
+// Get user's subscribed families
+app.get('/api/profile/families', authMiddleware, (req, res) => {
+  const families = db.getUserFamilies(req.user.id);
+  res.json({ families, currentFamilyId: req.user.familyId });
+});
+
+// Switch current family
+app.post('/api/profile/switch-family', authMiddleware, (req, res) => {
+  const { familyId } = req.body;
+  if (!familyId) return res.status(400).json({ error: 'معرف العائلة مطلوب' });
+  
+  // Check user is subscribed to this family
+  const families = db.getUserFamilies(req.user.id);
+  const exists = families.find(f => f.family_id === familyId);
+  if (!exists) return res.status(400).json({ error: 'أنت غير مشترك في هذه العائلة' });
+  
+  const family = db.getFamily(familyId);
+  if (!family || family.status === 'inactive') return res.status(400).json({ error: 'العائلة غير متاحة' });
+  
+  db.setCurrentFamily(req.user.id, familyId);
+  db.getDb().run('UPDATE users SET family_id = ? WHERE id = ?', [familyId, req.user.id]);
+  
+  res.json({ message: '✅ تم التبديل إلى عائلة ' + family.name, family });
+});
+
 // =============== ONLINE & FAMILY MEMBERSHIP ===============
 
 // Online user IDs (tracked via socket)

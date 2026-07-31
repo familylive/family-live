@@ -641,6 +641,14 @@
         </div>
       </div>
 
+      <div class="card" id="my-families-card">
+        <div class="card-title">🏠 العوائل المشترك بها <span id="my-families-count" class="badge"></span></div>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:8px">اضغط على عائلة للتبديل إليها</p>
+        <div id="my-families-list">
+          <div class="empty-state"><div class="empty-text">لا توجد عوائل</div></div>
+        </div>
+      </div>
+
       <div class="card">
         <div class="card-title">✏️ تعديل الملف الشخصي</div>
         <div class="form-group">
@@ -852,7 +860,7 @@ function navigateTo(pageName) {
   
   // Load page-specific data
   if (pageName === 'dashboard' && state.isLoggedIn) { loadDashboardAuctions(); loadDashboardAds(); }
-  if (pageName === 'profile' && state.isLoggedIn) loadProfilePage();
+  if (pageName === 'profile' && state.isLoggedIn) { loadProfilePage(); loadMyFamilies(); }
   if (pageName === 'codes' && state.isLoggedIn) loadCodesPage();
   if (pageName === 'auctions' && state.isLoggedIn) loadAuctionsPage();
   if (pageName === 'admin' && state.user?.role === 'admin') { loadAdminPage(); loadAdminAuctions(); }
@@ -1300,6 +1308,36 @@ async function loadProfilePage() {
   // Hide leave family for admin
   const leaveCard = document.getElementById('leave-family-card');
   if (leaveCard) leaveCard.style.display = (user?.role === 'admin' || !family) ? 'none' : 'block';
+}
+
+async function loadMyFamilies() {
+  try {
+    const { families, currentFamilyId } = await api('GET', '/api/profile/families');
+    const list = document.getElementById('my-families-list');
+    const count = document.getElementById('my-families-count');
+    if (!families?.length) {
+      list.innerHTML = '<div class="empty-state"><div class="empty-text">لا توجد عوائل</div></div>';
+      if (count) count.textContent = '0';
+      return;
+    }
+    if (count) count.textContent = families.length;
+    list.innerHTML = families.map(f =>
+      '<div class="my-family-item ' + (f.family_id === currentFamilyId ? 'current' : '') + '" onclick="switchFamily(\'' + f.family_id + '\')">' +
+        '<div class="my-family-name">' + (f.family_name || '') + (f.family_id === currentFamilyId ? ' <span class="current-tag">الحالية</span>' : '') + '</div>' +
+        '<div class="my-family-code" style="direction:ltr;letter-spacing:2px;color:var(--gold)">🔑 ' + (f.subscription_code || '') + '</div>' +
+      '</div>'
+    ).join('');
+  } catch(e) { console.error('My families:', e); }
+}
+
+async function switchFamily(familyId) {
+  try {
+    const result = await api('POST', '/api/profile/switch-family', { familyId });
+    showToast(result.message, 'success');
+    // Reload app data
+    const { user, family } = await api('GET', '/api/auth/verify');
+    await loadApp(user, family);
+  } catch(e) { showToast(e.message, 'error'); }
 }
 
 async function saveProfile() {
