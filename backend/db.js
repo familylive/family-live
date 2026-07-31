@@ -42,6 +42,8 @@ function initDb() {
       diwaniya_locked_until TEXT,
       diwaniya_lock_reason TEXT,
       diwaniya_locked_by TEXT,
+      name_changed_at TEXT,
+      name_changes_count INTEGER DEFAULT 0,
       created_at TEXT DEFAULT (datetime('now'))
     )
   `);
@@ -844,6 +846,31 @@ function getModeratorTier(stars) {
 function updateModeratorTier(userId, tier) {
   run('UPDATE users SET moderator_tier = ? WHERE id = ?', [tier, userId]);
   return getUserById(userId);
+}
+
+function getFamilyEditInfo(familyId) {
+  const family = queryOne('SELECT name_changed_at, name_changes_count FROM families WHERE id = ?', [familyId]);
+  const price = parseInt(getSetting('family_edit_price', '100'));
+  const freeChanges = parseInt(getSetting('family_free_changes', '3'));
+  const intervalDays = parseInt(getSetting('family_edit_interval_days', '90'));
+  let daysLeft = 0;
+  if (family && family.name_changed_at) {
+    const last = new Date(family.name_changed_at.replace(' ', 'T'));
+    const diff = Date.now() - last.getTime();
+    daysLeft = Math.max(0, intervalDays - Math.floor(diff / 86400000));
+  }
+  return {
+    last_changed: family ? family.name_changed_at : null,
+    changes_count: family ? family.name_changes_count : 0,
+    free_changes: freeChanges,
+    price: price,
+    interval_days: intervalDays,
+    days_left: daysLeft
+  };
+}
+
+function recordFamilyNameChange(familyId) {
+  run("UPDATE families SET name_changed_at = datetime('now'), name_changes_count = name_changes_count + 1 WHERE id = ?", [familyId]);
 }
 
 function getTierSettings() {

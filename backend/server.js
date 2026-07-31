@@ -389,16 +389,45 @@ app.post('/api/admin/ads/delete', authMiddleware, adminOrModerator, (req, res) =
 
 // =============== FOUNDER: EDIT OWN FAMILY ===============
 
-// Founder edits own family name (and optionally code)
+// Get family edit info (founder)
+app.get('/api/family/edit-info', authMiddleware, (req, res) => {
+  if (!req.user.familyId) return res.status(400).json({ error: 'لا يوجد عائلة' });
+  res.json({ info: db.getFamilyEditInfo(req.user.familyId) });
+});
+
+// Founder edits own family name (90-day rule + 3 free changes + 100 SAR payment)
 app.post('/api/family/edit', authMiddleware, (req, res) => {
   if (!req.user.familyId) return res.status(400).json({ error: 'لا يوجد عائلة' });
   if (req.user.role !== 'founder') return res.status(403).json({ error: 'فقط مؤسس العائلة يمكنه التعديل' });
-  const { name, subscription_code } = req.body;
+  const { name, subscription_code, paid } = req.body;
+  
+  const info = db.getFamilyEditInfo(req.user.familyId);
+  const isNameChange = name && name !== db.getFamily(req.user.familyId).name;
+  
+  if (isNameChange) {
+    // 90-day check
+    if (info.days_left > 0) {
+      return res.status(403).json({
+        error: 'لا يمكنك تعديل اسم العائلة إلا بعد ' + info.days_left + ' يوم',
+        daysLeft: info.days_left,
+        requiresConfirm: true
+      });
+    }
+    // Free changes check
+    if (info.changes_count >= info.free_changes && !paid) {
+      return res.json({
+        requiresPayment: true,
+        price: info.price,
+        message: 'استهلكت ' + info.free_changes + ' تعديلات مجانية - التعديل القادم بـ ' + info.price + ' ريال'
+      });
+    }
+    db.recordFamilyNameChange(req.user.familyId);
+  }
+  
   if (name) {
     db.getDb().run('UPDATE families SET name = ? WHERE id = ?', [name, req.user.familyId]);
   }
   if (subscription_code) {
-    // Check not used by another family
     const used = db.getDb().exec("SELECT id FROM families WHERE subscription_code = ? AND id != ?", [subscription_code, req.user.familyId]);
     if (used.length && used[0].values.length) {
       return res.status(400).json({ error: 'الرمز مستخدم من عائلة أخرى' });
