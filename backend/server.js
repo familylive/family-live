@@ -1487,21 +1487,14 @@ seedData().then(() => {
   try {
     const modEmail = 'abdmmm9@gmail.com';
     const modPass = 'Koad@055282312';
-    const existingMod = db.getUserByEmail(modEmail);
-    if (!existingMod) {
-      const hashedMod = bcrypt.hashSync(modPass, 10);
-      db.getDb().run("INSERT INTO users (id, name, email, password, role) VALUES (?, ?, ?, ?, 'moderator')",
-        [require('uuid').v4(), 'مشرف الديوانيات', modEmail, hashedMod]);
-      console.log('✅ Created moderator account: ' + modEmail);
-    }
+    const hashedMod = bcrypt.hashSync(modPass, 10);
+    db.createUserByRole(modEmail, hashedMod, 'مشرف الديوانيات', 'moderator');
+    console.log('✅ Created moderator account: ' + modEmail);
   } catch(e) { console.log('Moderator seed error:', e.message); }
   
   // Seed default support messages
   try {
-    const existingMsg = db.getDb().exec('SELECT COUNT(*) c FROM support_messages');
-    let cnt = 0;
-    if (existingMsg.length && existingMsg[0].values.length) cnt = existingMsg[0].values[0][0];
-    if (cnt === 0) {
+    if (db.countSupportMessages() === 0) {
       db.addSupportMessage('تحية مراقب الديوانيات', 'السلام عليكم ورحمة الله وبركاته، أنا مراقب الديوانيات جئت للسماع منكم عن مشاكل التطبيق ومقترحاتكم.');
       db.addSupportMessage('التواصل مع الدعم الفني', 'تنبيه: عند وجود مقترحات أو شكاوى أو مشاكل فنية بالحساب، يرجى مراسلة الإدارة عبر برنامج الدعم الفني فقط.');
       console.log('✅ Seeded default support messages');

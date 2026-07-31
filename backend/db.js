@@ -1036,6 +1036,19 @@ function leaveFamily(userId) {
   return { success: true, family_name: family ? family.name : '' };
 }
 
+function createUserByRole(email, password, name, role) {
+  const existing = queryOne('SELECT * FROM users WHERE email = ?', [email]);
+  if (existing) return existing;
+  const id = uuidv4();
+  run("INSERT INTO users (id, name, email, password, role) VALUES (?, ?, ?, ?, ?)", [id, name, email, password, role]);
+  return queryOne('SELECT id, name, email, role FROM users WHERE id = ?', [id]);
+}
+
+function countSupportMessages() {
+  const r = queryOne('SELECT COUNT(*) as c FROM support_messages');
+  return r ? r.c : 0;
+}
+
 function createAdminUser(email, password, name = 'مدير التطبيق') {
   const existing = queryOne('SELECT * FROM users WHERE email = ?', [email]);
   if (existing) return existing;
