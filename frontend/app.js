@@ -547,7 +547,9 @@ function addChatMessage(name, text, isSent) {
   msg.className = 'chat-msg' + (isSent ? ' sent' : '');
   const initial = name?.charAt(0) || '👤';
   const time = new Date().toLocaleTimeString('ar-SA', { hour:'2-digit', minute:'2-digit' });
-  msg.innerHTML = '<div class="chat-avatar">' + initial + '</div><div><div class="chat-bubble">' + text +
+  msg.innerHTML = '<div class="chat-avatar">' + initial + '</div><div>' +
+    '<div class="chat-sender">' + (name || '') + '</div>' +
+    '<div class="chat-bubble">' + text +
     '</div><div class="chat-time">' + time + '</div></div>';
   room.appendChild(msg);
   room.scrollTop = room.scrollHeight;
@@ -708,6 +710,7 @@ function addAudioMessage(name, audioBase64, audioType, isSent) {
   const dataSrc = 'data:' + audioType + ';base64,' + audioBase64;
   
   msg.innerHTML = '<div class="chat-avatar">' + initial + '</div><div>' +
+    '<div class="chat-sender">' + (name || '') + '</div>' +
     '<div class="audio-bubble"><audio controls src="' + dataSrc + '" style="height:40px;max-width:220px"></audio></div>' +
     '<div class="chat-time">' + new Date().toLocaleTimeString('ar-SA', { hour:'2-digit', minute:'2-digit' }) + '</div></div>';
   room.appendChild(msg);
@@ -860,6 +863,9 @@ function addRemoteAudio(peerId, peerName, stream) {
   audio.style.display = 'none';
   document.body.appendChild(audio);
   
+  // Setup speaking detection for this peer
+  setupSpeakingDetection(peerId, peerName, stream);
+  
   // Show in call indicator
   const participantsDiv = document.getElementById('call-participants');
   if (participantsDiv) {
@@ -893,5 +899,51 @@ function updateAudioCallUI(inCall) {
     btn.textContent = '🎤 انضم للمكالمة الصوتية';
     btn.className = 'btn btn-accent btn-full';
     document.getElementById('call-controls').style.display = 'none';
+  }
+}
+
+// ==================== SPEAKING INDICATOR ====================
+const speakingState = {};
+
+function setupSpeakingDetection(peerId, peerName, stream) {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const source = ctx.createMediaStreamSource(stream);
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 256;
+    source.connect(analyser);
+    
+    const data = new Uint8Array(analyser.frequencyBinCount);
+    
+    setInterval(() => {
+      analyser.getByteFrequencyData(data);
+      let sum = 0;
+      for (let i = 0; i < data.length; i++) sum += data[i];
+      const avg = sum / data.length;
+      const isSpeaking = avg > 15; // Threshold
+      updateSpeakingIndicator(peerId, peerName, isSpeaking);
+    }, 400);
+  } catch(e) {
+    console.error('Speaking detection error:', e);
+  }
+}
+
+function updateSpeakingIndicator(peerId, peerName, isSpeaking) {
+  const banner = document.getElementById('speaking-banner');
+  const nameSpan = document.getElementById('speaking-name');
+  if (!banner || !nameSpan) return;
+  
+  // Only show if someone is speaking and I'm in the call
+  if (isSpeaking) {
+    speakingState[peerId] = true;
+    nameSpan.textContent = peerName;
+    banner.classList.add('show');
+  } else {
+    speakingState[peerId] = false;
+    // Hide if nobody else is speaking
+    const anyoneSpeaking = Object.values(speakingState).some(v => v);
+    if (!anyoneSpeaking) banner.classList.remove('show');
   }
 }
