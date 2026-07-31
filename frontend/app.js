@@ -924,6 +924,48 @@ let localStream = null;
 let peerConnections = {};
 let inLiveCall = false;
 
+// ==================== CALL CONTROLS ====================
+let micMuted = false;
+let camOff = false;
+
+function toggleMic() {
+  if (!localStream) return;
+  micMuted = !micMuted;
+  localStream.getAudioTracks().forEach(t => t.enabled = !micMuted);
+  const btn = document.getElementById('mic-toggle-btn');
+  if (btn) {
+    btn.textContent = micMuted ? '🔇' : '🎤';
+    btn.classList.toggle('muted', micMuted);
+    btn.classList.toggle('off', micMuted);
+  }
+  // Show state on my tile
+  const state = document.getElementById('my-tile-state');
+  if (state) {
+    state.textContent = micMuted ? '🔇 كتم المايك' : '';
+    state.classList.toggle('muted-state', micMuted);
+  }
+  showToast(micMuted ? '🔇 كتمت المايك - ما يسمعونك' : '🎤 فتحت المايك', micMuted ? 'error' : 'success');
+}
+
+function toggleCamera() {
+  if (!localStream) return;
+  camOff = !camOff;
+  localStream.getVideoTracks().forEach(t => t.enabled = !camOff);
+  const btn = document.getElementById('cam-toggle-btn');
+  const myVideo = document.getElementById('my-video');
+  if (btn) {
+    btn.textContent = camOff ? '🚫' : '🎥';
+    btn.classList.toggle('off', camOff);
+  }
+  if (myVideo) myVideo.style.display = camOff ? 'none' : 'block';
+  const state = document.getElementById('my-tile-state');
+  if (state) {
+    state.textContent = camOff ? '🎥 كاميرا مغلقة' : '';
+    if (!micMuted) state.classList.remove('muted-state');
+  }
+  showToast(camOff ? '🚫 أغلقت الكاميرا - يسمعونك فقط' : '🎥 فتحت الكاميرا', camOff ? 'error' : 'success');
+}
+
 async function joinLiveAudio() {
   if (inLiveCall) return leaveLiveAudio();
   
@@ -956,6 +998,14 @@ function leaveLiveAudio() {
     localStream.getTracks().forEach(t => t.stop());
     localStream = null;
   }
+  // Reset state
+  micMuted = false; camOff = false;
+  const micBtn = document.getElementById('mic-toggle-btn');
+  const camBtn = document.getElementById('cam-toggle-btn');
+  const state = document.getElementById('my-tile-state');
+  if (micBtn) { micBtn.textContent = '🎤'; micBtn.classList.remove('off','muted'); }
+  if (camBtn) { camBtn.textContent = '🎥'; camBtn.classList.remove('off'); }
+  if (state) { state.textContent = ''; state.classList.remove('muted-state'); }
   
   inLiveCall = false;
   socket.emit('leave_audio_call', { sessionId: state.activeSession.id, userId: state.user.id });

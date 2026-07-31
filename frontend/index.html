@@ -591,6 +591,7 @@
             <div class="video-tile local" id="my-video-tile">
               <video id="my-video" autoplay playsinline muted style="display:none"></video>
               <div class="video-name">أنت</div>
+              <div class="tile-state" id="my-tile-state"></div>
             </div>
           </div>
           <div class="call-controls" id="call-controls" style="display:none">
@@ -599,6 +600,10 @@
             </div>
             <div class="call-timer" id="call-timer">00:00</div>
             <div class="call-limit">👥 الحد الأقصى: 6 مشاركين</div>
+            <div class="call-buttons" style="display:flex;gap:8px;justify-content:center;margin-top:10px">
+              <button class="call-control-btn" id="mic-toggle-btn" onclick="toggleMic()">🎤</button>
+              <button class="call-control-btn" id="cam-toggle-btn" onclick="toggleCamera()">🎥</button>
+            </div>
           </div>
           <button class="btn btn-accent btn-full" id="join-audio-btn" onclick="joinLiveAudio()">🎥 انضم لمكالمة الفيديو</button>
         </div>
