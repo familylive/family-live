@@ -205,19 +205,19 @@ app.post('/api/codes/purchase', authMiddleware, (req, res) => {
 });
 
 // Generate premium code
-app.post('/api/codes/generate-premium', (req, res) => {
+app.post('/api/codes/generate-premium', async (req, res) => {
   const code = db.generatePremiumCode();
   res.json({ code, message: 'تم إنشاء رمز مميز: ' + code });
 });
 
 // Get user's purchased codes
-app.get('/api/codes/my', authMiddleware, (req, res) => {
+app.get('/api/codes/my', authMiddleware, async (req, res) => {
   const codes = db.getUserCodes(req.user.id);
   res.json({ codes });
 });
 
 // Forgot password
-app.post('/api/auth/forgot-password', (req, res) => {
+app.post('/api/auth/forgot-password', async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: 'البريد الإلكتروني مطلوب' });
   const user = db.getUserByEmail(email);
@@ -227,7 +227,7 @@ app.post('/api/auth/forgot-password', (req, res) => {
 });
 
 // Reset password
-app.post('/api/auth/reset-password', (req, res) => {
+app.post('/api/auth/reset-password', async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'البريد وكلمة المرور مطلوبان' });
   const user = db.getUserByEmail(email);
@@ -238,19 +238,9 @@ app.post('/api/auth/reset-password', (req, res) => {
 });
 
 // Get all codes (admin)
-app.get('/api/codes/admin/all', authMiddleware, (req, res) => {
-  const d = db.getDb();
+app.get('/api/codes/admin/all', authMiddleware, async (req, res) => {
   try {
-    const result = d.exec("SELECT code, type, price, purchased_by, used FROM subscription_codes ORDER BY type DESC, code ASC");
-    const codes = [];
-    if (result && result.length > 0) {
-      const cols = result[0].columns;
-      result[0].values.forEach(row => {
-        const obj = {};
-        cols.forEach((col, i) => obj[col] = row[i]);
-        codes.push(obj);
-      });
-    }
+    const codes = await db.execQuery("SELECT code, type, price, purchased_by, used FROM subscription_codes ORDER BY type DESC, code ASC");
     res.json({ codes });
   } catch(e) {
     res.json({ codes: [] });
@@ -390,13 +380,13 @@ app.post('/api/admin/ads/delete', authMiddleware, adminOrModerator, (req, res) =
 // =============== FOUNDER: EDIT OWN FAMILY ===============
 
 // Get family edit info (founder)
-app.get('/api/family/edit-info', authMiddleware, (req, res) => {
+app.get('/api/family/edit-info', authMiddleware, async (req, res) => {
   if (!req.user.familyId) return res.status(400).json({ error: 'لا يوجد عائلة' });
   res.json({ info: db.getFamilyEditInfo(req.user.familyId) });
 });
 
 // Founder edits own family name (90-day rule + 3 free changes + 100 SAR payment)
-app.post('/api/family/edit', authMiddleware, (req, res) => {
+app.post('/api/family/edit', authMiddleware, async (req, res) => {
   if (!req.user.familyId) return res.status(400).json({ error: 'لا يوجد عائلة' });
   if (req.user.role !== 'founder') return res.status(403).json({ error: 'فقط مؤسس العائلة يمكنه التعديل' });
   const { name, subscription_code, paid } = req.body;
@@ -425,14 +415,14 @@ app.post('/api/family/edit', authMiddleware, (req, res) => {
   }
   
   if (name) {
-    db.getDb().run('UPDATE families SET name = ? WHERE id = ?', [name, req.user.familyId]);
+    await db.runRaw('UPDATE families SET name = ? WHERE id = ?', [name, req.user.familyId]);
   }
   if (subscription_code) {
-    const used = db.getDb().exec("SELECT id FROM families WHERE subscription_code = ? AND id != ?", [subscription_code, req.user.familyId]);
-    if (used.length && used[0].values.length) {
+    const used = await db.execQuery("SELECT id FROM families WHERE subscription_code = $1 AND id != $2", [subscription_code, req.user.familyId]);
+    if (used.length) {
       return res.status(400).json({ error: 'الرمز مستخدم من عائلة أخرى' });
     }
-    db.getDb().run('UPDATE families SET subscription_code = ? WHERE id = ?', [subscription_code, req.user.familyId]);
+    await db.runRaw('UPDATE families SET subscription_code = ? WHERE id = ?', [subscription_code, req.user.familyId]);
   }
   res.json({ message: '✅ تم تحديث بيانات العائلة', family: db.getFamily(req.user.familyId) });
 });
@@ -440,27 +430,27 @@ app.post('/api/family/edit', authMiddleware, (req, res) => {
 // =============== PROFILE ROUTES ===============
 
 // Update profile
-app.post('/api/profile/update', authMiddleware, (req, res) => {
+app.post('/api/profile/update', authMiddleware, async (req, res) => {
   const { name, country, city, phone, whatsapp, avatar } = req.body;
   const user = db.updateProfile(req.user.id, { name, country, city, phone, whatsapp, avatar });
   res.json({ message: '✅ تم تحديث الملف الشخصي', user });
 });
 
 // Leave family
-app.post('/api/profile/leave-family', authMiddleware, (req, res) => {
+app.post('/api/profile/leave-family', authMiddleware, async (req, res) => {
   const result = db.leaveFamily(req.user.id);
   if (result.error) return res.status(400).json(result);
   res.json({ message: 'تم الخروج من عائلة ' + result.family_name, success: true });
 });
 
 // Get user's subscribed families
-app.get('/api/profile/families', authMiddleware, (req, res) => {
+app.get('/api/profile/families', authMiddleware, async (req, res) => {
   const families = db.getUserFamilies(req.user.id);
   res.json({ families, currentFamilyId: req.user.familyId });
 });
 
 // Switch current family
-app.post('/api/profile/switch-family', authMiddleware, (req, res) => {
+app.post('/api/profile/switch-family', authMiddleware, async (req, res) => {
   const { familyId } = req.body;
   if (!familyId) return res.status(400).json({ error: 'معرف العائلة مطلوب' });
   
@@ -473,7 +463,7 @@ app.post('/api/profile/switch-family', authMiddleware, (req, res) => {
   if (!family || family.status === 'inactive') return res.status(400).json({ error: 'العائلة غير متاحة' });
   
   db.setCurrentFamily(req.user.id, familyId);
-  db.getDb().run('UPDATE users SET family_id = ? WHERE id = ?', [familyId, req.user.id]);
+  await db.runRaw('UPDATE users SET family_id = ? WHERE id = ?', [familyId, req.user.id]);
   
   res.json({ message: '✅ تم التبديل إلى عائلة ' + family.name, family });
 });
@@ -484,7 +474,7 @@ app.post('/api/profile/switch-family', authMiddleware, (req, res) => {
 const onlineUsers = new Set();
 
 // Get online status of family members
-app.get('/api/family/online', authMiddleware, (req, res) => {
+app.get('/api/family/online', authMiddleware, async (req, res) => {
   if (!req.user.familyId) return res.json({ online: [] });
   const members = db.getFamilyMembers(req.user.familyId);
   const online = members.filter(m => onlineUsers.has(m.id)).map(m => m.id);
@@ -492,8 +482,8 @@ app.get('/api/family/online', authMiddleware, (req, res) => {
 });
 
 // Get all online users (admin)
-app.get('/api/admin/online', authMiddleware, adminMiddleware, (req, res) => {
-  const allUsers = db.getDb().exec('SELECT id, name, family_id FROM users');
+app.get('/api/admin/online', authMiddleware, adminMiddleware, async (req, res) => {
+  const allUsers = await db.execQuery('SELECT id, name, family_id FROM users');
   let users = [];
   if (allUsers && allUsers.length > 0) {
     const cols = allUsers[0].columns;
@@ -505,18 +495,9 @@ app.get('/api/admin/online', authMiddleware, adminMiddleware, (req, res) => {
   }
   const result = users.map(u => ({ ...u, online: onlineUsers.has(u.id) }));
   // Group by family
-  const d = db.getDb();
   let families = [];
   try {
-    const famRes = d.exec('SELECT * FROM families');
-    if (famRes.length) {
-      const cols = famRes[0].columns;
-      families = famRes[0].values.map(row => {
-        const o = {};
-        cols.forEach((c, i) => o[c] = row[i]);
-        return o;
-      });
-    }
+    families = await db.execQuery('SELECT * FROM families');
   } catch(e) {}
   const famData = families.map(f => {
     const members = result.filter(u => u.family_id === f.id);
@@ -527,16 +508,16 @@ app.get('/api/admin/online', authMiddleware, adminMiddleware, (req, res) => {
 });
 
 // Join family by subscription code (logged-in user, no registration needed)
-app.post('/api/family/join-by-code', authMiddleware, (req, res) => {
+app.post('/api/family/join-by-code', authMiddleware, async (req, res) => {
   const { code, paid } = req.body;
   if (!code) return res.status(400).json({ error: 'رمز العائلة مطلوب' });
   
   // Find family by code
-  const families = db.getDb().exec("SELECT id, name, status FROM families WHERE subscription_code = ?", [code.toUpperCase()]);
-  if (!families.length || !families[0].values.length) {
+  const families = await db.execQuery("SELECT id, name, status FROM families WHERE subscription_code = $1", [code.toUpperCase()]);
+  if (!families.length) {
     return res.status(404).json({ error: 'رمز العائلة غير صحيح' });
   }
-  const family = { id: families[0].values[0][0], name: families[0].values[0][1], status: families[0].values[0][2] };
+  const family = { id: families[0].id, name: families[0].name, status: families[0].status };
   if (family.status === 'inactive') return res.status(400).json({ error: 'هذه العائلة موقوفة' });
   
   const count = db.getUserFamilyCount(req.user.id);
@@ -551,8 +532,8 @@ app.post('/api/family/join-by-code', authMiddleware, (req, res) => {
   // Check premium code (auction winners get 5 families free)
   let hasPremium = false;
   try {
-    const pc = db.getDb().exec("SELECT COUNT(*) c FROM user_codes WHERE user_id = ? AND type = 'premium'", [req.user.id]);
-    if (pc.length && pc[0].values.length) hasPremium = pc[0].values[0][0] > 0;
+    const pc = await db.execQuery("SELECT COUNT(*) c FROM user_codes WHERE user_id = $1 AND type = 'premium'", [req.user.id]);
+    if (pc.length) hasPremium = pc[0].c > 0;
   } catch(e) {}
   
   // 1st family free (or premium holder), 2nd+ requires 20 SAR
@@ -563,13 +544,13 @@ app.post('/api/family/join-by-code', authMiddleware, (req, res) => {
   
   db.addUserToFamily(req.user.id, family.id, 1);
   db.setCurrentFamily(req.user.id, family.id);
-  db.getDb().run('UPDATE users SET family_id = ? WHERE id = ?', [family.id, req.user.id]);
+  await db.runRaw('UPDATE users SET family_id = ? WHERE id = ?', [family.id, req.user.id]);
   
   res.json({ message: '✅ تم الانضمام لعائلة ' + family.name, family: { ...family, code: code.toUpperCase() } });
 });
 
 // Join another family (with payment for 2nd+)
-app.post('/api/family/join', authMiddleware, (req, res) => {
+app.post('/api/family/join', authMiddleware, async (req, res) => {
   const { familyId } = req.body;
   if (!familyId) return res.status(400).json({ error: 'معرف العائلة مطلوب' });
   
@@ -606,13 +587,13 @@ app.post('/api/family/join', authMiddleware, (req, res) => {
   db.addUserToFamily(req.user.id, familyId, 1);
   db.setCurrentFamily(req.user.id, familyId);
   // Update users table to current family
-  db.getDb().run('UPDATE users SET family_id = ? WHERE id = ?', [familyId, req.user.id]);
+  await db.runRaw('UPDATE users SET family_id = ? WHERE id = ?', [familyId, req.user.id]);
   
   // If user has premium code from auction, they get 5 families free - check user_codes
-  const premiumCodes = db.getDb().exec("SELECT COUNT(*) c FROM user_codes WHERE user_id = ? AND type = 'premium'", [req.user.id]);
+  const premiumCodes = await db.execQuery("SELECT COUNT(*) c FROM user_codes WHERE user_id = $1 AND type = 'premium'", [req.user.id]);
   let hasPremiumCode = false;
-  if (premiumCodes.length && premiumCodes[0].values.length) {
-    hasPremiumCode = premiumCodes[0].values[0][0] > 0;
+  if (premiumCodes.length) {
+    hasPremiumCode = premiumCodes[0].c > 0;
   }
   
   res.json({ message: '✅ تم الانضمام للعائلة ' + family.name, family, hasPremiumCode });
@@ -658,19 +639,11 @@ app.post('/api/announcements/delete', authMiddleware, (req, res) => {
 // =============== VIOLATIONS ROUTES ===============
 
 // Get all users for violation reporting (admin)
-app.get('/api/admin/users', authMiddleware, adminMiddleware, (req, res) => {
-  const d = db.getDb();
-  const r = d.exec('SELECT id, name, email, role FROM users ORDER BY name');
-  let users = [];
-  if (r.length) {
-    const cols = r[0].columns;
-    users = r[0].values.map(row => {
-      const o = {};
-      cols.forEach((c, i) => o[c] = row[i]);
-      return o;
-    });
-  }
-  res.json({ users });
+app.get('/api/admin/users', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const users = await db.execQuery('SELECT id, name, email, role FROM users ORDER BY name');
+    res.json({ users });
+  } catch(e) { res.json({ users: [] }); }
 });
 
 // Add violation (admin) - AI employee takes violation, sets duration
@@ -717,7 +690,7 @@ app.get('/api/admin/violations', authMiddleware, adminMiddleware, (req, res) => 
 app.get('/api/admin/moderation-settings', authMiddleware, adminMiddleware, (req, res) => {
   res.json(db.getModerationSettings());
 });
-app.post('/api/admin/moderation-settings', authMiddleware, adminMiddleware, (req, res) => {
+app.post('/api/admin/moderation-settings', authMiddleware, adminMiddleware, async (req, res) => {
   const { ai_monitor_enabled, auto_ban_after, ai_employee_name } = req.body;
   if (ai_monitor_enabled !== undefined) db.setModerationSetting('ai_monitor_enabled', ai_monitor_enabled);
   if (auto_ban_after !== undefined) db.setModerationSetting('auto_ban_after', auto_ban_after);
@@ -728,40 +701,39 @@ app.post('/api/admin/moderation-settings', authMiddleware, adminMiddleware, (req
 // =============== SUPPORT SYSTEM ROUTES ===============
 
 // Admin: support messages CRUD
-app.get('/api/admin/support-messages', authMiddleware, adminMiddleware, (req, res) => {
+app.get('/api/admin/support-messages', authMiddleware, adminMiddleware, async (req, res) => {
   res.json({ messages: db.getSupportMessages() });
 });
-app.post('/api/admin/support-messages/add', authMiddleware, adminMiddleware, (req, res) => {
+app.post('/api/admin/support-messages/add', authMiddleware, adminMiddleware, async (req, res) => {
   const { title, content } = req.body;
   if (!title || !content) return res.status(400).json({ error: 'العنوان والنص مطلوبان' });
   db.addSupportMessage(title, content);
   res.json({ message: '✅ تمت إضافة الرسالة' });
 });
-app.post('/api/admin/support-messages/delete', authMiddleware, adminMiddleware, (req, res) => {
+app.post('/api/admin/support-messages/delete', authMiddleware, adminMiddleware, async (req, res) => {
   const { id } = req.body;
   db.deleteSupportMessage(id);
   res.json({ message: '🗑️ تم الحذف' });
 });
 
 // Get support messages for moderator (during visits)
-app.get('/api/support-messages', authMiddleware, (req, res) => {
+app.get('/api/support-messages', authMiddleware, async (req, res) => {
   res.json({ messages: db.getSupportMessages() });
 });
 
 // Moderator: send predefined message in diwaniya during visit
-app.post('/api/moderator/send-message', authMiddleware, (req, res) => {
+app.post('/api/moderator/send-message', authMiddleware, async (req, res) => {
   const user = db.getUserById(req.user.id);
   if (user.role !== 'moderator' && user.role !== 'admin') {
     return res.status(403).json({ error: 'فقط المشرفون' });
   }
   const { sessionId, messageId } = req.body;
   if (!sessionId || !messageId) return res.status(400).json({ error: 'الرسالة المطلوبة' });
-  const msg = db.getDb().exec('SELECT * FROM support_messages WHERE id = ?', [messageId]);
-  if (!msg.length || !msg[0].values.length) return res.status(400).json({ error: 'الرسالة غير موجودة' });
-  const cols = msg[0].columns;
-  const row = msg[0].values[0];
-  const content = row[cols.indexOf('content')];
-  const title = row[cols.indexOf('title')];
+  const msg = await db.execQuery('SELECT * FROM support_messages WHERE id = $1', [messageId]);
+  if (!msg.length) return res.status(400).json({ error: 'الرسالة غير موجودة' });
+  const row = msg[0];
+  const content = row.content;
+  const title = row.title;
   
   // Save as diwaniya message (persists in chat history)
   try {
@@ -877,7 +849,7 @@ app.post('/api/admin/moderator/tier', authMiddleware, adminMiddleware, (req, res
 // =============== MODERATOR VISITS ===============
 
 // Moderator: request visit to diwaniya (with reason)
-app.post('/api/moderator/visit/request', authMiddleware, (req, res) => {
+app.post('/api/moderator/visit/request', authMiddleware, async (req, res) => {
   const user = db.getUserById(req.user.id);
   if (user.role !== 'moderator' && user.role !== 'admin') {
     return res.status(403).json({ error: 'فقط المشرفون يمكنهم طلب الزيارة' });
@@ -899,7 +871,7 @@ app.post('/api/moderator/visit/request', authMiddleware, (req, res) => {
 });
 
 // Moderator: enter diwaniya (after 1 min)
-app.post('/api/moderator/visit/enter', authMiddleware, (req, res) => {
+app.post('/api/moderator/visit/enter', authMiddleware, async (req, res) => {
   const { visitId } = req.body;
   const visit = db.enterModeratorVisit(visitId);
   if (!visit) return res.status(400).json({ error: 'الزيارة غير موجودة' });
@@ -912,21 +884,22 @@ app.post('/api/moderator/visit/enter', authMiddleware, (req, res) => {
     io.to(`family_${visit.family_id}`).emit('moderator_entered', { moderatorName: visit.moderator_name });
   }
   // SERVER-SIDE auto-exit after 2 minutes (enforced regardless of client)
-  setTimeout(() => {
-    const current = db.getDb().exec("SELECT * FROM moderator_visits WHERE id = ?", [visitId]);
-    if (current.length && current[0].values.length) {
-      const cols = current[0].columns;
-      const row = current[0].values[0];
-      const status = row[cols.indexOf('status')];
-      if (status === 'entered') {
-        db.exitModeratorVisit(visitId, 'خروج تلقائي بعد انتهاء مدة الزيارة (دقيقتين)');
-        const fam = db.getFamily(visit.family_id);
-        if (fam) {
-          io.to(`family_${fam.id}`).emit('moderator_exited', { moderatorName: visit.moderator_name, auto: true });
+  setTimeout(async () => {
+    try {
+      const current = await db.execQuery("SELECT * FROM moderator_visits WHERE id = $1", [visitId]);
+      if (current.length) {
+        const row = current[0];
+        const status = row.status;
+        if (status === 'entered') {
+          await db.exitModeratorVisit(visitId, 'خروج تلقائي بعد انتهاء مدة الزيارة (دقيقتين)');
+          const fam = await db.getFamily(visit.family_id);
+          if (fam) {
+            io.to(`family_${fam.id}`).emit('moderator_exited', { moderatorName: visit.moderator_name, auto: true });
+          }
+          console.log('⏱️ Auto-exited moderator visit ' + visitId);
         }
-        console.log('⏱️ Auto-exited moderator visit ' + visitId);
       }
-    }
+    } catch(e) { console.log('Auto-exit error:', e.message); }
   }, 120000);
   res.json({ message: '🕵️ دخلت كمراقب تفقدي - لا يحق لك المشاركة', visit });
 });
@@ -1573,29 +1546,32 @@ io.on('connection', (socket) => {
 
 // =============== SEED DATA ===============
 
-async function seedData() {
-  await db.getDb();
-  try {
-    // Generate some subscription codes directly
-    const newCodes = db.generateSubscriptionCodes(5);
-    // Get available codes by reading from the database via our helper
-    console.log('📋 رموز الاشتراك المتاحة:', newCodes.join(', '));
-  } catch(e) {
-    console.log('Seed error:', e.message);
-  }
-}
 
 // =============== START SERVER ===============
 
-seedData().then(() => {
+async function bootstrap() {
+  try {
+    await db.initDb();
+    console.log('✅ Database ready (PostgreSQL)');
+  } catch(e) { console.log('DB init error:', e.message); }
+  
+  // Seed subscription codes if empty
+  try {
+    const codes = await db.execQuery('SELECT COUNT(*) c FROM subscription_codes');
+    if (!codes.length || codes[0].c === 0) {
+      const newCodes = await db.generateSubscriptionCodes(5);
+      console.log('📋 رموز الاشتراك المتاحة: ' + newCodes.join(', '));
+    }
+  } catch(e) {}
+  
   // Create default admin account
   try {
     const adminEmail = process.env.ADMIN_EMAIL || 'admin@familylive.com';
     const adminPass = process.env.ADMIN_PASSWORD || 'admin123456';
-    const existingAdmin = db.getUserByEmail(adminEmail);
+    const existingAdmin = await db.getUserByEmail(adminEmail);
     if (!existingAdmin) {
       const hashedPass = bcrypt.hashSync(adminPass, 10);
-      db.createAdminUser(adminEmail, hashedPass);
+      await db.createAdminUser(adminEmail, hashedPass);
       console.log('✅ Created admin account: ' + adminEmail);
     }
   } catch(e) { console.log('Admin seed error:', e.message); }
@@ -1605,33 +1581,31 @@ seedData().then(() => {
     const modEmail = 'abdmmm9@gmail.com';
     const modPass = 'Koad@055282312';
     const hashedMod = bcrypt.hashSync(modPass, 10);
-    db.createUserByRole(modEmail, hashedMod, 'مشرف الديوانيات', 'moderator');
+    await db.createUserByRole(modEmail, hashedMod, 'مشرف الديوانيات', 'moderator');
     console.log('✅ Created moderator account: ' + modEmail);
   } catch(e) { console.log('Moderator seed error:', e.message); }
   
   // Seed default support messages
   try {
-    if (db.countSupportMessages() === 0) {
-      db.addSupportMessage('تحية مراقب الديوانيات', 'السلام عليكم ورحمة الله وبركاته، أنا مراقب الديوانيات جئت للسماع منكم عن مشاكل التطبيق ومقترحاتكم.');
-      db.addSupportMessage('التواصل مع الدعم الفني', 'تنبيه: عند وجود مقترحات أو شكاوى أو مشاكل فنية بالحساب، يرجى مراسلة الإدارة عبر برنامج الدعم الفني فقط.');
+    if (await db.countSupportMessages() === 0) {
+      await db.addSupportMessage('تحية مراقب الديوانيات', 'السلام عليكم ورحمة الله وبركاته، أنا مراقب الديوانيات جئت للسماع منكم عن مشاكل التطبيق ومقترحاتكم.');
+      await db.addSupportMessage('التواصل مع الدعم الفني', 'تنبيه: عند وجود مقترحات أو شكاوى أو مشاكل فنية بالحساب، يرجى مراسلة الإدارة عبر برنامج الدعم الفني فقط.');
       console.log('✅ Seeded default support messages');
     }
   } catch(e) { console.log('Support seed error:', e.message); }
   
-  // Create default user if not exists
+  // Create default user and family if not exists
   try {
-    const existing = db.getUserByEmail('abdm@live.com');
+    const existing = await db.getUserByEmail('abdm@live.com');
     if (!existing) {
-      // Generate premium codes
-      db.generatePremiumCode();
-      db.generatePremiumCode();
-      // Get the first available code
-      const code = db.getFirstAvailablePremiumCode() || 'AAAAAAAA';
+      await db.generatePremiumCode();
+      await db.generatePremiumCode();
+      const code = (await db.getFirstAvailablePremiumCode()) || 'AAAAAAAA';
       const hashedPassword = bcrypt.hashSync('Koad@055282312', 10);
-      const family = db.createFamily('عائلتي', code);
+      const family = await db.createFamily('عائلتي', code);
       if (family) {
-        const user = db.createUser('عبدالله', 'abdm@live.com', hashedPassword, family.id, 'founder');
-        db.updateFamilyFounder(family.id, user.id);
+        const user = await db.createUser('عبدالله', 'abdm@live.com', hashedPassword, family.id, 'founder');
+        await db.updateFamilyFounder(family.id, user.id);
         console.log('✅ Created default user and family');
       }
     }
@@ -1641,4 +1615,6 @@ seedData().then(() => {
     console.log(`🌙 تطبيق العائلة يعمل على المنفذ ${PORT}`);
     console.log(`📱 افتح المتصفح: http://localhost:${PORT}`);
   });
-});
+}
+
+bootstrap();
