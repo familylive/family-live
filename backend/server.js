@@ -383,8 +383,8 @@ app.post('/api/admin/ads/delete', authMiddleware, adminMiddleware, (req, res) =>
 
 // Update profile
 app.post('/api/profile/update', authMiddleware, (req, res) => {
-  const { name, country, city, phone, avatar } = req.body;
-  const user = db.updateProfile(req.user.id, { name, country, city, phone, avatar });
+  const { name, country, city, phone, whatsapp, avatar } = req.body;
+  const user = db.updateProfile(req.user.id, { name, country, city, phone, whatsapp, avatar });
   res.json({ message: '✅ تم تحديث الملف الشخصي', user });
 });
 
@@ -762,7 +762,8 @@ app.get('/api/family', authMiddleware, (req, res) => {
   const family = db.getFamily(req.user.familyId);
   const members = db.getFamilyMembers(req.user.familyId);
   const invitations = db.getInvitationsByFamily(req.user.familyId);
-  res.json({ family, members, invitations });
+  const founder = db.getUserById(family.founder_id);
+  res.json({ family, members, invitations, founder });
 });
 
 // Send invitations

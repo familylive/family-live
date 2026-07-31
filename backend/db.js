@@ -52,6 +52,7 @@ function initDb() {
       email TEXT NOT NULL UNIQUE,
       password TEXT NOT NULL,
       phone TEXT,
+      whatsapp TEXT,
       country TEXT,
       city TEXT,
       family_id TEXT,
@@ -301,11 +302,11 @@ function getUserByEmail(email) {
 }
 
 function getUserById(id) {
-  return queryOne('SELECT id, name, email, phone, family_id, role, avatar, points, created_at FROM users WHERE id = ?', [id]);
+  return queryOne('SELECT id, name, email, phone, whatsapp, country, city, family_id, role, avatar, points, created_at FROM users WHERE id = ?', [id]);
 }
 
 function getFamilyMembers(familyId) {
-  return queryAll('SELECT id, name, email, role, avatar, points, last_seen FROM users WHERE family_id = ? ORDER BY role DESC, points DESC', [familyId]);
+  return queryAll('SELECT id, name, email, phone, whatsapp, role, avatar, points, last_seen FROM users WHERE family_id = ? ORDER BY role DESC, points DESC', [familyId]);
 }
 
 // Family functions
@@ -738,11 +739,12 @@ function deleteAnnouncement(id) {
 }
 
 function updateProfile(userId, data) {
-  const { name, country, city, phone, avatar } = data;
+  const { name, country, city, phone, whatsapp, avatar } = data;
   if (name !== undefined) run('UPDATE users SET name = ? WHERE id = ?', [name, userId]);
   if (country !== undefined) run('UPDATE users SET country = ? WHERE id = ?', [country, userId]);
   if (city !== undefined) run('UPDATE users SET city = ? WHERE id = ?', [city, userId]);
   if (phone !== undefined) run('UPDATE users SET phone = ? WHERE id = ?', [phone, userId]);
+  if (whatsapp !== undefined) run('UPDATE users SET whatsapp = ? WHERE id = ?', [whatsapp, userId]);
   if (avatar !== undefined) run('UPDATE users SET avatar = ? WHERE id = ?', [avatar, userId]);
   return getUserById(userId);
 }

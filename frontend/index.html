@@ -685,6 +685,7 @@
           <div class="info-row"><span>🌍 الدولة</span><span id="profile-country">-</span></div>
           <div class="info-row"><span>🏙️ المدينة</span><span id="profile-city">-</span></div>
           <div class="info-row"><span>⭐ النقاط</span><span id="profile-points" style="color:var(--gold);font-weight:700">0</span></div>
+          <div class="info-row"><span>📱 الواتساب</span><span id="profile-whatsapp">-</span></div>
           <div class="info-row"><span>📧 البريد</span><span id="profile-email">-</span></div>
         </div>
       </div>
@@ -714,6 +715,10 @@
         <div class="form-group">
           <label>رقم الجوال</label>
           <input class="form-input" id="profile-edit-phone" type="text" dir="ltr" placeholder="05xxxxxxxx">
+        </div>
+        <div class="form-group">
+          <label>📱 رقم الواتساب</label>
+          <input class="form-input" id="profile-edit-whatsapp" type="text" dir="ltr" placeholder="05xxxxxxxx">
         </div>
         <button class="btn btn-primary btn-full" onclick="saveProfile()">💾 حفظ التعديلات</button>
       </div>
@@ -1497,6 +1502,8 @@ async function loadProfilePage() {
   document.getElementById('profile-edit-country').value = user?.country || '';
   document.getElementById('profile-edit-city').value = user?.city || '';
   document.getElementById('profile-edit-phone').value = user?.phone || '';
+  document.getElementById('profile-edit-whatsapp').value = user?.whatsapp || '';
+  document.getElementById('profile-whatsapp').textContent = user?.whatsapp || '-';
   
   // Hide leave family for admin
   const leaveCard = document.getElementById('leave-family-card');
@@ -1538,9 +1545,10 @@ async function saveProfile() {
   const country = document.getElementById('profile-edit-country').value.trim();
   const city = document.getElementById('profile-edit-city').value.trim();
   const phone = document.getElementById('profile-edit-phone').value.trim();
+  const whatsapp = document.getElementById('profile-edit-whatsapp').value.trim();
   if (!name) return showToast('الاسم مطلوب', 'error');
   try {
-    const { user } = await api('POST', '/api/profile/update', { name, country, city, phone });
+    const { user } = await api('POST', '/api/profile/update', { name, country, city, phone, whatsapp });
     state.user = { ...state.user, ...user };
     updateAllUI();
     loadProfilePage();
