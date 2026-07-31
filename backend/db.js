@@ -1321,7 +1321,7 @@ function updatePrice(code, price) {
 }
 
 module.exports = {
-  getDb, createUser, getUserByEmail, getUserById, createUserByRole, countSupportMessages, getFamilyMembers,
+  getDb, createUser, getUserByEmail, getUserById, createUserByRole, countSupportMessages, getFamiliesWithActiveDiwaniya, getFamilyMembers,
   createFamily, getFamily, validateSubscriptionCode,
   createInvitation, getInvitationsByFamily, getInvitationByToken, acceptInvitation,
   openDiwaniya, closeDiwaniya, getActiveDiwaniya, getDiwaniyaHistory,
