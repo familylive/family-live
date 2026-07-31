@@ -68,6 +68,7 @@ async function api(method, path, body = null) {
   } else {
     showAuth('landing');
     loadLandingPage();
+    updateMenuVisibility();
   }
 })();
 
@@ -170,6 +171,7 @@ function logout() {
   // Show landing
   showAuth('landing');
   loadLandingPage();
+  updateMenuVisibility();
   showToast('تم تسجيل الخروج 👋');
 }
 
@@ -285,30 +287,7 @@ function updateAllUI() {
   }
   
   // Adapt menu for visitors vs logged-in users
-  const isLogged = state.isLoggedIn;
-  const loginItem = document.getElementById('menu-login-item');
-  const registerItem = document.getElementById('menu-register-item');
-  const logoutBtn = document.getElementById('menu-logout-btn');
-  const aboutItem = document.getElementById('menu-about-item');
-  const privacyItem = document.getElementById('menu-privacy-item');
-  const supportVisitor = document.getElementById('menu-support-visitor');
-  const supportItem = document.querySelector('.menu-nav-item[data-page="support"]');
-  // App pages to hide for visitors
-  const appPages = ['page-dashboard','page-family','page-diwaniya','page-games','page-challenges','page-leaderboard','page-codes','page-auctions','page-profile'];
-  
-  if (loginItem) loginItem.style.display = isLogged ? 'none' : 'flex';
-  if (registerItem) registerItem.style.display = isLogged ? 'none' : 'flex';
-  if (logoutBtn) logoutBtn.style.display = isLogged ? 'flex' : 'none';
-  if (aboutItem) aboutItem.style.display = isLogged ? 'none' : 'flex';
-  if (privacyItem) privacyItem.style.display = isLogged ? 'none' : 'flex';
-  if (supportVisitor) supportVisitor.style.display = isLogged ? 'none' : 'flex';
-  if (supportItem) supportItem.style.display = isLogged ? 'flex' : 'none';
-  
-  // Hide/show app pages in menu for visitors
-  appPages.forEach(p => {
-    const item = document.querySelector('.menu-nav-item[data-page="' + p.replace('page-','') + '"]');
-    if (item) item.style.display = isLogged ? 'flex' : 'none';
-  });
+  updateMenuVisibility();
 
   const inviteSection = document.getElementById('invite-section');
   const diwCtrl = document.getElementById('diwaniya-controls-card');
@@ -343,6 +322,39 @@ function updateAllUI() {
     loadDiwaniyaMessages(state.activeSession.id);
   }
   } catch(e) { console.error('updateAllUI error:', e.message); }
+}
+
+// ==================== MENU VISIBILITY ====================
+function updateMenuVisibility() {
+  const isLogged = !!(state.isLoggedIn && state.user);
+  const loginItem = document.getElementById('menu-login-item');
+  const registerItem = document.getElementById('menu-register-item');
+  const logoutBtn = document.getElementById('menu-logout-btn');
+  const aboutItem = document.getElementById('menu-about-item');
+  const privacyItem = document.getElementById('menu-privacy-item');
+  const supportVisitor = document.getElementById('menu-support-visitor');
+  const supportItem = document.querySelector('.menu-nav-item[data-page="support"]');
+  const joinMenu = document.getElementById('menu-join-family');
+  const adminMenu = document.getElementById('menu-admin');
+  const modMenu = document.getElementById('menu-moderator');
+  // App pages to hide for visitors
+  const appPages = ['dashboard','family','diwaniya','games','challenges','leaderboard','codes','auctions','profile'];
+  
+  if (loginItem) loginItem.style.display = isLogged ? 'none' : 'flex';
+  if (registerItem) registerItem.style.display = isLogged ? 'none' : 'flex';
+  if (logoutBtn) logoutBtn.style.display = isLogged ? 'flex' : 'none';
+  if (aboutItem) aboutItem.style.display = isLogged ? 'none' : 'flex';
+  if (privacyItem) privacyItem.style.display = isLogged ? 'none' : 'flex';
+  if (supportVisitor) supportVisitor.style.display = isLogged ? 'none' : 'flex';
+  if (supportItem) supportItem.style.display = isLogged ? 'flex' : 'none';
+  if (joinMenu) joinMenu.style.display = (isLogged && !state.family) ? 'flex' : 'none';
+  if (adminMenu) adminMenu.style.display = (state.user?.role === 'admin') ? 'flex' : 'none';
+  if (modMenu) modMenu.style.display = (state.user?.role === 'moderator' || state.user?.role === 'admin') ? 'flex' : 'none';
+  
+  appPages.forEach(p => {
+    const item = document.querySelector('.menu-nav-item[data-page="' + p + '"]');
+    if (item) item.style.display = isLogged ? 'flex' : 'none';
+  });
 }
 
 // ==================== SOCKET ====================
