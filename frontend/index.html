@@ -812,6 +812,42 @@
         </div>
       </div>
 
+      <div class="card" id="admin-ai-card">
+        <div class="card-title">🤖 موظف الذكاء الاصطناعي - نظام المخالفات</div>
+        <div id="ai-violation-stats" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"></div>
+        <div class="form-group">
+          <label>العضو المخالف</label>
+          <select class="form-input" id="violation-user">
+            <option value="">اختر العضو...</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>سبب المخالفة</label>
+          <input class="form-input" id="violation-reason" type="text" placeholder="مثال: كلمات ممنوعة في المحادثة الصوتية">
+        </div>
+        <div style="display:flex;gap:8px">
+          <div class="form-group" style="flex:1">
+            <label>نوع المخالفة</label>
+            <select class="form-input" id="violation-type">
+              <option value="text">✍️ نصي</option>
+              <option value="audio">🎤 صوتي</option>
+              <option value="video">🎥 فيديو</option>
+              <option value="image">📷 صورة</option>
+            </select>
+          </div>
+          <div class="form-group" style="flex:1">
+            <label>مدة الإيقاف (ساعات)</label>
+            <input class="form-input" id="violation-duration" type="number" value="24" min="1">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>الدليل (اختياري)</label>
+          <input class="form-input" id="violation-evidence" type="text" placeholder="وصف الدليل..." dir="ltr">
+        </div>
+        <button class="btn btn-danger btn-full" onclick="addViolation()">⛔ تسجيل المخالفة وإيقاف العضوية</button>
+        <div id="violations-log" style="margin-top:14px"></div>
+      </div>
+
       <div class="card" id="admin-moderation-card">
         <div class="card-title">🚫 الرقابة - الكلمات الممنوعة</div>
         <div style="display:flex;gap:8px;margin-bottom:10px">
@@ -973,7 +1009,7 @@ function navigateTo(pageName) {
   if (pageName === 'dashboard' && state.isLoggedIn) { loadDashboardAuctions(); loadDashboardAds(); }
   if (pageName === 'profile' && state.isLoggedIn) { loadProfilePage(); loadMyFamilies(); }
   if (pageName === 'family' && state.isLoggedIn) { loadAnnouncements(); populateAnnTarget(); populateManagerSelect(); }
-  if (pageName === 'admin' && state.user?.role === 'admin') { loadBannedWords(); loadAdminBans(); }
+  if (pageName === 'admin' && state.user?.role === 'admin') { loadBannedWords(); loadAdminBans(); loadAIUsers(); loadViolations(); }
   if (pageName === 'codes' && state.isLoggedIn) loadCodesPage();
   if (pageName === 'auctions' && state.isLoggedIn) loadAuctionsPage();
   if (pageName === 'admin' && state.user?.role === 'admin') { loadAdminPage(); loadAdminAuctions(); }
@@ -1786,6 +1822,66 @@ async function grantDiwaniyaManager(canOpen) {
     await api('POST', '/api/family/diwaniya-manager', { userId, canOpen });
     showToast(canOpen ? '🗝️ تم منح الصلاحية' : 'تم سحب الصلاحية', 'success');
     refreshData();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+// ==================== AI EMPLOYEE / VIOLATIONS ====================
+async function loadAIUsers() {
+  try {
+    const { users } = await api('GET', '/api/admin/users');
+    const select = document.getElementById('violation-user');
+    if (!select) return;
+    select.innerHTML = '<option value="">اختر العضو...</option>' +
+      users.map(u => '<option value="' + u.id + '">' + (u.name || u.email) + ' (' + (u.role === 'admin' ? 'مدير' : u.role === 'founder' ? 'مؤسس' : 'عضو') + ')</option>').join('');
+  } catch(e) {}
+}
+
+async function loadViolations() {
+  try {
+    const { violations, stats } = await api('GET', '/api/admin/violations');
+    const statsDiv = document.getElementById('ai-violation-stats');
+    if (statsDiv) {
+      statsDiv.innerHTML =
+        '<div class="admin-stat-box"><div class="admin-stat-num">' + (stats.total||0) + '</div><div class="admin-stat-label">📋 مخالفة</div></div>' +
+        '<div class="admin-stat-box"><div class="admin-stat-num">' + (stats.text||0) + '</div><div class="admin-stat-label">✍️ نص</div></div>' +
+        '<div class="admin-stat-box"><div class="admin-stat-num">' + (stats.audio||0) + '</div><div class="admin-stat-label">🎤 صوت</div></div>' +
+        '<div class="admin-stat-box"><div class="admin-stat-num">' + (stats.video||0) + '</div><div class="admin-stat-label">🎥 فيديو</div></div>';
+    }
+    const log = document.getElementById('violations-log');
+    if (!violations?.length) {
+      log.innerHTML = '<div class="empty-state"><div class="empty-text">لا توجد مخالفات مسجلة</div></div>';
+      return;
+    }
+    log.innerHTML = '<div class="card-title" style="font-size:14px;margin-bottom:8px">📋 سجل المخالفات</div>' +
+      violations.map(v => {
+        const typeIcon = { text:'✍️', audio:'🎤', video:'🎥', image:'📷' }[v.violation_type] || '📋';
+        const until = v.banned_until ? new Date(v.banned_until).toLocaleString('ar-SA') : '-';
+        return '<div class="admin-family-item">' +
+          '<div class="admin-family-name">' + typeIcon + ' ' + (v.user_name || '') + ' <span style="font-size:11px;color:var(--danger)">موقوف</span></div>' +
+          '<div class="admin-family-meta">' + (v.reason || '') + ' · ' + (v.duration_hours||0) + ' ساعة · حتى ' + until + '</div>' +
+        '</div>';
+      }).join('');
+  } catch(e) { console.error('Violations:', e); }
+}
+
+async function addViolation() {
+  const userId = document.getElementById('violation-user').value;
+  const reason = document.getElementById('violation-reason').value.trim();
+  const violationType = document.getElementById('violation-type').value;
+  const durationHours = parseInt(document.getElementById('violation-duration').value);
+  const evidence = document.getElementById('violation-evidence').value.trim();
+  if (!userId) return showToast('اختر العضو المخالف', 'error');
+  if (!reason) return showToast('اكتب سبب المخالفة', 'error');
+  if (!durationHours) return showToast('حدد مدة الإيقاف', 'error');
+  if (!confirm('⛔ تأكيد تسجيل المخالفة وإيقاف العضوية؟')) return;
+  try {
+    await api('POST', '/api/admin/violations/add', { userId, reason, durationHours, violationType, evidence });
+    showToast('⛔ تم تسجيل المخالفة وإيقاف العضوية', 'success');
+    document.getElementById('violation-reason').value = '';
+    document.getElementById('violation-evidence').value = '';
+    document.getElementById('violation-duration').value = '24';
+    loadViolations();
+    loadAdminBans();
   } catch(e) { showToast(e.message, 'error'); }
 }
 

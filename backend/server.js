@@ -555,6 +555,51 @@ app.post('/api/announcements/delete', authMiddleware, (req, res) => {
   res.json({ message: 'تم' });
 });
 
+// =============== VIOLATIONS ROUTES ===============
+
+// Get all users for violation reporting (admin)
+app.get('/api/admin/users', authMiddleware, adminMiddleware, (req, res) => {
+  const d = db.getDb();
+  const r = d.exec('SELECT id, name, email, role FROM users ORDER BY name');
+  let users = [];
+  if (r.length) {
+    const cols = r[0].columns;
+    users = r[0].values.map(row => {
+      const o = {};
+      cols.forEach((c, i) => o[c] = row[i]);
+      return o;
+    });
+  }
+  res.json({ users });
+});
+
+// Add violation (admin) - AI employee takes violation, sets duration
+app.post('/api/admin/violations/add', authMiddleware, adminMiddleware, (req, res) => {
+  const { userId, reason, durationHours, violationType, evidence } = req.body;
+  if (!userId || !reason || !durationHours) return res.status(400).json({ error: 'جميع الحقول مطلوبة' });
+  const violation = db.addViolation(userId, reason, parseInt(durationHours), violationType || 'text', evidence, req.user.id);
+  res.json({ message: '⛔ تم تسجيل المخالفة وإيقاف العضوية', violation });
+});
+
+// Get all violations (admin)
+app.get('/api/admin/violations', authMiddleware, adminMiddleware, (req, res) => {
+  const violations = db.getAllViolations();
+  const stats = db.getViolationStats();
+  res.json({ violations, stats });
+});
+
+// Moderation settings (admin)
+app.get('/api/admin/moderation-settings', authMiddleware, adminMiddleware, (req, res) => {
+  res.json(db.getModerationSettings());
+});
+app.post('/api/admin/moderation-settings', authMiddleware, adminMiddleware, (req, res) => {
+  const { ai_monitor_enabled, auto_ban_after, ai_employee_name } = req.body;
+  if (ai_monitor_enabled !== undefined) db.setModerationSetting('ai_monitor_enabled', ai_monitor_enabled);
+  if (auto_ban_after !== undefined) db.setModerationSetting('auto_ban_after', auto_ban_after);
+  if (ai_employee_name !== undefined) db.setModerationSetting('ai_employee_name', ai_employee_name);
+  res.json({ message: '✅ تم حفظ الإعدادات', settings: db.getModerationSettings() });
+});
+
 // =============== MODERATION ROUTES ===============
 
 // Banned words (admin)

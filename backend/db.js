@@ -239,6 +239,20 @@ function initDb() {
     )
   `);
   db.run(`
+    CREATE TABLE IF NOT EXISTS violations (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      reason TEXT NOT NULL,
+      duration_hours INTEGER DEFAULT 24,
+      violation_type TEXT NOT NULL DEFAULT 'text' CHECK(violation_type IN ('text', 'audio', 'video', 'image')),
+      evidence TEXT,
+      created_by TEXT,
+      banned_until TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  `);
+  db.run(`
     CREATE TABLE IF NOT EXISTS user_codes (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,
@@ -601,6 +615,53 @@ function unbanUser(userId) {
   return true;
 }
 
+// =============== VIOLATIONS (AI EMPLOYEE SYSTEM) ===============
+function addViolation(userId, reason, durationHours, violationType, evidence, createdBy) {
+  const id = uuidv4();
+  const bannedUntil = new Date(Date.now() + durationHours * 3600000).toISOString();
+  run('INSERT INTO violations (id, user_id, reason, duration_hours, violation_type, evidence, created_by, banned_until) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    [id, userId, reason, durationHours, violationType, evidence || '', createdBy, bannedUntil]);
+  // Auto-ban the user
+  run("UPDATE bans SET status = 'expired' WHERE user_id = ? AND status = 'active'", [userId]);
+  run('INSERT INTO bans (id, user_id, reason, duration_hours, banned_until, created_by) VALUES (?, ?, ?, ?, ?, ?)',
+    [uuidv4(), userId, reason, durationHours, bannedUntil, createdBy]);
+  return queryOne('SELECT * FROM violations WHERE id = ?', [id]);
+}
+
+function getAllViolations() {
+  return queryAll(`
+    SELECT v.*, u.name as user_name, u.email as user_email
+    FROM violations v
+    JOIN users u ON v.user_id = u.id
+    ORDER BY v.created_at DESC LIMIT 50
+  `);
+}
+
+function getViolationStats() {
+  const total = queryOne('SELECT COUNT(*) as c FROM violations');
+  const text = queryOne("SELECT COUNT(*) as c FROM violations WHERE violation_type = 'text'");
+  const audio = queryOne("SELECT COUNT(*) as c FROM violations WHERE violation_type = 'audio'");
+  const video = queryOne("SELECT COUNT(*) as c FROM violations WHERE violation_type = 'video'");
+  return {
+    total: total ? total.c : 0,
+    text: text ? text.c : 0,
+    audio: audio ? audio.c : 0,
+    video: video ? video.c : 0,
+  };
+}
+
+function getModerationSettings() {
+  return {
+    ai_monitor_enabled: getSetting('ai_monitor_enabled', '1'),
+    auto_ban_after: getSetting('auto_ban_after', '3'),
+    ai_employee_name: getSetting('ai_employee_name', 'موظف الذكاء الاصطناعي'),
+  };
+}
+
+function setModerationSetting(key, value) {
+  setSetting(key, value);
+}
+
 // Diwaniya managers
 function setDiwaniyaManager(userId, canOpen) {
   run('UPDATE users SET can_open_diwaniya = ? WHERE id = ?', [canOpen ? 1 : 0, userId]);
@@ -932,6 +993,6 @@ module.exports = {
   updatePrice, getFirstAvailablePremiumCode,
   getAllFamilies, updateFamilyData, setFamilyStatus, deleteFamily, createAdminUser, getAdminStats,
   getActiveAds, getAllAds, addAd, updateAd, deleteAd, trackAdView, trackAdClick, getAdsStats, getFeaturedFamilies,
-  getBannedWords, addBannedWord, deleteBannedWord, checkBannedWord, banUser, getActiveBan, getAllBans, unbanUser, setDiwaniyaManager, countDiwaniyaManagers, updateProfile, leaveFamily, updateLastSeen, getLastSeen, createAnnouncement, getFamilyAnnouncements, getAnnouncementsForUser, deleteAnnouncement, getUserFamilies, getUserFamilyCount, addUserToFamily, setCurrentFamily, getSetting, setSetting, createAuction, getActiveAuctions, getAllAuctions, getAuctionById, joinAuction, placeBid, getAvailableAuctionCodes,
+  getBannedWords, addBannedWord, deleteBannedWord, checkBannedWord, addViolation, getAllViolations, getViolationStats, getModerationSettings, setModerationSetting, banUser, getActiveBan, getAllBans, unbanUser, setDiwaniyaManager, countDiwaniyaManagers, updateProfile, leaveFamily, updateLastSeen, getLastSeen, createAnnouncement, getFamilyAnnouncements, getAnnouncementsForUser, deleteAnnouncement, getUserFamilies, getUserFamilyCount, addUserToFamily, setCurrentFamily, getSetting, setSetting, createAuction, getActiveAuctions, getAllAuctions, getAuctionById, joinAuction, placeBid, getAvailableAuctionCodes,
   endAuction, confirmAuctionPayment, cancelAuction, getAuctionBids, isAuctionParticipant,
 };
