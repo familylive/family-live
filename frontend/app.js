@@ -54,14 +54,16 @@ async function api(method, path, body = null) {
   document.getElementById('app').classList.add('visible');
   if (splash) splash.style.display = 'none';
   
-  const savedToken = localStorage.getItem('token');
+  const savedToken = localStorage.getItem('token') || sessionStorage.getItem('token');
   if (savedToken) {
     try {
       const { user, family } = await api('GET', '/api/auth/verify');
       await loadApp(user, family);
     } catch(e) {
       localStorage.removeItem('token');
-      showAuth('login');
+      sessionStorage.removeItem('token');
+      showAuth('landing');
+      loadLandingPage();
     }
   } else {
     showAuth('landing');
@@ -73,11 +75,18 @@ async function api(method, path, body = null) {
 async function login() {
   const email = document.getElementById('login-email').value.trim();
   const password = document.getElementById('login-password').value;
+  const remember = document.getElementById('remember-me')?.checked;
   if (!email || !password) return showToast('يرجى ملء جميع الحقول', 'error');
   try {
     showToast('جاري تسجيل الدخول...');
     const { token, user, family } = await api('POST', '/api/auth/login', { email, password });
-    localStorage.setItem('token', token);
+    if (remember) {
+      localStorage.setItem('token', token);
+    } else {
+      // Session only - store in sessionStorage
+      sessionStorage.setItem('token', token);
+      localStorage.removeItem('token');
+    }
     await loadApp(user, family);
     showToast('مرحباً بعودتك! 👋', 'success');
   } catch (e) { showToast(e.message || 'فشل تسجيل الدخول', 'error'); }
@@ -130,9 +139,11 @@ function switchRegTab(tab) {
 function logout() {
   if (!confirm('هل أنت متأكد من تسجيل الخروج؟')) return;
   localStorage.removeItem('token');
+  sessionStorage.removeItem('token');
   if (socket) socket.disconnect();
   state.isLoggedIn = false; state.user = null; state.family = null;
-  showAuth('login');
+  showAuth('landing');
+  loadLandingPage();
 }
 
 // ==================== LOAD APP ====================
