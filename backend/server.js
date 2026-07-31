@@ -1550,10 +1550,11 @@ io.on('connection', (socket) => {
 // =============== START SERVER ===============
 
 async function bootstrap() {
+  console.log('🔌 DATABASE_URL set:', process.env.DATABASE_URL ? 'YES (length ' + process.env.DATABASE_URL.length + ')' : 'NO ❌');
   try {
     await db.initDb();
     console.log('✅ Database ready (PostgreSQL)');
-  } catch(e) { console.log('DB init error:', e.message); }
+  } catch(e) { console.log('DB init error:', e.message, e.code || ''); }
   
   // Seed subscription codes if empty
   try {
