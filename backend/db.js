@@ -605,6 +605,10 @@ function cancelAuction(auctionId) {
   return getAuctionById(auctionId);
 }
 
+function getAvailableAuctionCodes() {
+  return queryAll("SELECT * FROM subscription_codes WHERE type = 'premium' AND (used = 0 OR used IS NULL) ORDER BY code ASC");
+}
+
 function getAuctionBids(auctionId) {
   return queryAll(`
     SELECT ab.*, u.name as user_name
@@ -687,6 +691,6 @@ module.exports = {
   updatePrice, getFirstAvailablePremiumCode,
   getAllFamilies, updateFamilyData, setFamilyStatus, deleteFamily, createAdminUser, getAdminStats,
   getActiveAds, getAllAds, addAd, updateAd, deleteAd, getFeaturedFamilies,
-  createAuction, getActiveAuctions, getAllAuctions, getAuctionById, joinAuction, placeBid,
+  createAuction, getActiveAuctions, getAllAuctions, getAuctionById, joinAuction, placeBid, getAvailableAuctionCodes,
   endAuction, confirmAuctionPayment, cancelAuction, getAuctionBids, isAuctionParticipant,
 };

@@ -563,8 +563,10 @@
       <div class="card" id="auction-create-card" style="display:none">
         <div class="card-title">🏷️ فتح مزاد جديد</div>
         <div class="form-group">
-          <label>رمز الرمز المميز (مثال: AAAAAAAA)</label>
-          <input class="form-input" id="auction-code-2" type="text" dir="ltr" style="letter-spacing:3px;text-transform:uppercase">
+          <label>اختر الرمز المميز (المتاح فقط)</label>
+          <select class="form-input" id="auction-code-2">
+            <option value="">اختر رمزاً...</option>
+          </select>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <div class="form-group" style="flex:1;min-width:100px">
@@ -600,8 +602,10 @@
       <div class="card" id="admin-auction-section">
         <div class="card-title">🏷️ فتح مزاد جديد</div>
         <div class="form-group">
-          <label>رمز الرمز المميز (مثال: AAAAAAAA)</label>
-          <input class="form-input" id="auction-code" type="text" dir="ltr" style="letter-spacing:3px;text-transform:uppercase">
+          <label>اختر الرمز المميز (المتاح فقط)</label>
+          <select class="form-input" id="auction-code">
+            <option value="">اختر رمزاً...</option>
+          </select>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <div class="form-group" style="flex:1;min-width:100px">
@@ -1027,6 +1031,18 @@ async function loadAuctionsPage() {
   const createCard = document.getElementById('auction-create-card');
   if (createCard) createCard.style.display = state.user?.role === 'admin' ? 'block' : 'none';
   
+  // Load available codes into dropdowns for admin
+  if (state.user?.role === 'admin') {
+    try {
+      const { codes } = await api('GET', '/api/admin/auctions/available-codes');
+      const sel1 = document.getElementById('auction-code-2');
+      const sel2 = document.getElementById('auction-code');
+      const opts = '<option value="">اختر رمزاً...</option>' + codes.map(c => '<option value="' + c.code + '">' + c.code + '</option>').join('');
+      if (sel1) sel1.innerHTML = opts;
+      if (sel2) sel2.innerHTML = opts;
+    } catch(e) { console.error('Codes load:', e); }
+  }
+  
   try {
     const { auctions } = await api('GET', '/api/auctions/active');
     const list = document.getElementById('auctions-list');
@@ -1049,15 +1065,19 @@ async function loadAuctionsPage() {
           '<span>رسوم الدخول: ' + a.entry_fee + ' ريال</span>' +
           '<span>أقل زيادة: ' + (a.min_increment || 10) + ' ريال</span>' +
         '</div>' +
+        '<div class="auction-bids" id="auction-bids-' + a.id + '"><div class="empty-bids">لا توجد مزايدات بعد</div></div>' +
         '<div class="auction-actions">' +
           '<button class="btn btn-accent btn-full" onclick="joinAuction(\'' + a.id + '\')">🎟️ دخول المزاد</button>' +
           '<div class="bid-row">' +
-            '<input type="number" class="form-input" id="bid-' + a.id + '" placeholder="مبلغك" min="' + ((a.current_price||a.starting_price) + (a.min_increment||10)) + '">' +
+            '<input type="number" class="form-input" id="bid-' + a.id + '" placeholder="مبلغ المزايدة" min="' + ((a.current_price||a.starting_price) + (a.min_increment||10)) + '">' +
             '<button class="btn btn-primary" onclick="placeBid(\'' + a.id + '\')">💥 مزايدة</button>' +
           '</div>' +
         '</div>' +
       '</div>';
     }).join('');
+    
+    // Load bid history for each auction
+    auctions.forEach(a => loadBidHistory(a.id));
     
     // Start timers
     document.querySelectorAll('.auction-timer').forEach(el => {
@@ -1097,6 +1117,22 @@ async function placeBid(auctionId) {
     showToast(result.message, 'success');
     loadAuctionsPage();
   } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function loadBidHistory(auctionId) {
+  try {
+    const { bids } = await api('GET', '/api/auctions/' + auctionId);
+    const container = document.getElementById('auction-bids-' + auctionId);
+    if (!container) return;
+    if (!bids?.length) {
+      container.innerHTML = '<div class="empty-bids">لا توجد مزايدات بعد</div>';
+      return;
+    }
+    container.innerHTML = '<div class="bids-title">📊 المزايدات:</div>' +
+      bids.map(b =>
+        '<div class="bid-item"><span class="bid-user">👤 ' + b.user_name + '</span><span class="bid-amount">💰 ' + b.amount + ' ريال</span></div>'
+      ).join('');
+  } catch(e) { console.error('Bids:', e); }
 }
 
 async function createAuctionFromAuctionsPage() {

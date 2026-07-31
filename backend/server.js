@@ -393,7 +393,14 @@ app.post('/api/admin/auctions/create', authMiddleware, adminMiddleware, (req, re
     return res.status(400).json({ error: 'جميع الحقول مطلوبة' });
   }
   const auction = db.createAuction(code, parseInt(startingPrice), parseInt(entryFee), parseInt(durationMinutes), parseInt(minIncrement || 10), req.user.id);
+  if (auction?.error) return res.status(400).json(auction);
   res.json({ message: '🏷️ تم فتح المزاد', auction });
+});
+
+// Get available codes for auction (admin)
+app.get('/api/admin/auctions/available-codes', authMiddleware, adminMiddleware, (req, res) => {
+  const codes = db.getAvailableAuctionCodes();
+  res.json({ codes });
 });
 
 // Admin: all auctions
