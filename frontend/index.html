@@ -111,8 +111,8 @@
     <div id="page-landing" class="page-content auth-page active">
       <!-- Top Auth Buttons -->
       <div class="landing-auth-bar">
-        <button class="btn btn-accent" onclick="showAuth('login')">🔐 تسجيل الدخول</button>
-        <button class="btn btn-primary" onclick="showAuth('register')">📝 تسجيل</button>
+        <button class="btn btn-accent landing-btn" onclick="showAuth('login')"><span class="btn-icon">🔐</span> تسجيل الدخول</button>
+        <button class="btn btn-primary landing-btn" onclick="showAuth('register')"><span class="btn-icon">📝</span> تسجيل</button>
       </div>
       <div class="landing-logo">
         <img src="/assets/logo.png" alt="العائلة" class="landing-logo-img">
@@ -133,6 +133,14 @@
         <h3 class="landing-section-title">🌟 عوائل مميزة</h3>
         <div class="featured-families" id="featured-families">
           <div class="empty-state"><div class="empty-text">لا توجد عوائل بعد</div></div>
+        </div>
+      </div>
+
+      <!-- Active Auctions (public) -->
+      <div class="landing-section">
+        <h3 class="landing-section-title">🏷️ مزادات الرموز المميزة</h3>
+        <div id="landing-auctions">
+          <div class="empty-state"><div class="empty-text">لا توجد مزادات نشطة حالياً</div></div>
         </div>
       </div>
 
@@ -1189,7 +1197,37 @@ async function deleteAdAdmin(id) {
   } catch(e) { showToast(e.message, 'error'); }
 }
 
+async function loadLandingAuctions() {
+  try {
+    const { auctions } = await api('GET', '/api/auctions/active');
+    const div = document.getElementById('landing-auctions');
+    if (!auctions?.length) {
+      div.innerHTML = '<div class="empty-state"><div class="empty-text">لا توجد مزادات نشطة حالياً</div></div>';
+      return;
+    }
+    div.innerHTML = auctions.slice(0, 3).map(a => {
+      const end = new Date(a.end_time).getTime();
+      return '<div class="auction-card compact">' +
+        '<div class="auction-header"><span class="auction-code">🏷️ ' + a.code + '</span><span class="auction-live">🔴 مباشر</span></div>' +
+        '<div class="auction-price">💰 <span class="current-price">' + (a.current_price || a.starting_price) + '</span> ريال</div>' +
+        '<div class="auction-meta"><span>رسوم الدخول: ' + a.entry_fee + ' ريال</span></div>' +
+        '<button class="btn btn-accent btn-full" onclick="landingBidClick()">💥 مزايدة</button>' +
+      '</div>';
+    }).join('');
+  } catch(e) { console.error('Landing auctions:', e); }
+}
+
+function landingBidClick() {
+  if (state.isLoggedIn) {
+    navigateTo('auctions');
+  } else {
+    showToast('📝 سجل دخول أولاً للمزايدة', 'success');
+    setTimeout(() => showAuth('login'), 600);
+  }
+}
+
 async function loadLandingPage() {
+  loadLandingAuctions();
   try {
     // Load ads
     const { ads } = await api('GET', '/api/ads');

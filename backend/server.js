@@ -715,8 +715,8 @@ app.post('/api/family/diwaniya-manager', authMiddleware, (req, res) => {
 
 // =============== AUCTIONS ROUTES ===============
 
-// Get active auctions (logged in users)
-app.get('/api/auctions/active', authMiddleware, (req, res) => {
+// Get active auctions (public - visitors can view, login to bid)
+app.get('/api/auctions/active', (req, res) => {
   const auctions = db.getActiveAuctions();
   res.json({ auctions });
 });

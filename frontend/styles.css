@@ -1483,3 +1483,35 @@ body {
   color: #fff;
   background: var(--danger);
 }
+
+/* Landing auth buttons - beautiful */
+.landing-auth-bar {
+  background: linear-gradient(135deg, rgba(201,147,12,.12), rgba(59,130,196,.08));
+  border-radius: 18px;
+  padding: 14px;
+  margin: 12px;
+  box-shadow: 0 4px 20px rgba(201,147,12,.08);
+  border: 1px solid rgba(201,147,12,.2);
+}
+.landing-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 140px;
+  font-size: 15px;
+  padding: 12px 18px;
+  border-radius: 12px;
+}
+.btn-icon {
+  font-size: 18px;
+}
+.auction-card.compact {
+  padding: 12px;
+}
+.auction-card.compact .auction-price {
+  font-size: 16px;
+}
+.auction-card.compact .current-price {
+  font-size: 20px;
+}
