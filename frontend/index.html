@@ -806,18 +806,11 @@
       </div>
       
       <div class="card">
-        <div class="card-title">🔍 طلب زيارة تفقدية</div>
-        <div class="form-group">
-          <label>العائلة (الديوانية)</label>
-          <select class="form-input" id="moderator-family-select">
-            <option value="">اختر العائلة...</option>
-          </select>
+        <div class="card-title">🟢 العوائل المتصلة الآن (ديوانيات مفتوحة)</div>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:8px">اختر عائلة للدخول — زيارة تفقدية دقيقتين فقط</p>
+        <div id="moderator-online-families">
+          <div class="empty-state"><div class="empty-text">لا توجد عوائل متصلة حالياً</div></div>
         </div>
-        <div class="form-group">
-          <label>سبب الزيارة (إجباري)</label>
-          <input class="form-input" id="moderator-visit-reason" type="text" placeholder="اكتب سبب الزيارة...">
-        </div>
-        <button class="btn btn-accent btn-full" onclick="requestModeratorVisit()">🕵️ طلب الزيارة</button>
         <div id="moderator-visit-status" style="margin-top:10px"></div>
         <div id="moderator-send-box" style="display:none;margin-top:12px">
           <div class="form-group">
@@ -1733,7 +1726,7 @@ async function loadProfilePage() {
   
   document.getElementById('profile-avatar').textContent = user?.avatar || user?.name?.charAt(0) || '👤';
   document.getElementById('profile-name').textContent = user?.name || '';
-  document.getElementById('profile-role').textContent = user?.role === 'founder' ? 'المؤسس 👑' : (user?.role === 'admin' ? 'مدير التطبيق 🛡️' : 'عضو');
+  document.getElementById('profile-role').textContent = user?.role === 'founder' ? 'المؤسس 👑' : (user?.role === 'admin' ? 'مدير التطبيق 🛡️' : (user?.role === 'moderator' ? 'مشرف الديوانيات 🕵️' : 'عضو'));
   document.getElementById('profile-family').textContent = family?.name || '-';
   document.getElementById('profile-code').textContent = family?.subscription_code || '-';
   document.getElementById('profile-country').textContent = user?.country || '-';
@@ -2515,21 +2508,53 @@ async function rateModerator(moderatorId, visitId, rating) {
 // ==================== MODERATOR VISITS ====================
 let pendingVisit = null;
 
+let pendingVisitFamily = null;
+
 async function loadModeratorFamilies() {
   try {
     const { families } = await api('GET', '/api/moderator/online-families');
-    const select = document.getElementById('moderator-family-select');
-    const statusBox = document.getElementById('moderator-visit-status');
-    if (!select) return;
+    const container = document.getElementById('moderator-online-families');
+    if (!container) return;
     if (!families?.length) {
-      select.innerHTML = '<option value="">لا توجد عوائل متصلة حالياً</option>';
-      if (statusBox) statusBox.innerHTML = '<div style="text-align:center;padding:12px;background:rgba(231,76,60,.06);border-radius:var(--radius-sm);color:var(--text-muted);font-size:13px">🕌 لا توجد ديوانيات مفتوحة حالياً — لا يمكن طلب زيارة</div>';
+      container.innerHTML = '<div class="empty-state"><div class="empty-text">🕌 لا توجد عوائل متصلة حالياً</div></div>';
       return;
     }
-    if (statusBox) statusBox.innerHTML = '';
-    select.innerHTML = '<option value="">اختر العائلة المتصلة...</option>' +
-      families.map(f => '<option value="' + f.id + '">🕌 ' + (f.name || '') + ' (ديوانية مفتوحة)</option>').join('');
+    container.innerHTML = families.map(f =>
+      '<div class="my-family-item" style="display:flex;justify-content:space-between;align-items:center">' +
+        '<div><div class="admin-family-name">🕌 ' + (f.name || '') + '</div>' +
+        '<div class="admin-family-meta" style="direction:ltr;letter-spacing:2px;color:var(--gold)">🔑 ' + (f.subscription_code || '') + '</div></div>' +
+        '<button class="btn btn-accent" onclick="moderatorEnterFamily(\'' + f.id + '\', \'' + (f.name||'').replace(/'/g,"") + '\')">🚪 دخول</button>' +
+      '</div>'
+    ).join('');
   } catch(e) { console.error('Mod families:', e); }
+}
+
+async function moderatorEnterFamily(familyId, familyName) {
+  const reason = prompt('🕵️ اكتب سبب الزيارة (إجباري) للدخول لعائلة ' + familyName + ':');
+  if (!reason) return;
+  try {
+    const result = await api('POST', '/api/moderator/visit/request', { familyId, reason });
+    pendingVisit = result.visit;
+    pendingVisitFamily = familyId;
+    showToast('🕵️ تم إرسال الطلب - ستدخل بعد دقيقة', 'success');
+    // Start 1 minute countdown then auto-enter
+    const status = document.getElementById('moderator-visit-status');
+    status.innerHTML = '<div style="text-align:center;padding:12px;background:rgba(59,130,196,.08);border-radius:var(--radius-sm)">' +
+      '<p>🕵️ تم إرسال طلب الزيارة لعائلة ' + familyName + '</p>' +
+      '<p style="color:var(--info);font-size:13px">سيتم دخولك تلقائياً بعد دقيقة للزيارة التفقدية (دقيقتين كحد أقصى)</p>' +
+      '<p style="color:var(--info);font-size:20px;font-weight:900;direction:ltr" id="mod-enter-countdown">01:00</p>' +
+      '<button class="btn btn-accent btn-full" style="margin-top:8px" onclick="enterModeratorVisit()">🕵️ دخول الآن</button></div>';
+    let sec = 60;
+    window._enterTimer = setInterval(() => {
+      sec--;
+      const el = document.getElementById('mod-enter-countdown');
+      if (el) el.textContent = String(Math.floor(sec/60)).padStart(2,'0') + ':' + String(sec%60).padStart(2,'0');
+      if (sec <= 0) {
+        clearInterval(window._enterTimer);
+        enterModeratorVisit();
+      }
+    }, 1000);
+  } catch(e) { showToast(e.message, 'error'); }
 }
 
 async function requestModeratorVisit() {
