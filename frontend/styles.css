@@ -1400,3 +1400,57 @@ body {
 .terms-content ul li {
   margin-bottom: 4px;
 }
+
+/* Violation banner */
+.violation-banner {
+  position: fixed;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-200%);
+  background: linear-gradient(135deg, #c0392b, #96281b);
+  color: #fff;
+  border-radius: var(--radius);
+  box-shadow: 0 10px 40px rgba(192,57,43,.4);
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  z-index: 600;
+  max-width: 92vw;
+  width: 420px;
+  transition: transform .5s cubic-bezier(.34,1.56,.64,1);
+}
+.violation-banner.show {
+  transform: translateX(-50%) translateY(0);
+}
+.violation-icon {
+  font-size: 36px;
+  animation: pulse 1s infinite;
+}
+.violation-title {
+  font-size: 16px;
+  font-weight: 800;
+}
+.violation-msg {
+  font-size: 13px;
+  margin-top: 2px;
+  color: #ffd9d4;
+}
+.violation-reason {
+  font-size: 12px;
+  margin-top: 4px;
+  color: #ffb3aa;
+}
+.violation-close {
+  position: absolute;
+  top: 8px;
+  left: 10px;
+  background: rgba(255,255,255,.2);
+  border: none;
+  color: #fff;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 13px;
+}

@@ -1908,6 +1908,26 @@ async function loadAdminOnline() {
   } catch(e) { console.error('Admin online:', e); }
 }
 
+function showViolationBanner(violatorName, reason) {
+  // Play warning sound
+  playNotificationSound();
+  let banner = document.getElementById('violation-banner');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'violation-banner';
+    banner.className = 'violation-banner';
+    document.body.appendChild(banner);
+  }
+  banner.innerHTML = '<div class="violation-icon">🔒</div>' +
+    '<div><div class="violation-title">تم إغلاق الديوانية بسبب مخالفة</div>' +
+    '<div class="violation-msg">العضو <b style="color:#fff">' + (violatorName || 'غير معروف') + '</b> تسبب في إيقاف الجلسة</div>' +
+    '<div class="violation-reason">السبب: ' + (reason || 'مخالفة الشروط') + '</div></div>' +
+    '<button class="violation-close" onclick="this.parentElement.classList.remove(\'show\')">✕</button>';
+  banner.classList.add('show');
+  clearTimeout(banner._t);
+  banner._t = setTimeout(() => banner.classList.remove('show'), 15000);
+}
+
 async function loadAuctionsPage() {
   // Show create auction form for admins
   const createCard = document.getElementById('auction-create-card');

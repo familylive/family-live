@@ -316,6 +316,15 @@ function connectSocket() {
     document.getElementById('diwaniya-toggle-btn').textContent = '🔓 فتح الديوانية';
     document.getElementById('stat-diwaniya').textContent = '🔴 متوقفة';
   });
+  socket.on('diwaniya_closed_violation', (data) => {
+    // Close diwaniya UI
+    state.diwaniyaOpen = false; state.activeSession = null;
+    stopDiwaniyaTimer(); enableChat(false);
+    document.getElementById('diwaniya-toggle-btn').textContent = '🔓 فتح الديوانية';
+    document.getElementById('stat-diwaniya').textContent = '🔴 متوقفة';
+    // Show prominent violation banner to all family members
+    showViolationBanner(data.violatorName, data.reason);
+  });
   socket.on('user_online', (data) => {
     if (state.family?.id && state.onlineMembers) {
       if (!state.onlineMembers.includes(data.userId)) state.onlineMembers.push(data.userId);

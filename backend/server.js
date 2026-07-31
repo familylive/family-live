@@ -578,6 +578,24 @@ app.post('/api/admin/violations/add', authMiddleware, adminMiddleware, (req, res
   const { userId, reason, durationHours, violationType, evidence } = req.body;
   if (!userId || !reason || !durationHours) return res.status(400).json({ error: 'جميع الحقول مطلوبة' });
   const violation = db.addViolation(userId, reason, parseInt(durationHours), violationType || 'text', evidence, req.user.id);
+  
+  // If violation is diwaniya-related (audio/video/text in chat), close the diwaniya automatically
+  const violator = db.getUserById(userId);
+  if (violator && violator.family_id) {
+    const activeSession = db.getActiveDiwaniya(violator.family_id);
+    if (activeSession) {
+      db.closeDiwaniya(activeSession.id);
+      // Notify family: diwaniya closed due to violation, show violator name
+      io.to(`family_${violator.family_id}`).emit('diwaniya_closed_violation', {
+        violatorName: violator.name,
+        reason: reason,
+        sessionId: activeSession.id,
+        closedAt: new Date().toISOString()
+      });
+      console.log(`🔒 Diwaniya closed due to violation by ${violator.name}`);
+    }
+  }
+  
   res.json({ message: '⛔ تم تسجيل المخالفة وإيقاف العضوية', violation });
 });
 
