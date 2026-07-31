@@ -285,13 +285,30 @@ function updateAllUI() {
   }
   
   // Adapt menu for visitors vs logged-in users
+  const isLogged = state.isLoggedIn;
   const loginItem = document.getElementById('menu-login-item');
   const registerItem = document.getElementById('menu-register-item');
   const logoutBtn = document.getElementById('menu-logout-btn');
-  const isLogged = state.isLoggedIn;
+  const aboutItem = document.getElementById('menu-about-item');
+  const privacyItem = document.getElementById('menu-privacy-item');
+  const supportVisitor = document.getElementById('menu-support-visitor');
+  const supportItem = document.querySelector('.menu-nav-item[data-page="support"]');
+  // App pages to hide for visitors
+  const appPages = ['page-dashboard','page-family','page-diwaniya','page-games','page-challenges','page-leaderboard','page-codes','page-auctions','page-profile'];
+  
   if (loginItem) loginItem.style.display = isLogged ? 'none' : 'flex';
   if (registerItem) registerItem.style.display = isLogged ? 'none' : 'flex';
   if (logoutBtn) logoutBtn.style.display = isLogged ? 'flex' : 'none';
+  if (aboutItem) aboutItem.style.display = isLogged ? 'none' : 'flex';
+  if (privacyItem) privacyItem.style.display = isLogged ? 'none' : 'flex';
+  if (supportVisitor) supportVisitor.style.display = isLogged ? 'none' : 'flex';
+  if (supportItem) supportItem.style.display = isLogged ? 'flex' : 'none';
+  
+  // Hide/show app pages in menu for visitors
+  appPages.forEach(p => {
+    const item = document.querySelector('.menu-nav-item[data-page="' + p.replace('page-','') + '"]');
+    if (item) item.style.display = isLogged ? 'flex' : 'none';
+  });
 
   const inviteSection = document.getElementById('invite-section');
   const diwCtrl = document.getElementById('diwaniya-controls-card');

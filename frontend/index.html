@@ -109,6 +109,15 @@
       <div class="menu-nav-item" id="menu-register-item" onclick="showAuth('register');toggleMenu()" style="display:none">
         <span class="nav-icon">📝</span> تسجيل
       </div>
+      <div class="menu-nav-item" id="menu-about-item" onclick="showToast('🚧 هذه الصفحة قيد التجهيز', 'error');toggleMenu()" style="display:none">
+        <span class="nav-icon">👪</span> عن عائلتي
+      </div>
+      <div class="menu-nav-item" id="menu-privacy-item" onclick="showToast('🚧 هذه الصفحة قيد التجهيز', 'error');toggleMenu()" style="display:none">
+        <span class="nav-icon">🔒</span> الخصوصية
+      </div>
+      <div class="menu-nav-item" id="menu-support-visitor" onclick="visitorSupportClick();toggleMenu()" style="display:none">
+        <span class="nav-icon">🎧</span> مركز الدعم والمساعدة
+      </div>
       <div class="menu-nav-item" id="menu-admin" data-page="admin" onclick="navigateTo('admin');toggleMenu()" style="display:none">
         <span class="nav-icon">⚙️</span> لوحة الإدارة
       </div>
@@ -1419,6 +1428,11 @@ async function loadLandingPage() {
       featuredDiv.innerHTML = '<div class="empty-state"><div class="empty-text">لا توجد عوائل بعد</div></div>';
     }
   } catch(e) { console.error('Featured error:', e); }
+}
+
+function visitorSupportClick() {
+  showToast('📝 سجل دخول أولاً للتواصل مع الدعم الفني', 'success');
+  setTimeout(() => showAuth('login'), 600);
 }
 
 function goHome() {
