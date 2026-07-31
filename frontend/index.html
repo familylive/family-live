@@ -34,12 +34,19 @@
   <!-- Header -->
   <header class="header" id="app-header">
     <button class="menu-btn" onclick="toggleMenu()" aria-label="القائمة">☰</button>
+    <a class="header-logo" onclick="goHome()" title="الرئيسية">
+      <img src="/assets/logo.png" alt="العائلة">
+    </a>
     <div class="header-title">
       <span id="header-title-text">العائلة</span>
       <span class="family-badge" id="family-badge">العائلة</span>
       <span class="family-code-badge" id="family-code-badge" title="رمز العائلة" style="display:none"></span>
     </div>
-    <div class="header-points" id="header-points">
+    <div class="header-auth-btns" id="header-auth-btns">
+      <button class="header-auth-btn login" onclick="showAuth('login')">🔐 تسجيل الدخول</button>
+      <button class="header-auth-btn" onclick="showAuth('register')">📝 تسجيل</button>
+    </div>
+    <div class="header-points" id="header-points" style="display:none">
       <span class="points-icon">⭐</span>
       <span id="points-display">0</span>
     </div>
@@ -125,9 +132,6 @@
       <div class="landing-auth-bar">
         <button class="btn btn-accent landing-btn" onclick="showAuth('login')"><span class="btn-icon">🔐</span> تسجيل الدخول</button>
         <button class="btn btn-primary landing-btn" onclick="showAuth('register')"><span class="btn-icon">📝</span> تسجيل</button>
-      </div>
-      <div class="landing-logo">
-        <img src="/assets/logo.png" alt="العائلة" class="landing-logo-img">
       </div>
       <h1 class="landing-title">العائلة</h1>
       <p class="landing-subtitle">تواصل عائلتنا في كل مكان</p>
@@ -1415,6 +1419,15 @@ async function loadLandingPage() {
       featuredDiv.innerHTML = '<div class="empty-state"><div class="empty-text">لا توجد عوائل بعد</div></div>';
     }
   } catch(e) { console.error('Featured error:', e); }
+}
+
+function goHome() {
+  if (state.isLoggedIn) {
+    navigateTo(state.user?.role === 'admin' ? 'admin' : 'dashboard');
+  } else {
+    showAuth('landing');
+    loadLandingPage();
+  }
 }
 
 async function toggleLang() {
