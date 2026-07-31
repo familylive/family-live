@@ -1845,22 +1845,41 @@ function showFamilyNotification(title, message) {
   banner._t = setTimeout(() => banner.classList.remove('show'), 8000);
 }
 
-function playNotificationSound() {
+let notifCtx = null;
+function getNotifCtx() {
   try {
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    const ctx = new AudioCtx();
-    // Play a pleasant notification tone (3 beeps)
-    [0, 0.3, 0.6].forEach(t => {
+    if (!notifCtx) notifCtx = new AudioCtx();
+    if (notifCtx.state === 'suspended') notifCtx.resume();
+    return notifCtx;
+  } catch(e) { return null; }
+}
+// Unlock audio on first user interaction (browser policy)
+function unlockAudio() {
+  const ctx = getNotifCtx();
+  if (ctx && ctx.state === 'suspended') ctx.resume();
+}
+document.addEventListener('click', unlockAudio, { once: true });
+document.addEventListener('touchstart', unlockAudio, { once: true });
+
+function playNotificationSound() {
+  try {
+    const ctx = getNotifCtx();
+    if (!ctx || ctx.state !== 'running') { console.log('Audio locked, will play on interaction'); return; }
+    // Pleasant 3-note ascending chime (louder)
+    const notes = [523.25, 659.25, 783.99]; // C5, E5, G5
+    notes.forEach((freq, i) => {
+      const t = ctx.currentTime + i * 0.18;
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.connect(gain);
       gain.connect(ctx.destination);
-      osc.frequency.value = 880;
+      osc.frequency.value = freq;
       osc.type = 'sine';
-      gain.gain.setValueAtTime(0.3, ctx.currentTime + t);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.2);
-      osc.start(ctx.currentTime + t);
-      osc.stop(ctx.currentTime + t + 0.25);
+      gain.gain.setValueAtTime(0.5, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+      osc.start(t);
+      osc.stop(t + 0.4);
     });
   } catch(e) { console.error('Sound error:', e); }
 }
