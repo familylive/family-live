@@ -176,6 +176,7 @@ async function refreshData() {
 }
 
 function updateAllUI() {
+  try {
   document.getElementById('menu-user-name').textContent = state.user?.name || '';
   document.getElementById('menu-user-role').textContent = state.isFounder ? 'المؤسس 👑' : 'عضو';
   document.getElementById('menu-avatar').textContent = state.user?.avatar || '👤';
@@ -234,6 +235,7 @@ function updateAllUI() {
     if (remaining > 0) { state.diwaniyaRemaining = remaining; startDiwaniyaTimer(Math.ceil(remaining / 60)); }
     loadDiwaniyaMessages(state.activeSession.id);
   }
+  } catch(e) { console.error('updateAllUI error:', e.message); }
 }
 
 // ==================== SOCKET ====================
