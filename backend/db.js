@@ -556,11 +556,11 @@ function getAdsStats() {
 }
 function addAd(title, imageUrl, linkUrl, position = 'banner') {
   const id = uuidv4();
-  run('INSERT INTO ads (id, title, image_url, link_url, position) VALUES (?, ?, ?, ?, ?)', [id, title, imageUrl, linkUrl, position]);
+  run('INSERT INTO ads (id, title, image_url, link_url, position) VALUES (?, ?, ?, ?, ?)', [id, title, imageUrl || '', linkUrl || '', position]);
   return queryOne('SELECT * FROM ads WHERE id = ?', [id]);
 }
 function updateAd(id, title, imageUrl, linkUrl, status) {
-  run('UPDATE ads SET title = ?, image_url = ?, link_url = ?, status = ? WHERE id = ?', [title, imageUrl, linkUrl, status, id]);
+  run('UPDATE ads SET title = ?, image_url = ?, link_url = ?, status = ? WHERE id = ?', [title, imageUrl || '', linkUrl || '', status, id]);
   return queryOne('SELECT * FROM ads WHERE id = ?', [id]);
 }
 function deleteAd(id) {
