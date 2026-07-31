@@ -90,6 +90,9 @@
       <div class="menu-nav-item" data-page="profile" onclick="navigateTo('profile');toggleMenu()">
         <span class="nav-icon">👤</span> ملفي الشخصي
       </div>
+      <div class="menu-nav-item" id="menu-moderator" data-page="moderator" onclick="navigateTo('moderator');toggleMenu()" style="display:none">
+        <span class="nav-icon">🕵️</span> زيارات المودريتر
+      </div>
       <div class="menu-nav-item" id="menu-login-item" onclick="showAuth('login');toggleMenu()" style="display:none">
         <span class="nav-icon">🔐</span> تسجيل الدخول
       </div>
@@ -746,6 +749,35 @@
       </div>
     </div>
 
+    <!-- Moderator Page -->
+    <div id="page-moderator" class="page-content">
+      <div class="page-title">🕵️ زيارات المودريتر</div>
+      <div class="page-subtitle">زيارة تفقدية للديوانيات (دقيقة واحدة انتظار + دقيقتين زيارة)</div>
+      
+      <div class="card">
+        <div class="card-title">🔍 طلب زيارة تفقدية</div>
+        <div class="form-group">
+          <label>العائلة (الديوانية)</label>
+          <select class="form-input" id="moderator-family-select">
+            <option value="">اختر العائلة...</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>سبب الزيارة (إجباري)</label>
+          <input class="form-input" id="moderator-visit-reason" type="text" placeholder="اكتب سبب الزيارة...">
+        </div>
+        <button class="btn btn-accent btn-full" onclick="requestModeratorVisit()">🕵️ طلب الزيارة</button>
+        <div id="moderator-visit-status" style="margin-top:10px"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">📋 زياراتي السابقة</div>
+        <div id="moderator-visits-history">
+          <div class="empty-state"><div class="empty-text">لا توجد زيارات</div></div>
+        </div>
+      </div>
+    </div>
+
     <!-- Auctions Page -->
     <div id="page-auctions" class="page-content">
       <div class="page-title">🏷️ مزادات الرموز المميزة</div>
@@ -823,6 +855,24 @@
         <div class="card-title">📋 كل المزادات</div>
         <div id="admin-auctions-list">
           <div class="empty-state"><div class="empty-text">لا توجد مزادات</div></div>
+        </div>
+      </div>
+
+      <div class="card" id="admin-users-card">
+        <div class="card-title">👥 المستخدمون</div>
+        <div class="agreement-tabs" style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+          <button class="btn btn-sm btn-accent" onclick="showUsersTab('admin')">🛡️ الإدارة</button>
+          <button class="btn btn-sm" onclick="showUsersTab('moderator')">🕵️ المشرفون</button>
+          <button class="btn btn-sm" onclick="showUsersTab('founder')">👑 المؤسسون</button>
+          <button class="btn btn-sm" onclick="showUsersTab('member')">👥 الأعضاء</button>
+        </div>
+        <div id="admin-users-list"></div>
+      </div>
+
+      <div class="card" id="admin-moderator-visits-card">
+        <div class="card-title">🕵️ زيارات المودريتر <button class="btn btn-sm" style="float:left" onclick="loadModeratorVisitsAdmin()">🔄</button></div>
+        <div id="admin-moderator-visits-list">
+          <div class="empty-state"><div class="empty-text">لا توجد زيارات</div></div>
         </div>
       </div>
 
@@ -1048,7 +1098,7 @@ function navigateTo(pageName) {
   const navItem = document.querySelector('.menu-nav-item[data-page="' + pageName + '"]');
   if (page) page.classList.add('active');
   if (navItem) navItem.classList.add('active');
-  const titles = { dashboard:'الرئيسية', family:'العائلة', diwaniya:'الديوانية', games:'الألعاب', challenges:'التحديات', leaderboard:'قادة النقاط', codes:'رموزي', profile:'ملفي الشخصي', login:'تسجيل الدخول', register:'إنشاء حساب' };
+  const titles = { dashboard:'الرئيسية', family:'العائلة', diwaniya:'الديوانية', games:'الألعاب', challenges:'التحديات', leaderboard:'قادة النقاط', codes:'رموزي', profile:'ملفي الشخصي', moderator:'زيارات المودريتر', login:'تسجيل الدخول', register:'إنشاء حساب' };
   const titleEl = document.getElementById('header-title-text');
   if (titleEl && titles[pageName]) titleEl.textContent = titles[pageName];
   toggleHeaderVisibility(pageName);
@@ -1058,7 +1108,8 @@ function navigateTo(pageName) {
   if (pageName === 'dashboard' && state.isLoggedIn) { loadDashboardAuctions(); loadDashboardAds(); }
   if (pageName === 'profile' && state.isLoggedIn) { loadProfilePage(); loadMyFamilies(); }
   if (pageName === 'family' && state.isLoggedIn) { loadAnnouncements(); populateAnnTarget(); populateManagerSelect(); }
-  if (pageName === 'admin' && state.user?.role === 'admin') { loadBannedWords(); loadAdminBans(); loadAIUsers(); loadViolations(); loadAdminAgreements(); }
+  if (pageName === 'admin' && state.user?.role === 'admin') { loadBannedWords(); loadAdminBans(); loadAIUsers(); loadViolations(); loadAdminAgreements(); loadAdminUsers(); loadModeratorVisitsAdmin(); }
+  if (pageName === 'moderator' && (state.user?.role === 'moderator' || state.user?.role === 'admin')) { loadModeratorFamilies(); loadModeratorVisitsHistory(); }
   if (pageName === 'codes' && state.isLoggedIn) loadCodesPage();
   if (pageName === 'auctions' && state.isLoggedIn) loadAuctionsPage();
   if (pageName === 'admin' && state.user?.role === 'admin') { loadAdminPage(); loadAdminAuctions(); }
@@ -2057,6 +2108,190 @@ function showAgreementTab(tab) {
     ).join('');
 }
 
+// ==================== USERS MANAGEMENT ====================
+let usersData = { admin: [], moderator: [], founder: [], member: [] };
+
+async function loadAdminUsers() {
+  try {
+    const { users } = await api('GET', '/api/admin/users-detailed');
+    usersData = { admin: [], moderator: [], founder: [], member: [] };
+    users.forEach(u => { if (usersData[u.role]) usersData[u.role].push(u); });
+    showUsersTab('admin');
+  } catch(e) { console.error('Users:', e); }
+}
+
+function showUsersTab(role) {
+  document.querySelectorAll('#admin-users-card .agreement-tabs .btn').forEach(b => b.classList.remove('btn-accent'));
+  const buttons = document.querySelectorAll('#admin-users-card .agreement-tabs .btn');
+  const idx = { admin: 0, moderator: 1, founder: 2, member: 3 }[role];
+  if (buttons[idx]) buttons[idx].classList.add('btn-accent');
+  
+  const list = document.getElementById('admin-users-list');
+  const data = usersData[role] || [];
+  const labels = { admin: '🛡️ الإدارة', moderator: '🕵️ المشرفون', founder: '👑 المؤسسون', member: '👥 الأعضاء' };
+  if (!data.length) {
+    list.innerHTML = '<div class="card-title" style="font-size:14px">' + (labels[role]||'') + '</div><div class="empty-state"><div class="empty-text">لا يوجد مستخدمون</div></div>';
+    return;
+  }
+  list.innerHTML = '<div class="card-title" style="font-size:14px">' + (labels[role]||'') + ' (' + data.length + ')</div>' +
+    data.map(u =>
+      '<div class="admin-family-item" id="user-item-' + u.id + '">' +
+        '<div class="admin-family-name">' + (u.name || '') + '</div>' +
+        '<div class="admin-family-meta">📧 ' + (u.email || '-') + ' · 📱 ' + (u.whatsapp || '-') + ' · 🏠 ' + (u.family_name || '-') + ' · ⭐ ' + (u.points||0) + '</div>' +
+        '<div class="admin-family-actions">' +
+          '<button class="btn btn-sm" onclick="editUser(\'' + u.id + '\')">✏️ تعديل</button>' +
+          (u.role === 'member' ? '<button class="btn btn-sm btn-success" onclick="promoteUser(\'' + u.id + '\', \'moderator\')">⬆️ ترقية لمشرف</button>' : '') +
+          (u.role === 'moderator' ? '<button class="btn btn-sm btn-secondary" onclick="promoteUser(\'' + u.id + '\', \'member\')">⬇️ عضو</button>' : '') +
+          '<button class="btn btn-sm btn-danger" onclick="banUserAdmin(\'' + u.id + '\', \'' + (u.name||'').replace(/'/g,"") + '\')">⛔ إيقاف</button>' +
+          '<button class="btn btn-sm btn-danger" onclick="deleteUserAdmin(\'' + u.id + '\')">🗑️ حذف</button>' +
+        '</div>' +
+        '<div id="edit-form-' + u.id + '" style="display:none;margin-top:8px;padding:10px;background:var(--bg-hover);border-radius:var(--radius-sm)">' +
+          '<div class="form-group"><label>الاسم</label><input class="form-input" id="edit-name-' + u.id + '" value="' + (u.name||'') + '"></div>' +
+          '<div class="form-group"><label>البريد</label><input class="form-input" id="edit-email-' + u.id + '" value="' + (u.email||'') + '" dir="ltr"></div>' +
+          '<div class="form-group"><label>الواتساب</label><input class="form-input" id="edit-whatsapp-' + u.id + '" value="' + (u.whatsapp||'') + '" dir="ltr"></div>' +
+          '<button class="btn btn-primary btn-full" onclick="saveUserEdit(\'' + u.id + '\')">💾 حفظ</button>' +
+        '</div>' +
+      '</div>'
+    ).join('');
+}
+
+function editUser(id) {
+  const form = document.getElementById('edit-form-' + id);
+  if (form) form.style.display = form.style.display === 'none' ? 'block' : 'none';
+}
+
+async function saveUserEdit(id) {
+  const name = document.getElementById('edit-name-' + id).value.trim();
+  const email = document.getElementById('edit-email-' + id).value.trim();
+  const whatsapp = document.getElementById('edit-whatsapp-' + id).value.trim();
+  try {
+    await api('POST', '/api/admin/users/update', { userId: id, name, email, whatsapp });
+    showToast('✅ تم حفظ التعديلات', 'success');
+    loadAdminUsers();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function promoteUser(id, role) {
+  try {
+    await api('POST', '/api/admin/users/update', { userId: id, role });
+    showToast(role === 'moderator' ? '⬆️ تمت الترقية لمشرف' : '⬇️ أصبح عضواً', 'success');
+    loadAdminUsers();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function deleteUserAdmin(id) {
+  if (!confirm('🗑️ حذف هذا المستخدم نهائياً؟')) return;
+  try {
+    await api('POST', '/api/admin/users/delete', { userId: id });
+    showToast('🗑️ تم الحذف', 'success');
+    loadAdminUsers();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+// ==================== MODERATOR VISITS ====================
+let pendingVisit = null;
+
+async function loadModeratorFamilies() {
+  try {
+    const { families } = await api('GET', '/api/featured-families');
+    const all = await api('GET', '/api/admin/families');
+    const select = document.getElementById('moderator-family-select');
+    if (!select) return;
+    const fams = all.families || families || [];
+    select.innerHTML = '<option value="">اختر العائلة...</option>' +
+      fams.map(f => '<option value="' + f.id + '">' + (f.name || '') + '</option>').join('');
+  } catch(e) {}
+}
+
+async function requestModeratorVisit() {
+  const familyId = document.getElementById('moderator-family-select').value;
+  const reason = document.getElementById('moderator-visit-reason').value.trim();
+  if (!familyId) return showToast('اختر العائلة', 'error');
+  if (!reason) return showToast('سبب الزيارة إجباري', 'error');
+  try {
+    const result = await api('POST', '/api/moderator/visit/request', { familyId, reason });
+    pendingVisit = result.visit;
+    showToast('🕵️ تم إرسال الطلب - ستدخل بعد دقيقة', 'success');
+    // Show countdown to entry
+    const status = document.getElementById('moderator-visit-status');
+    status.innerHTML = '<div style="text-align:center;padding:12px;background:rgba(59,130,196,.08);border-radius:var(--radius-sm)">' +
+      '<p>🕵️ تم إرسال طلب الزيارة للديوانية</p>' +
+      '<p style="color:var(--info);font-size:13px">ستدخل بعد دقيقة واحدة للزيارة التفقدية (دقيقتين كحد أقصى)</p>' +
+      '<button class="btn btn-accent btn-full" style="margin-top:8px" onclick="enterModeratorVisit()">🕵️ دخول الديوانية</button></div>';
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function enterModeratorVisit() {
+  if (!pendingVisit) return showToast('لا يوجد طلب زيارة', 'error');
+  try {
+    await api('POST', '/api/moderator/visit/enter', { visitId: pendingVisit.id });
+    showToast('🕵️ دخلت كمراقب - لا يحق لك المشاركة', 'success');
+    // Start 2 minute countdown
+    const status = document.getElementById('moderator-visit-status');
+    status.innerHTML = '<div style="text-align:center;padding:12px;background:rgba(231,76,60,.08);border-radius:var(--radius-sm)">' +
+      '<p>🕵️ أنت في زيارة تفقدية</p>' +
+      '<p style="color:var(--danger);font-size:24px;font-weight:900;direction:ltr" id="mod-visit-countdown">02:00</p>' +
+      '<p style="font-size:12px;color:var(--text-muted)">سيخرجك النظام تلقائياً</p>' +
+      '<button class="btn btn-danger btn-full" style="margin-top:8px" onclick="exitModeratorVisit()">🚪 إنهاء الزيارة</button></div>';
+    let sec = 120;
+    window._modTimer = setInterval(() => {
+      sec--;
+      const el = document.getElementById('mod-visit-countdown');
+      if (el) el.textContent = String(Math.floor(sec/60)).padStart(2,'0') + ':' + String(sec%60).padStart(2,'0');
+      if (sec <= 0) {
+        clearInterval(window._modTimer);
+        exitModeratorVisit();
+      }
+    }, 1000);
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function exitModeratorVisit() {
+  if (!pendingVisit) return;
+  const report = prompt('📋 اكتب تقرير الزيارة (يُرسل للإدارة):');
+  try {
+    await api('POST', '/api/moderator/visit/exit', { visitId: pendingVisit.id, report: report || '' });
+    showToast('📋 تم إرسال التقرير للإدارة', 'success');
+    if (window._modTimer) clearInterval(window._modTimer);
+    pendingVisit = null;
+    loadModeratorVisitsHistory();
+    const status = document.getElementById('moderator-visit-status');
+    if (status) status.innerHTML = '';
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function loadModeratorVisitsHistory() {
+  try {
+    const { visits } = await api('GET', '/api/moderator/visits');
+    const list = document.getElementById('moderator-visits-history');
+    if (!visits?.length) {
+      list.innerHTML = '<div class="empty-state"><div class="empty-text">لا توجد زيارات</div></div>';
+      return;
+    }
+    list.innerHTML = visits.map(v => {
+      const statusLabel = { requested:'⏳ مطلوب', approved:'✅ موافق عليه', entered:'🕵️ داخل', exited:'📋 منتهي' }[v.status] || v.status;
+      return '<div class="admin-family-item"><div class="admin-family-name">' + statusLabel + '</div>' +
+        '<div class="admin-family-meta">السبب: ' + (v.reason||'') + ' · ' + (v.requested_at||'') + (v.report ? ' · التقرير: ' + v.report : '') + '</div></div>';
+    }).join('');
+  } catch(e) {}
+}
+
+async function loadModeratorVisitsAdmin() {
+  try {
+    const { visits } = await api('GET', '/api/admin/moderator-visits');
+    const list = document.getElementById('admin-moderator-visits-list');
+    if (!visits?.length) {
+      list.innerHTML = '<div class="empty-state"><div class="empty-text">لا توجد زيارات</div></div>';
+      return;
+    }
+    list.innerHTML = visits.map(v => {
+      const statusLabel = { requested:'⏳ مطلوب', approved:'✅ موافق عليه', entered:'🕵️ داخل', exited:'📋 منتهي' }[v.status] || v.status;
+      return '<div class="admin-family-item"><div class="admin-family-name">🕵️ ' + (v.moderator_name||'') + ' <span style="font-size:11px">' + statusLabel + '</span></div>' +
+        '<div class="admin-family-meta">السبب: ' + (v.reason||'') + '<br>📅 ' + (v.requested_at||'') + (v.entered_at ? ' · دخول: ' + v.entered_at : '') + (v.exit_at ? ' · خروج: ' + v.exit_at : '') + (v.report ? '<br>📋 التقرير: ' + v.report : '') + '</div></div>';
+    }).join('');
+  } catch(e) {}
+}
+
 async function loadAdminOnline() {
   try {
     const { families } = await api('GET', '/api/admin/online');
@@ -2078,6 +2313,26 @@ async function loadAdminOnline() {
       '</div>';
     }).join('');
   } catch(e) { console.error('Admin online:', e); }
+}
+
+function showModeratorVisitBanner(moderatorName, reason, scheduledAt) {
+  playNotificationSound();
+  let banner = document.getElementById('moderator-visit-banner');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'moderator-visit-banner';
+    banner.className = 'moderator-visit-banner';
+    document.body.appendChild(banner);
+  }
+  banner.innerHTML = '<div class="violation-icon">🕵️</div>' +
+    '<div><div class="violation-title">تنبيه: زيارة تفقدية</div>' +
+    '<div class="violation-msg">المشرف <b style="color:#fff">' + (moderatorName || '') + '</b> سيقوم بزيارتكم بعد دقيقة من الآن</div>' +
+    '<div class="violation-reason">السبب: ' + (reason || 'زيارة تفقدية') + '</div>' +
+    '<div class="violation-countdown">⏳ الزيارة لمدة دقيقتين فقط - تفقدية</div></div>' +
+    '<button class="violation-close" onclick="this.parentElement.classList.remove(\'show\')">✕</button>';
+  banner.classList.add('show');
+  clearTimeout(banner._t);
+  banner._t = setTimeout(() => banner.classList.remove('show'), 70000); // ~1 min
 }
 
 function showViolationBanner(violatorName, reason, lockedUntil) {

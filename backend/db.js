@@ -56,7 +56,7 @@ function initDb() {
       country TEXT,
       city TEXT,
       family_id TEXT,
-      role TEXT NOT NULL DEFAULT 'member' CHECK(role IN ('founder', 'member', 'admin')),
+      role TEXT NOT NULL DEFAULT 'member' CHECK(role IN ('founder', 'member', 'admin', 'moderator')),
       avatar TEXT DEFAULT '👤',
       points INTEGER DEFAULT 0,
       last_seen TEXT,
@@ -266,6 +266,23 @@ function initDb() {
       agreed_at TEXT,
       created_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  `);
+  db.run(`
+    CREATE TABLE IF NOT EXISTS moderator_visits (
+      id TEXT PRIMARY KEY,
+      moderator_id TEXT NOT NULL,
+      moderator_name TEXT,
+      diwaniya_session_id TEXT,
+      family_id TEXT,
+      reason TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'requested' CHECK(status IN ('requested', 'approved', 'entered', 'exited', 'rejected')),
+      requested_at TEXT DEFAULT (datetime('now')),
+      scheduled_at TEXT,
+      entered_at TEXT,
+      exit_at TEXT,
+      report TEXT,
+      FOREIGN KEY (moderator_id) REFERENCES users(id)
     )
   `);
   db.run(`
@@ -640,6 +657,68 @@ function getAllAgreements() {
     LEFT JOIN families f ON a.family_id = f.id
     ORDER BY a.role_at_agreement, a.created_at DESC
   `);
+}
+
+// =============== USERS MANAGEMENT & MODERATOR VISITS ===============
+function getAllUsersDetailed() {
+  return queryAll(`
+    SELECT u.id, u.name, u.email, u.phone, u.whatsapp, u.country, u.city, u.role, u.points, u.last_seen,
+      u.can_open_diwaniya, f.name as family_name, f.subscription_code
+    FROM users u
+    LEFT JOIN families f ON u.family_id = f.id
+    ORDER BY u.role, u.name
+  `);
+}
+
+function updateUserByAdmin(userId, data) {
+  const { name, email, whatsapp, phone, role } = data;
+  if (name !== undefined) run('UPDATE users SET name = ? WHERE id = ?', [name, userId]);
+  if (email !== undefined) {
+    const exists = queryOne('SELECT * FROM users WHERE email = ? AND id != ?', [email, userId]);
+    if (exists) return { error: 'البريد مستخدم من شخص آخر' };
+    run('UPDATE users SET email = ? WHERE id = ?', [email, userId]);
+  }
+  if (whatsapp !== undefined) run('UPDATE users SET whatsapp = ? WHERE id = ?', [whatsapp, userId]);
+  if (phone !== undefined) run('UPDATE users SET phone = ? WHERE id = ?', [phone, userId]);
+  if (role !== undefined && ['admin', 'moderator', 'founder', 'member'].includes(role)) {
+    run('UPDATE users SET role = ? WHERE id = ?', [role, userId]);
+  }
+  return queryOne('SELECT id, name, email, phone, whatsapp, role, points FROM users WHERE id = ?', [userId]);
+}
+
+function deleteUserByAdmin(userId) {
+  run('DELETE FROM users WHERE id = ?', [userId]);
+  return true;
+}
+
+// Moderator visits
+function requestModeratorVisit(moderatorId, moderatorName, familyId, reason) {
+  const id = uuidv4();
+  const scheduledAt = new Date(Date.now() + 60000).toISOString(); // +1 minute
+  run("INSERT INTO moderator_visits (id, moderator_id, moderator_name, family_id, reason, status, scheduled_at) VALUES (?, ?, ?, ?, ?, 'requested', ?)",
+    [id, moderatorId, moderatorName, familyId, reason, scheduledAt]);
+  return queryOne('SELECT * FROM moderator_visits WHERE id = ?', [id]);
+}
+function approveModeratorVisit(visitId, sessionId) {
+  run("UPDATE moderator_visits SET status = 'approved', diwaniya_session_id = ? WHERE id = ?", [sessionId, visitId]);
+  return queryOne('SELECT * FROM moderator_visits WHERE id = ?', [visitId]);
+}
+function enterModeratorVisit(visitId) {
+  run("UPDATE moderator_visits SET status = 'entered', entered_at = datetime('now') WHERE id = ?", [visitId]);
+  return queryOne('SELECT * FROM moderator_visits WHERE id = ?', [visitId]);
+}
+function exitModeratorVisit(visitId, report) {
+  run("UPDATE moderator_visits SET status = 'exited', exit_at = datetime('now'), report = ? WHERE id = ?", [report || '', visitId]);
+  return queryOne('SELECT * FROM moderator_visits WHERE id = ?', [visitId]);
+}
+function getModeratorVisits() {
+  return queryAll('SELECT * FROM moderator_visits ORDER BY requested_at DESC LIMIT 50');
+}
+function getModeratorVisitsByUser(userId) {
+  return queryAll('SELECT * FROM moderator_visits WHERE moderator_id = ? ORDER BY requested_at DESC LIMIT 20', [userId]);
+}
+function getPendingVisitByModerator(userId) {
+  return queryOne("SELECT * FROM moderator_visits WHERE moderator_id = ? AND status IN ('requested', 'approved', 'entered') ORDER BY requested_at DESC LIMIT 1", [userId]);
 }
 
 // =============== MODERATION ===============
@@ -1077,6 +1156,6 @@ module.exports = {
   updatePrice, getFirstAvailablePremiumCode,
   getAllFamilies, updateFamilyData, setFamilyStatus, deleteFamily, createAdminUser, getAdminStats,
   getActiveAds, getAllAds, addAd, updateAd, deleteAd, trackAdView, trackAdClick, getAdsStats, getFeaturedFamilies,
-  lockDiwaniya, getDiwaniyaLock, getAgreement, acceptAgreement, rejectAgreement, canOpenDiwaniya, getFamilyAgreements, getAllAgreements, getBannedWords, addBannedWord, deleteBannedWord, checkBannedWord, addViolation, getAllViolations, getViolationStats, getModerationSettings, setModerationSetting, banUser, getActiveBan, getAllBans, unbanUser, setDiwaniyaManager, countDiwaniyaManagers, updateProfile, leaveFamily, updateLastSeen, getLastSeen, createAnnouncement, getFamilyAnnouncements, getAnnouncementsForUser, deleteAnnouncement, getUserFamilies, getUserFamilyCount, addUserToFamily, setCurrentFamily, getSetting, setSetting, createAuction, getActiveAuctions, getAllAuctions, getAuctionById, joinAuction, placeBid, getAvailableAuctionCodes,
+  lockDiwaniya, getDiwaniyaLock, getAllUsersDetailed, updateUserByAdmin, deleteUserByAdmin, requestModeratorVisit, approveModeratorVisit, enterModeratorVisit, exitModeratorVisit, getModeratorVisits, getModeratorVisitsByUser, getPendingVisitByModerator, getAgreement, acceptAgreement, rejectAgreement, canOpenDiwaniya, getFamilyAgreements, getAllAgreements, getBannedWords, addBannedWord, deleteBannedWord, checkBannedWord, addViolation, getAllViolations, getViolationStats, getModerationSettings, setModerationSetting, banUser, getActiveBan, getAllBans, unbanUser, setDiwaniyaManager, countDiwaniyaManagers, updateProfile, leaveFamily, updateLastSeen, getLastSeen, createAnnouncement, getFamilyAnnouncements, getAnnouncementsForUser, deleteAnnouncement, getUserFamilies, getUserFamilyCount, addUserToFamily, setCurrentFamily, getSetting, setSetting, createAuction, getActiveAuctions, getAllAuctions, getAuctionById, joinAuction, placeBid, getAvailableAuctionCodes,
   endAuction, confirmAuctionPayment, cancelAuction, getAuctionBids, isAuctionParticipant,
 };

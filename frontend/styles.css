@@ -1515,3 +1515,35 @@ body {
 .auction-card.compact .current-price {
   font-size: 20px;
 }
+
+/* Moderator visit banner */
+.moderator-visit-banner {
+  position: fixed;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-200%);
+  background: linear-gradient(135deg, #c0392b, #e74c3c);
+  color: #fff;
+  border-radius: var(--radius);
+  box-shadow: 0 10px 40px rgba(192,57,43,.4);
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  z-index: 600;
+  max-width: 92vw;
+  width: 420px;
+  transition: transform .5s cubic-bezier(.34,1.56,.64,1);
+}
+.moderator-visit-banner.show {
+  transform: translateX(-50%) translateY(0);
+}
+.moderator-in-chat {
+  text-align: center;
+  font-size: 12px;
+  color: var(--info);
+  background: rgba(59,130,196,.08);
+  padding: 6px;
+  border-radius: var(--radius-sm);
+  margin: 6px 0;
+}

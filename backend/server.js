@@ -273,6 +273,14 @@ function adminMiddleware(req, res, next) {
   next();
 }
 
+// Admin or moderator middleware
+function adminOrModerator(req, res, next) {
+  if (req.user.role !== 'admin' && req.user.role !== 'moderator') {
+    return res.status(403).json({ error: 'هذه الصلاحية للإدارة أو المشرفين' });
+  }
+  next();
+}
+
 // =============== ADMIN: FAMILY MANAGEMENT ===============
 
 // List all families (admin)
@@ -350,13 +358,13 @@ app.get('/api/featured-families', (req, res) => {
 });
 
 // Admin: all ads
-app.get('/api/admin/ads', authMiddleware, adminMiddleware, (req, res) => {
+app.get('/api/admin/ads', authMiddleware, adminOrModerator, (req, res) => {
   const ads = db.getAllAds();
   res.json({ ads });
 });
 
 // Admin: add ad
-app.post('/api/admin/ads/add', authMiddleware, adminMiddleware, (req, res) => {
+app.post('/api/admin/ads/add', authMiddleware, adminOrModerator, (req, res) => {
   const { title, image_url, link_url, position } = req.body;
   if (!title) return res.status(400).json({ error: 'عنوان الإعلان مطلوب' });
   const ad = db.addAd(title, image_url || '', link_url || '', position || 'banner');
@@ -364,7 +372,7 @@ app.post('/api/admin/ads/add', authMiddleware, adminMiddleware, (req, res) => {
 });
 
 // Admin: update ad
-app.post('/api/admin/ads/update', authMiddleware, adminMiddleware, (req, res) => {
+app.post('/api/admin/ads/update', authMiddleware, adminOrModerator, (req, res) => {
   const { id, title, image_url, link_url, status } = req.body;
   if (!id) return res.status(400).json({ error: 'معرف الإعلان مطلوب' });
   const ad = db.updateAd(id, title, image_url || '', link_url || '', status || 'active');
@@ -372,7 +380,7 @@ app.post('/api/admin/ads/update', authMiddleware, adminMiddleware, (req, res) =>
 });
 
 // Admin: delete ad
-app.post('/api/admin/ads/delete', authMiddleware, adminMiddleware, (req, res) => {
+app.post('/api/admin/ads/delete', authMiddleware, adminOrModerator, (req, res) => {
   const { id } = req.body;
   if (!id) return res.status(400).json({ error: 'معرف الإعلان مطلوب' });
   db.deleteAd(id);
@@ -665,6 +673,86 @@ app.post('/api/admin/moderation-settings', authMiddleware, adminMiddleware, (req
   if (auto_ban_after !== undefined) db.setModerationSetting('auto_ban_after', auto_ban_after);
   if (ai_employee_name !== undefined) db.setModerationSetting('ai_employee_name', ai_employee_name);
   res.json({ message: '✅ تم حفظ الإعدادات', settings: db.getModerationSettings() });
+});
+
+// =============== USERS MANAGEMENT (ADMIN) ===============
+
+// Get all users detailed (admin)
+app.get('/api/admin/users-detailed', authMiddleware, adminMiddleware, (req, res) => {
+  res.json({ users: db.getAllUsersDetailed() });
+});
+
+// Update user (admin) - edit, promote/demote
+app.post('/api/admin/users/update', authMiddleware, adminMiddleware, (req, res) => {
+  const { userId, name, email, whatsapp, phone, role } = req.body;
+  if (!userId) return res.status(400).json({ error: 'معرف المستخدم مطلوب' });
+  const result = db.updateUserByAdmin(userId, { name, email, whatsapp, phone, role });
+  if (result?.error) return res.status(400).json(result);
+  res.json({ message: '✅ تم تحديث بيانات المستخدم', user: result });
+});
+
+// Delete user (admin)
+app.post('/api/admin/users/delete', authMiddleware, adminMiddleware, (req, res) => {
+  const { userId } = req.body;
+  if (!userId) return res.status(400).json({ error: 'معرف المستخدم مطلوب' });
+  db.deleteUserByAdmin(userId);
+  res.json({ message: '🗑️ تم حذف المستخدم' });
+});
+
+// =============== MODERATOR VISITS ===============
+
+// Moderator: request visit to diwaniya (with reason)
+app.post('/api/moderator/visit/request', authMiddleware, (req, res) => {
+  const user = db.getUserById(req.user.id);
+  if (user.role !== 'moderator' && user.role !== 'admin') {
+    return res.status(403).json({ error: 'فقط المشرفون يمكنهم طلب الزيارة' });
+  }
+  const { familyId, reason } = req.body;
+  if (!familyId || !reason) return res.status(400).json({ error: 'العائلة وسبب الزيارة مطلوبان' });
+  const visit = db.requestModeratorVisit(req.user.id, user.name, familyId, reason);
+  // Notify the family diwaniya (if active)
+  const active = db.getActiveDiwaniya(familyId);
+  if (active) {
+    io.to(`family_${familyId}`).emit('moderator_visit_requested', {
+      moderatorName: user.name,
+      reason: reason,
+      scheduledAt: visit.scheduled_at,
+      visitId: visit.id
+    });
+  }
+  res.json({ message: '🕵️ تم إرسال طلب الزيارة، ستدخل بعد دقيقة', visit });
+});
+
+// Moderator: enter diwaniya (after 1 min)
+app.post('/api/moderator/visit/enter', authMiddleware, (req, res) => {
+  const { visitId } = req.body;
+  const visit = db.enterModeratorVisit(visitId);
+  if (!visit) return res.status(400).json({ error: 'الزيارة غير موجودة' });
+  if (visit.family_id) {
+    io.to(`family_${visit.family_id}`).emit('moderator_entered', { moderatorName: visit.moderator_name });
+  }
+  res.json({ message: '🕵️ دخلت كمراقب تفقدي - لا يحق لك المشاركة', visit });
+});
+
+// Moderator: exit + send report
+app.post('/api/moderator/visit/exit', authMiddleware, (req, res) => {
+  const { visitId, report } = req.body;
+  const visit = db.exitModeratorVisit(visitId, report);
+  if (!visit) return res.status(400).json({ error: 'الزيارة غير موجودة' });
+  if (visit.family_id) {
+    io.to(`family_${visit.family_id}`).emit('moderator_exited', { moderatorName: visit.moderator_name });
+  }
+  res.json({ message: '📋 تم إرسال تقرير الزيارة للإدارة', visit });
+});
+
+// Moderator: my visits
+app.get('/api/moderator/visits', authMiddleware, (req, res) => {
+  res.json({ visits: db.getModeratorVisitsByUser(req.user.id) });
+});
+
+// Admin: all moderator visits
+app.get('/api/admin/moderator-visits', authMiddleware, adminMiddleware, (req, res) => {
+  res.json({ visits: db.getModeratorVisits() });
 });
 
 // =============== AGREEMENTS ROUTES ===============
@@ -981,6 +1069,12 @@ app.post('/api/diwaniya/message', authMiddleware, (req, res) => {
   const { sessionId, message } = req.body;
   if (!sessionId || !message) return res.status(400).json({ error: 'الرسالة مطلوبة' });
   
+  // Moderator is observer only - cannot post
+  const msgUser = db.getUserById(req.user.id);
+  if (msgUser && msgUser.role === 'moderator') {
+    return res.status(403).json({ error: '🕵️ المشرف مراقب فقط ولا يحق له المشاركة' });
+  }
+  
   // Check banned words
   const banned = db.checkBannedWord(message);
   if (banned) {
@@ -1085,6 +1179,12 @@ io.on('connection', (socket) => {
 
   socket.on('diwaniya_message', (data) => {
     const { sessionId, userId, message } = data;
+    // Moderator is observer only
+    const sender = db.getUserById(userId);
+    if (sender && sender.role === 'moderator') {
+      io.to(`user_${userId}`).emit('message_blocked', { message: '🕵️ المشرف مراقب فقط ولا يحق له المشاركة' });
+      return;
+    }
     // Check banned words - block and warn the writer
     const banned = db.checkBannedWord(message);
     if (banned) {
