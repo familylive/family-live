@@ -149,20 +149,35 @@ function logout() {
 // ==================== LOAD APP ====================
 async function loadApp(user, family) {
   Object.assign(state, { user, family, isFounder: user.role === 'founder', isLoggedIn: true, points: user.points || 0 });
+  
+  // For admin or users without family, skip family-dependent calls
+  const hasFamily = !!family || !!user.family_id;
+  
   try {
-    const [famData, challData, lbData, diwData] = await Promise.all([
-      api('GET', '/api/family'),
-      api('GET', '/api/challenges'),
-      api('GET', '/api/leaderboard'),
-      api('GET', '/api/diwaniya/active'),
-    ]);
-    state.members = famData.members || [];
-    state.invites = famData.invitations || [];
-    state.challenges = challData.challenges || [];
-    state.pendingChallenges = challData.pending || [];
-    state.leaderboard = lbData.leaderboard || [];
-    state.activeSession = diwData.session;
-    state.diwaniyaOpen = diwData.session?.status === 'open';
+    if (hasFamily) {
+      const [famData, challData, lbData, diwData] = await Promise.all([
+        api('GET', '/api/family'),
+        api('GET', '/api/challenges'),
+        api('GET', '/api/leaderboard'),
+        api('GET', '/api/diwaniya/active'),
+      ]);
+      state.members = famData.members || [];
+      state.invites = famData.invitations || [];
+      state.challenges = challData.challenges || [];
+      state.pendingChallenges = challData.pending || [];
+      state.leaderboard = lbData.leaderboard || [];
+      state.activeSession = diwData.session;
+      state.diwaniyaOpen = diwData.session?.status === 'open';
+    } else {
+      // Admin or new user: load minimal data
+      state.members = [];
+      state.invites = [];
+      state.challenges = [];
+      state.pendingChallenges = [];
+      state.leaderboard = [];
+      state.activeSession = null;
+      state.diwaniyaOpen = false;
+    }
   } catch (e) { console.error('Load error:', e); }
   updateAllUI();
   connectSocket();
@@ -215,6 +230,9 @@ function updateAllUI() {
   if (state.family) {
     if (greeting) greeting.textContent = '👋 مرحباً بك ' + (state.user?.name || '') + ' 🏡';
     if (familyName) familyName.textContent = 'في عائلة ' + state.family.name;
+  } else if (state.user?.role === 'admin') {
+    if (greeting) greeting.textContent = '👋 مرحباً بك ' + (state.user?.name || '') + ' ⚙️';
+    if (familyName) familyName.textContent = 'لوحة تحكم إدارة التطبيق';
   } else if (state.isLoggedIn) {
     if (greeting) greeting.textContent = '👋 مرحباً بك ' + (state.user?.name || '') + ' 🆕';
     if (familyName) familyName.textContent = 'أنت جديد، استكشف التطبيق أو انضم لعائلة';
