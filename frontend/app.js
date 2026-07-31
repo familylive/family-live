@@ -337,8 +337,9 @@ function updateMenuVisibility() {
   const joinMenu = document.getElementById('menu-join-family');
   const adminMenu = document.getElementById('menu-admin');
   const modMenu = document.getElementById('menu-moderator');
-  // App pages to hide for visitors
-  const appPages = ['dashboard','family','diwaniya','games','challenges','leaderboard','codes','auctions','profile'];
+  const onlineFam = document.getElementById('menu-online-families');
+  // App pages
+  const allPages = ['dashboard','family','diwaniya','games','challenges','leaderboard','codes','auctions','profile'];
   
   if (loginItem) loginItem.style.display = isLogged ? 'none' : 'flex';
   if (registerItem) registerItem.style.display = isLogged ? 'none' : 'flex';
@@ -347,13 +348,23 @@ function updateMenuVisibility() {
   if (privacyItem) privacyItem.style.display = isLogged ? 'none' : 'flex';
   if (supportVisitor) supportVisitor.style.display = isLogged ? 'none' : 'flex';
   if (supportItem) supportItem.style.display = isLogged ? 'flex' : 'none';
-  if (joinMenu) joinMenu.style.display = (isLogged && !state.family) ? 'flex' : 'none';
+  if (joinMenu) joinMenu.style.display = (isLogged && !state.family && state.user?.role !== 'moderator') ? 'flex' : 'none';
   if (adminMenu) adminMenu.style.display = (state.user?.role === 'admin') ? 'flex' : 'none';
   if (modMenu) modMenu.style.display = (state.user?.role === 'moderator' || state.user?.role === 'admin') ? 'flex' : 'none';
+  if (onlineFam) onlineFam.style.display = (state.user?.role === 'moderator') ? 'flex' : 'none';
   
-  appPages.forEach(p => {
+  // Moderator: only home + profile visible from app pages (can only enter diwaniyas via visits)
+  const isModerator = state.user?.role === 'moderator';
+  allPages.forEach(p => {
     const item = document.querySelector('.menu-nav-item[data-page="' + p + '"]');
-    if (item) item.style.display = isLogged ? 'flex' : 'none';
+    if (!item) return;
+    if (!isLogged) { item.style.display = 'none'; return; }
+    if (isModerator) {
+      // Moderator sees only home + profile (no family/diwaniya/games/etc)
+      item.style.display = (p === 'dashboard' || p === 'profile') ? 'flex' : 'none';
+    } else {
+      item.style.display = 'flex';
+    }
   });
 }
 
