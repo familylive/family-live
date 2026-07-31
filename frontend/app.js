@@ -138,12 +138,39 @@ function switchRegTab(tab) {
 
 function logout() {
   if (!confirm('هل أنت متأكد من تسجيل الخروج؟')) return;
-  localStorage.removeItem('token');
-  sessionStorage.removeItem('token');
+  // Clear ALL tokens from everywhere
+  localStorage.clear();
+  sessionStorage.clear();
   if (socket) socket.disconnect();
-  state.isLoggedIn = false; state.user = null; state.family = null;
+  // Reset state completely
+  Object.assign(state, { user: null, family: null, isFounder: false, isLoggedIn: false, points: 0, members: [], challenges: [], invites: [], leaderboard: [], pendingChallenges: [], onlineMembers: [] });
+  // Reset menu UI to defaults
+  const menuName = document.getElementById('menu-user-name');
+  const menuRole = document.getElementById('menu-user-role');
+  const menuAvatar = document.getElementById('menu-avatar');
+  const pointsDisplay = document.getElementById('points-display');
+  const familyBadge = document.getElementById('family-badge');
+  if (menuName) menuName.textContent = 'الاسم';
+  if (menuRole) menuRole.textContent = 'عضو';
+  if (menuAvatar) menuAvatar.textContent = '👤';
+  if (pointsDisplay) pointsDisplay.textContent = '0';
+  if (familyBadge) familyBadge.textContent = 'العائلة';
+  // Hide logged-in-only menu items
+  const joinMenu = document.getElementById('menu-join-family');
+  const adminMenu = document.getElementById('menu-admin');
+  const modMenu = document.getElementById('menu-moderator');
+  if (joinMenu) joinMenu.style.display = 'none';
+  if (adminMenu) adminMenu.style.display = 'none';
+  if (modMenu) modMenu.style.display = 'none';
+  // Close side menu
+  const menu = document.getElementById('side-menu');
+  const overlay = document.getElementById('menu-overlay');
+  if (menu) menu.classList.remove('open');
+  if (overlay) overlay.classList.remove('open');
+  // Show landing
   showAuth('landing');
   loadLandingPage();
+  showToast('تم تسجيل الخروج 👋');
 }
 
 // ==================== LOAD APP ====================
