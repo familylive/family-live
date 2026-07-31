@@ -432,6 +432,32 @@ function addInviteInput() {
   container.appendChild(group);
 }
 
+// ==================== WHATSAPP INVITES ====================
+function inviteViaWhatsApp() {
+  const div = document.getElementById('whatsapp-members-select');
+  const list = document.getElementById('whatsapp-members-list');
+  if (div) div.style.display = div.style.display === 'none' ? 'block' : 'none';
+  if (!list) return;
+  const withWhatsApp = (state.members || []).filter(m => m.whatsapp && m.id !== state.user?.id);
+  if (!withWhatsApp.length) {
+    list.innerHTML = '<div class="empty-text" style="font-size:12px">لا يوجد أعضاء سجلوا أرقام واتساب بعد</div>';
+    return;
+  }
+  list.innerHTML = withWhatsApp.map(m => {
+    const cleanNum = String(m.whatsapp).replace(/[^0-9]/g, '');
+    const intl = cleanNum.startsWith('0') ? '966' + cleanNum.slice(1) : cleanNum;
+    const msg = encodeURIComponent('👋 دعوة من مؤسس عائلة ' + (state.family?.name || '') + ' للتواجد في التطبيق\n🔑 رمز العائلة: ' + (state.family?.subscription_code || '') + '\n📞 رقم المؤسس: ' + (state.user?.whatsapp || '') + '\n🔗 https://family-live.onrender.com');
+    return '<div class="my-family-item" style="cursor:pointer" onclick="window.open(\'https://wa.me/' + intl + '?text=' + msg + '\', \'_blank\')">' +
+      '<span>📱 ' + (m.name || '') + '</span><span style="color:var(--gold)">' + (m.whatsapp || '') + '</span>' +
+      '<span class="btn btn-sm btn-accent">إرسال</span></div>';
+  }).join('');
+}
+
+function inviteViaWhatsAppShare() {
+  const msg = encodeURIComponent('👋 انضم لعائلة ' + (state.family?.name || '') + ' على تطبيق العائلة\n🔑 رمز العائلة: ' + (state.family?.subscription_code || '') + '\n📞 من المؤسس: ' + (state.user?.whatsapp || state.user?.phone || '') + '\n🔗 https://family-live.onrender.com');
+  window.open('https://wa.me/?text=' + msg, '_blank');
+}
+
 async function sendInvites() {
   const inputs = document.querySelectorAll('#invite-inputs .form-input');
   const emails = Array.from(inputs).map(i => i.value.trim()).filter(Boolean);
