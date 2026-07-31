@@ -880,6 +880,15 @@ function toggleHeaderVisibility(pageName) {
 
 function showAuth(page) { navigateTo(page); }
 
+function shuffleArray(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
 async function loadDashboardAds() {
   try {
     const { ads } = await api('GET', '/api/ads');
@@ -888,7 +897,9 @@ async function loadDashboardAds() {
       slider.innerHTML = '<div class="empty-state"><div class="empty-text">لا توجد إعلانات</div></div>';
       return;
     }
-    slider.innerHTML = ads.map(a => {
+    // Show last 4 ads, shuffled randomly each visit
+    const last4 = shuffleArray(ads.slice(0, 4));
+    slider.innerHTML = last4.map(a => {
       // Track impression
       api('POST', '/api/ads/view', { id: a.id }).catch(() => {});
       return '<div class="ad-card" onclick="trackAdClick(\'' + a.id + '\', \'' + (a.link_url || '') + '\')" style="cursor:pointer">' +
@@ -996,7 +1007,8 @@ async function loadLandingPage() {
     const { ads } = await api('GET', '/api/ads');
     const adsSlider = document.getElementById('ads-slider');
     if (ads?.length) {
-      adsSlider.innerHTML = ads.map(a =>
+      const last4 = shuffleArray(ads.slice(0, 4));
+      adsSlider.innerHTML = last4.map(a =>
         '<div class="ad-card">' +
           (a.image_url ? '<img src="' + a.image_url + '" alt="' + (a.title||'') + '" onerror="this.style.display=\'none\'">' : '<div style="height:120px;display:flex;align-items:center;justify-content:center;background:var(--bg-input);border-radius:var(--radius-sm);font-size:40px">📢</div>') +
           '<div class="ad-title">' + (a.title || '') + '</div>' +
