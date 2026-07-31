@@ -1454,3 +1454,16 @@ body {
   cursor: pointer;
   font-size: 13px;
 }
+
+/* Violation countdown */
+.violation-countdown {
+  font-size: 13px;
+  margin-top: 6px;
+  color: #ffe0dc;
+}
+.violation-countdown b {
+  font-size: 18px;
+  direction: ltr;
+  display: inline-block;
+  font-variant-numeric: tabular-nums;
+}

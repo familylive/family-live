@@ -322,8 +322,8 @@ function connectSocket() {
     stopDiwaniyaTimer(); enableChat(false);
     document.getElementById('diwaniya-toggle-btn').textContent = '🔓 فتح الديوانية';
     document.getElementById('stat-diwaniya').textContent = '🔴 متوقفة';
-    // Show prominent violation banner to all family members
-    showViolationBanner(data.violatorName, data.reason);
+    // Show persistent violation banner with countdown
+    showViolationBanner(data.violatorName, data.reason, data.lockedUntil || null);
   });
   socket.on('user_online', (data) => {
     if (state.family?.id && state.onlineMembers) {

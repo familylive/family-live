@@ -39,6 +39,9 @@ function initDb() {
       subscription_code TEXT NOT NULL UNIQUE,
       founder_id TEXT,
       status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'inactive')),
+      diwaniya_locked_until TEXT,
+      diwaniya_lock_reason TEXT,
+      diwaniya_locked_by TEXT,
       created_at TEXT DEFAULT (datetime('now'))
     )
   `);
@@ -559,6 +562,28 @@ function setSetting(key, value) {
   run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [key, String(value)]);
 }
 
+// =============== DIWANIYA LOCKDOWN ===============
+function lockDiwaniya(familyId, untilIso, reason, lockedByName) {
+  run('UPDATE families SET diwaniya_locked_until = ?, diwaniya_lock_reason = ?, diwaniya_locked_by = ? WHERE id = ?',
+    [untilIso, reason, lockedByName, familyId]);
+}
+
+function getDiwaniyaLock(familyId) {
+  const family = queryOne('SELECT diwaniya_locked_until, diwaniya_lock_reason, diwaniya_locked_by FROM families WHERE id = ?', [familyId]);
+  if (!family || !family.diwaniya_locked_until) return null;
+  const now = new Date().toISOString();
+  if (family.diwaniya_locked_until <= now) {
+    // Lock expired - clear it
+    run('UPDATE families SET diwaniya_locked_until = NULL, diwaniya_lock_reason = NULL, diwaniya_locked_by = NULL WHERE id = ?', [familyId]);
+    return null;
+  }
+  return {
+    locked_until: family.diwaniya_locked_until,
+    reason: family.diwaniya_lock_reason,
+    locked_by: family.diwaniya_locked_by
+  };
+}
+
 // =============== MODERATION ===============
 function getBannedWords() {
   return queryAll('SELECT * FROM banned_words ORDER BY created_at DESC');
@@ -993,6 +1018,6 @@ module.exports = {
   updatePrice, getFirstAvailablePremiumCode,
   getAllFamilies, updateFamilyData, setFamilyStatus, deleteFamily, createAdminUser, getAdminStats,
   getActiveAds, getAllAds, addAd, updateAd, deleteAd, trackAdView, trackAdClick, getAdsStats, getFeaturedFamilies,
-  getBannedWords, addBannedWord, deleteBannedWord, checkBannedWord, addViolation, getAllViolations, getViolationStats, getModerationSettings, setModerationSetting, banUser, getActiveBan, getAllBans, unbanUser, setDiwaniyaManager, countDiwaniyaManagers, updateProfile, leaveFamily, updateLastSeen, getLastSeen, createAnnouncement, getFamilyAnnouncements, getAnnouncementsForUser, deleteAnnouncement, getUserFamilies, getUserFamilyCount, addUserToFamily, setCurrentFamily, getSetting, setSetting, createAuction, getActiveAuctions, getAllAuctions, getAuctionById, joinAuction, placeBid, getAvailableAuctionCodes,
+  lockDiwaniya, getDiwaniyaLock, getBannedWords, addBannedWord, deleteBannedWord, checkBannedWord, addViolation, getAllViolations, getViolationStats, getModerationSettings, setModerationSetting, banUser, getActiveBan, getAllBans, unbanUser, setDiwaniyaManager, countDiwaniyaManagers, updateProfile, leaveFamily, updateLastSeen, getLastSeen, createAnnouncement, getFamilyAnnouncements, getAnnouncementsForUser, deleteAnnouncement, getUserFamilies, getUserFamilyCount, addUserToFamily, setCurrentFamily, getSetting, setSetting, createAuction, getActiveAuctions, getAllAuctions, getAuctionById, joinAuction, placeBid, getAvailableAuctionCodes,
   endAuction, confirmAuctionPayment, cancelAuction, getAuctionBids, isAuctionParticipant,
 };

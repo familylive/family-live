@@ -579,21 +579,28 @@ app.post('/api/admin/violations/add', authMiddleware, adminMiddleware, (req, res
   if (!userId || !reason || !durationHours) return res.status(400).json({ error: 'جميع الحقول مطلوبة' });
   const violation = db.addViolation(userId, reason, parseInt(durationHours), violationType || 'text', evidence, req.user.id);
   
-  // If violation is diwaniya-related (audio/video/text in chat), close the diwaniya automatically
+  // If violation is diwaniya-related, close diwaniya + lock it
   const violator = db.getUserById(userId);
   if (violator && violator.family_id) {
     const activeSession = db.getActiveDiwaniya(violator.family_id);
     if (activeSession) {
       db.closeDiwaniya(activeSession.id);
-      // Notify family: diwaniya closed due to violation, show violator name
-      io.to(`family_${violator.family_id}`).emit('diwaniya_closed_violation', {
-        violatorName: violator.name,
-        reason: reason,
-        sessionId: activeSession.id,
-        closedAt: new Date().toISOString()
-      });
-      console.log(`🔒 Diwaniya closed due to violation by ${violator.name}`);
     }
+    // Lock diwaniya: founder ban duration, otherwise 24 hours
+    const durationMs = (violator.role === 'founder' ? parseInt(durationHours) : 24) * 3600000;
+    const lockedUntil = new Date(Date.now() + durationMs).toISOString();
+    db.lockDiwaniya(violator.family_id, lockedUntil, reason, violator.name);
+    
+    // Notify family: diwaniya closed due to violation, show violator name + lock time
+    io.to(`family_${violator.family_id}`).emit('diwaniya_closed_violation', {
+      violatorName: violator.name,
+      reason: reason,
+      sessionId: activeSession ? activeSession.id : null,
+      lockedUntil: lockedUntil,
+      lockedHours: violator.role === 'founder' ? parseInt(durationHours) : 24,
+      closedAt: new Date().toISOString()
+    });
+    console.log(`🔒 Diwaniya locked until ${lockedUntil} due to violation by ${violator.name}`);
   }
   
   res.json({ message: '⛔ تم تسجيل المخالفة وإيقاف العضوية', violation });
@@ -805,6 +812,23 @@ app.post('/api/diwaniya/open', authMiddleware, (req, res) => {
     return res.status(403).json({ error: 'فقط المؤسس أو من منحه الصلاحية يمكنه فتح الديوانية' });
   }
   
+  // Check diwaniya lockdown
+  if (req.user.familyId) {
+    const lock = db.getDiwaniyaLock(req.user.familyId);
+    if (lock) {
+      const remainingMs = new Date(lock.locked_until).getTime() - Date.now();
+      const remainingH = Math.floor(remainingMs / 3600000);
+      const remainingM = Math.floor((remainingMs % 3600000) / 60000);
+      return res.status(403).json({
+        error: '🔒 الديوانية مغلقة بسبب مخالفة من ' + lock.locked_by + '، متبقي ' + remainingH + ' ساعة و ' + remainingM + ' دقيقة',
+        locked: true,
+        locked_until: lock.locked_until,
+        locked_by: lock.locked_by,
+        reason: lock.reason
+      });
+    }
+  }
+  
   const { durationMinutes, topic, mode } = req.body;
   const duration = durationMinutes || 30;
   const diwaniyaMode = mode || 'text';
@@ -841,11 +865,12 @@ app.post('/api/diwaniya/close/:sessionId', authMiddleware, (req, res) => {
   res.json(result);
 });
 
-// Get active diwaniya
+// Get active diwaniya + lockdown status
 app.get('/api/diwaniya/active', authMiddleware, (req, res) => {
   if (!req.user.familyId) return res.status(400).json({ error: 'لا يوجد عائلة' });
   const session = db.getActiveDiwaniya(req.user.familyId);
-  res.json({ session });
+  const lock = db.getDiwaniyaLock(req.user.familyId);
+  res.json({ session, lock });
 });
 
 // Get diwaniya history
