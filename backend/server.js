@@ -496,7 +496,7 @@ app.post('/api/diwaniya/open', authMiddleware, (req, res) => {
     return res.status(400).json({ error: 'المدة يجب أن تكون بين 15 و 60 دقيقة' });
   }
   
-  if (!['text', 'audio', 'both'].includes(diwaniyaMode)) {
+  if (!['text', 'audio', 'video', 'both', 'all'].includes(diwaniyaMode)) {
     return res.status(400).json({ error: 'نوع الديوانية غير صالح' });
   }
 

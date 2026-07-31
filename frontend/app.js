@@ -353,7 +353,7 @@ async function toggleDiwaniya() {
     state.diwaniyaMode = mode;
     document.getElementById('diwaniya-toggle-btn').textContent = '🔒 إغلاق الديوانية';
     document.getElementById('stat-diwaniya').textContent = '🟢 مفتوحة';
-    const modeLabel = { text: '✍️ كتابي', audio: '🎤 صوتي', both: '📝🎤 كتابي+صوتي' };
+    const modeLabel = { text: '✍️ كتابي', audio: '🎤 صوتي', video: '🎥 فيديو', both: '📝🎤 كتابي+صوتي', all: '📝🎥🎤 كل شي' };
     document.querySelector('#timer-display .timer-label').textContent = 'الديوانية مفتوحة - ' + (modeLabel[mode] || mode);
     startDiwaniyaTimer(duration);
     setupChatMode(mode);
@@ -627,12 +627,12 @@ function setupChatMode(mode) {
     modeLabel.className = 'mode-indicator';
     if (chatRoom?.parentNode) chatRoom.parentNode.insertBefore(modeLabel, chatRoom);
   }
-  const labels = { text: '✍️ الديوانية كتابية', audio: '🎤 الديوانية صوتية - مكالمة مباشرة', both: '📝🎤 كتابية + مكالمة صوتية' };
+  const labels = { text: '✍️ الديوانية كتابية', audio: '🎤 الديوانية صوتية - مكالمة مباشرة', video: '🎥 مكالمة فيديو - حد أقصى 6', both: '📝🎤 كتابية + صوتية', all: '📝🎥🎤 كل شي' };
   modeLabel.textContent = labels[mode] || '✍️ الديوانية';
 
-  // Show/hide live audio section
+  // Show/hide live video section
   if (liveAudioSection) {
-    liveAudioSection.style.display = (mode === 'audio' || mode === 'both') ? 'block' : 'none';
+    liveAudioSection.style.display = (mode === 'audio' || mode === 'video' || mode === 'both' || mode === 'all') ? 'block' : 'none';
   }
 
   if (mode === 'audio') {
@@ -646,7 +646,10 @@ function setupChatMode(mode) {
     `;
     document.getElementById('chat-input-field')?.remove();
     document.getElementById('chat-send-btn')?.remove();
-  } else if (mode === 'both') {
+  } else if (mode === 'video') {
+    // Video only - hide text input, video call via join button
+    chatInput.innerHTML = '';
+  } else if (mode === 'both' || mode === 'all') {
     // Both - keep text input + add mic button
     const sendBtn = chatInput.querySelector('#chat-send-btn');
     chatInput.innerHTML = `

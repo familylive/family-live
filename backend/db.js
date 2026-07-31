@@ -80,7 +80,7 @@ function initDb() {
       duration_minutes INTEGER NOT NULL DEFAULT 30,
       status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open', 'closed')),
       topic TEXT,
-      mode TEXT NOT NULL DEFAULT 'text' CHECK(mode IN ('text', 'audio', 'both')),
+      mode TEXT NOT NULL DEFAULT 'text' CHECK(mode IN ('text', 'audio', 'video', 'both', 'all')),
       FOREIGN KEY (family_id) REFERENCES families(id),
       FOREIGN KEY (opened_by) REFERENCES users(id)
     )
