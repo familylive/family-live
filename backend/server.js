@@ -387,6 +387,27 @@ app.post('/api/admin/ads/delete', authMiddleware, adminOrModerator, (req, res) =
   res.json({ message: '🗑️ تم حذف الإعلان' });
 });
 
+// =============== FOUNDER: EDIT OWN FAMILY ===============
+
+// Founder edits own family name (and optionally code)
+app.post('/api/family/edit', authMiddleware, (req, res) => {
+  if (!req.user.familyId) return res.status(400).json({ error: 'لا يوجد عائلة' });
+  if (req.user.role !== 'founder') return res.status(403).json({ error: 'فقط مؤسس العائلة يمكنه التعديل' });
+  const { name, subscription_code } = req.body;
+  if (name) {
+    db.getDb().run('UPDATE families SET name = ? WHERE id = ?', [name, req.user.familyId]);
+  }
+  if (subscription_code) {
+    // Check not used by another family
+    const used = db.getDb().exec("SELECT id FROM families WHERE subscription_code = ? AND id != ?", [subscription_code, req.user.familyId]);
+    if (used.length && used[0].values.length) {
+      return res.status(400).json({ error: 'الرمز مستخدم من عائلة أخرى' });
+    }
+    db.getDb().run('UPDATE families SET subscription_code = ? WHERE id = ?', [subscription_code, req.user.familyId]);
+  }
+  res.json({ message: '✅ تم تحديث بيانات العائلة', family: db.getFamily(req.user.familyId) });
+});
+
 // =============== PROFILE ROUTES ===============
 
 // Update profile

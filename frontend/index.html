@@ -1201,7 +1201,7 @@ function navigateTo(pageName) {
   if (pageName === 'profile' && state.isLoggedIn) { loadProfilePage(); loadMyFamilies(); }
   if (pageName === 'support' && state.isLoggedIn) loadMyTickets();
   if (pageName === 'admin' && state.user?.role === 'admin') loadAdminSupport();
-  if (pageName === 'family' && state.isLoggedIn) { loadAnnouncements(); populateAnnTarget(); populateManagerSelect(); }
+  if (pageName === 'family' && state.isLoggedIn) { loadAnnouncements(); populateAnnTarget(); populateManagerSelect(); loadFamilyPageData(); }
   if (pageName === 'admin' && state.user?.role === 'admin') { loadBannedWords(); loadAdminBans(); loadAIUsers(); loadViolations(); loadAdminAgreements(); loadAdminUsers(); loadModeratorVisitsAdmin(); }
   if (pageName === 'moderator' && (state.user?.role === 'moderator' || state.user?.role === 'admin')) { loadModeratorFamilies(); loadModeratorVisitsHistory(); loadModeratorProfile(); }
   if (pageName === 'admin' && state.user?.role === 'admin') loadTierSettings();
