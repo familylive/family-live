@@ -135,6 +135,8 @@ function initDb() {
       link_url TEXT,
       status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'inactive')),
       position TEXT NOT NULL DEFAULT 'banner',
+      views INTEGER DEFAULT 0,
+      clicks INTEGER DEFAULT 0,
       created_at TEXT DEFAULT (datetime('now'))
     )
   `);
@@ -461,6 +463,16 @@ function getActiveAds() {
 function getAllAds() {
   return queryAll('SELECT * FROM ads ORDER BY created_at DESC');
 }
+function trackAdView(id) {
+  run('UPDATE ads SET views = views + 1 WHERE id = ?', [id]);
+}
+function trackAdClick(id) {
+  run('UPDATE ads SET clicks = clicks + 1 WHERE id = ?', [id]);
+}
+function getAdsStats() {
+  const r = queryOne('SELECT COUNT(*) as total, SUM(views) as views, SUM(clicks) as clicks FROM ads');
+  return { total: r ? r.total || 0 : 0, views: r ? r.views || 0 : 0, clicks: r ? r.clicks || 0 : 0 };
+}
 function addAd(title, imageUrl, linkUrl, position = 'banner') {
   const id = uuidv4();
   run('INSERT INTO ads (id, title, image_url, link_url, position) VALUES (?, ?, ?, ?, ?)', [id, title, imageUrl, linkUrl, position]);
@@ -690,7 +702,7 @@ module.exports = {
   generatePremiumCode, getAvailablePremiumCodes, purchaseCode, getUserCodes, userHasFamily, updatePassword,
   updatePrice, getFirstAvailablePremiumCode,
   getAllFamilies, updateFamilyData, setFamilyStatus, deleteFamily, createAdminUser, getAdminStats,
-  getActiveAds, getAllAds, addAd, updateAd, deleteAd, getFeaturedFamilies,
+  getActiveAds, getAllAds, addAd, updateAd, deleteAd, trackAdView, trackAdClick, getAdsStats, getFeaturedFamilies,
   createAuction, getActiveAuctions, getAllAuctions, getAuctionById, joinAuction, placeBid, getAvailableAuctionCodes,
   endAuction, confirmAuctionPayment, cancelAuction, getAuctionBids, isAuctionParticipant,
 };

@@ -315,6 +315,27 @@ app.get('/api/ads', (req, res) => {
   res.json({ ads });
 });
 
+// Track ad view (public)
+app.post('/api/ads/view', (req, res) => {
+  const { id } = req.body;
+  if (id) db.trackAdView(id);
+  res.json({ ok: true });
+});
+
+// Track ad click (public)
+app.post('/api/ads/click', (req, res) => {
+  const { id } = req.body;
+  if (id) db.trackAdClick(id);
+  res.json({ ok: true });
+});
+
+// Admin: ads stats
+app.get('/api/admin/ads/stats', authMiddleware, adminMiddleware, (req, res) => {
+  const stats = db.getAdsStats();
+  const ads = db.getAllAds();
+  res.json({ stats, ads });
+});
+
 // Get featured families (public)
 app.get('/api/featured-families', (req, res) => {
   const families = db.getFeaturedFamilies(5);

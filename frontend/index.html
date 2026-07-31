@@ -338,6 +338,14 @@
       <div class="page-title">الرئيسية</div>
       <div class="page-subtitle">نشاط عائلتك اليوم</div>
 
+      <!-- Ads Slider -->
+      <div class="landing-section">
+        <h3 class="landing-section-title">📢 إعلانات</h3>
+        <div class="ads-slider" id="dash-ads-slider">
+          <div class="empty-state"><div class="empty-text">لا توجد إعلانات</div></div>
+        </div>
+      </div>
+
       <!-- User Profile Card -->
       <div class="card card-glow" id="welcome-card">
         <div class="welcome-header">
@@ -682,6 +690,25 @@
         </div>
       </div>
 
+      <div class="card" id="admin-ads-card">
+        <div class="card-title">📢 إدارة الإعلانات</div>
+        <div id="admin-ads-stats" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px"></div>
+        <div class="form-group">
+          <label>عنوان الإعلان</label>
+          <input class="form-input" id="ad-title" type="text" placeholder="مثال: إعلان عائلة الشهري">
+        </div>
+        <div class="form-group">
+          <label>رابط الصورة</label>
+          <input class="form-input" id="ad-image" type="text" placeholder="https://example.com/image.png" dir="ltr">
+        </div>
+        <div class="form-group">
+          <label>رابط عند الضغط (اختياري)</label>
+          <input class="form-input" id="ad-link" type="text" placeholder="https://..." dir="ltr">
+        </div>
+        <button class="btn btn-accent btn-full" onclick="addAd()">➕ إضافة إعلان</button>
+        <div id="admin-ads-list" style="margin-top:12px"></div>
+      </div>
+
       <div class="card">
         <div class="card-title">👨‍👩‍👧‍👦 جميع العوائل <span id="admin-families-count" class="badge"></span></div>
         <div id="admin-families-list">
@@ -758,7 +785,7 @@ function navigateTo(pageName) {
   toggleHeaderVisibility(pageName);
   
   // Load page-specific data
-  if (pageName === 'dashboard' && state.isLoggedIn) loadDashboardAuctions();
+  if (pageName === 'dashboard' && state.isLoggedIn) { loadDashboardAuctions(); loadDashboardAds(); }
   if (pageName === 'codes' && state.isLoggedIn) loadCodesPage();
   if (pageName === 'auctions' && state.isLoggedIn) loadAuctionsPage();
   if (pageName === 'admin' && state.user?.role === 'admin') { loadAdminPage(); loadAdminAuctions(); }
@@ -776,6 +803,92 @@ function toggleHeaderVisibility(pageName) {
 }
 
 function showAuth(page) { navigateTo(page); }
+
+async function loadDashboardAds() {
+  try {
+    const { ads } = await api('GET', '/api/ads');
+    const slider = document.getElementById('dash-ads-slider');
+    if (!ads?.length) {
+      slider.innerHTML = '<div class="empty-state"><div class="empty-text">لا توجد إعلانات</div></div>';
+      return;
+    }
+    slider.innerHTML = ads.map(a => {
+      // Track impression
+      api('POST', '/api/ads/view', { id: a.id }).catch(() => {});
+      return '<div class="ad-card" onclick="trackAdClick(\'' + a.id + '\', \'' + (a.link_url || '') + '\')" style="cursor:pointer">' +
+        (a.image_url ? '<img src="' + a.image_url + '" alt="' + (a.title||'') + '" onerror="this.style.display=\'none\'">' : '<div style="height:120px;display:flex;align-items:center;justify-content:center;background:var(--bg-input);border-radius:var(--radius-sm);font-size:40px">📢</div>') +
+        '<div class="ad-title">' + (a.title || '') + '</div>' +
+        '<div class="service-desc" style="margin-top:2px">👁️ ' + (a.views||0) + ' ظهور</div>' +
+      '</div>';
+    }).join('');
+  } catch(e) { console.error('Dash ads:', e); }
+}
+
+function trackAdClick(id, linkUrl) {
+  api('POST', '/api/ads/click', { id }).catch(() => {});
+  if (linkUrl) window.open(linkUrl, '_blank');
+}
+
+// Admin ads management
+async function loadAdminAds() {
+  try {
+    const { stats, ads } = await api('GET', '/api/admin/ads/stats');
+    const statsDiv = document.getElementById('admin-ads-stats');
+    if (statsDiv) {
+      statsDiv.innerHTML =
+        '<div class="admin-stat-box"><div class="admin-stat-num">' + (stats.total||0) + '</div><div class="admin-stat-label">📢 إعلان</div></div>' +
+        '<div class="admin-stat-box"><div class="admin-stat-num">' + (stats.views||0) + '</div><div class="admin-stat-label">👁️ ظهور</div></div>' +
+        '<div class="admin-stat-box"><div class="admin-stat-num">' + (stats.clicks||0) + '</div><div class="admin-stat-label">🖱️ ضغطات</div></div>';
+    }
+    const list = document.getElementById('admin-ads-list');
+    if (!ads?.length) {
+      list.innerHTML = '<div class="empty-state"><div class="empty-text">لا توجد إعلانات</div></div>';
+      return;
+    }
+    list.innerHTML = ads.map(a =>
+      '<div class="admin-family-item">' +
+        '<div class="admin-family-name">📢 ' + (a.title || '') + ' <span style="font-size:11px;color:' + (a.status === 'active' ? 'var(--success)' : 'var(--danger)') + '">' + (a.status === 'active' ? 'نشط' : 'موقوف') + '</span></div>' +
+        '<div class="admin-family-meta">👁️ ظهور: ' + (a.views||0) + ' · 🖱️ ضغطات: ' + (a.clicks||0) + ' · 📅 ' + (a.created_at||'') + '</div>' +
+        '<div class="admin-family-actions">' +
+          '<button class="btn btn-sm ' + (a.status === 'active' ? 'btn-danger' : 'btn-success') + '" onclick="toggleAdStatus(\'' + a.id + '\', \'' + (a.status === 'active' ? 'inactive' : 'active') + '\')">' + (a.status === 'active' ? '⛔ إيقاف' : '🟢 تفعيل') + '</button>' +
+          '<button class="btn btn-sm btn-danger" onclick="deleteAdAdmin(\'' + a.id + '\')">🗑️ حذف</button>' +
+        '</div>' +
+      '</div>'
+    ).join('');
+  } catch(e) { console.error('Admin ads:', e); }
+}
+
+async function addAd() {
+  const title = document.getElementById('ad-title').value.trim();
+  const image_url = document.getElementById('ad-image').value.trim();
+  const link_url = document.getElementById('ad-link').value.trim();
+  if (!title) return showToast('عنوان الإعلان مطلوب', 'error');
+  try {
+    await api('POST', '/api/admin/ads/add', { title, image_url, link_url });
+    showToast('✅ تم إضافة الإعلان', 'success');
+    document.getElementById('ad-title').value = '';
+    document.getElementById('ad-image').value = '';
+    document.getElementById('ad-link').value = '';
+    loadAdminAds();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function toggleAdStatus(id, status) {
+  try {
+    await api('POST', '/api/admin/ads/update', { id, status });
+    showToast(status === 'active' ? '🟢 تم التفعيل' : '⛔ تم الإيقاف', 'success');
+    loadAdminAds();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function deleteAdAdmin(id) {
+  if (!confirm('حذف هذا الإعلان؟')) return;
+  try {
+    await api('POST', '/api/admin/ads/delete', { id });
+    showToast('🗑️ تم الحذف', 'success');
+    loadAdminAds();
+  } catch(e) { showToast(e.message, 'error'); }
+}
 
 async function loadLandingPage() {
   try {
@@ -897,6 +1010,7 @@ async function updateCodePrice(code) {
 let editingFamilyId = null;
 
 async function loadAdminPage() {
+  loadAdminAds();
   try {
     // Load stats
     const { stats } = await api('GET', '/api/admin/stats');
