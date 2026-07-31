@@ -1401,15 +1401,34 @@ async function loadLandingAuctions() {
       div.innerHTML = '<div class="empty-state"><div class="empty-text">لا توجد مزادات نشطة حالياً</div></div>';
       return;
     }
-    div.innerHTML = auctions.slice(0, 3).map(a => {
+    div.innerHTML = '<div class="auctions-grid">' + auctions.slice(0, 4).map(a => {
       const end = new Date(a.end_time).getTime();
       return '<div class="auction-card compact">' +
         '<div class="auction-header"><span class="auction-code">🏷️ ' + a.code + '</span><span class="auction-live">🔴 مباشر</span></div>' +
+        '<div class="auction-timer" data-end="' + end + '" data-id="' + a.id + '"><span class="timer-icon">⏱️</span> <span class="countdown">--:--:--</span></div>' +
         '<div class="auction-price">💰 <span class="current-price">' + (a.current_price || a.starting_price) + '</span> ريال</div>' +
         '<div class="auction-meta"><span>رسوم الدخول: ' + a.entry_fee + ' ريال</span></div>' +
         '<button class="btn btn-accent btn-full" onclick="landingBidClick()">' + (state.isLoggedIn ? '💥 مزايدة' : '🔐 سجل للمزايدة') + '</button>' +
       '</div>';
-    }).join('');
+    }).join('') + '</div>';
+    // Start landing countdowns (days/hours/min/sec)
+    document.querySelectorAll('#landing-auctions .auction-timer').forEach(el => {
+      const id = el.dataset.id;
+      const end = parseInt(el.dataset.end);
+      if (auctionTimers[id]) clearInterval(auctionTimers[id]);
+      auctionTimers[id] = setInterval(() => {
+        const diff = Math.max(0, end - Date.now());
+        const d = Math.floor(diff / 86400000);
+        const h = Math.floor((diff % 86400000) / 3600000);
+        const m = Math.floor((diff % 3600000) / 60000);
+        const s = Math.floor((diff % 60000) / 1000);
+        const el2 = document.querySelector('#landing-auctions .auction-timer[data-id="' + id + '"] .countdown');
+        if (el2) {
+          el2.textContent = (d > 0 ? d + 'يوم ' : '') + String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+        }
+        if (diff <= 0) { clearInterval(auctionTimers[id]); if (el2) el2.textContent = 'انتهى'; }
+      }, 1000);
+    });
   } catch(e) { console.error('Landing auctions:', e); }
 }
 
@@ -3035,6 +3054,22 @@ async function createAuction() {
   } catch(e) { showToast(e.message, 'error'); }
 }
 
+function startAdminCountdowns() {
+  if (window._adminCountTimer) clearInterval(window._adminCountTimer);
+  window._adminCountTimer = setInterval(() => {
+    document.querySelectorAll('.admin-countdown').forEach(el => {
+      const end = parseInt(el.dataset.end);
+      if (!end) return;
+      const diff = Math.max(0, end - Date.now());
+      const d = Math.floor(diff / 86400000);
+      const h = Math.floor((diff % 86400000) / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      const s = Math.floor((diff % 60000) / 1000);
+      el.textContent = (d > 0 ? d + 'يوم ' : '') + String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+    });
+  }, 1000);
+}
+
 async function loadAdminAuctions() {
   try {
     const { auctions } = await api('GET', '/api/admin/auctions');
@@ -3045,10 +3080,12 @@ async function loadAdminAuctions() {
     }
     list.innerHTML = auctions.map(a => {
       const statusLabel = { active:'🟢 نشط', ended:'🏁 منتهي', cancelled:'❌ ملغي' }[a.status] || a.status;
+      const end = a.end_time ? new Date(a.end_time).getTime() : 0;
       return '<div class="admin-family-item">' +
         '<div class="admin-family-name">🏷️ ' + a.code + ' <span style="font-size:12px;color:var(--text-muted)">' + statusLabel + '</span></div>' +
         '<div class="admin-family-meta">' +
-          '💰 ' + (a.current_price||a.starting_price) + ' ريال · 🎟️ دخول: ' + a.entry_fee + ' ريال · ⏱️ ' + a.min_increment + ' ريال زيادة' +
+          '💰 ' + (a.current_price||a.starting_price) + ' ريال · 🎟️ دخول: ' + a.entry_fee + ' ريال · ⏱️ زيادة: ' + a.min_increment + ' ريال' +
+          (a.status === 'active' ? ' · <b style="color:var(--gold)" class="admin-countdown" data-end="' + end + '">--:--:--</b>' : '') +
           (a.winner_name ? ' · 🏆 ' + a.winner_name : '') +
           (a.paid ? ' · ✅ مسدد' : '') +
         '</div>' +
@@ -3059,6 +3096,8 @@ async function loadAdminAuctions() {
         '</div>' +
       '</div>';
     }).join('');
+    // Start admin countdowns (days)
+    startAdminCountdowns();
   } catch(e) { console.error('Admin auctions:', e); }
 }
 
