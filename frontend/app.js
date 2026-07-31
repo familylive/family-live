@@ -497,20 +497,41 @@ function startMessagePolling() {
   if (state._msgPoll) clearInterval(state._msgPoll);
   state._msgPoll = setInterval(() => {
     if (state.diwaniyaOpen && state.activeSession?.id) {
-      loadDiwaniyaMessages(state.activeSession.id);
+      loadDiwaniyaMessages(state.activeSession.id, true);
     }
-  }, 4000);
+  }, 3000);
 }
 function stopMessagePolling() {
   if (state._msgPoll) { clearInterval(state._msgPoll); state._msgPoll = null; }
 }
 
-async function loadDiwaniyaMessages(sessionId) {
+let lastMsgCount = 0;
+let notifiedMsgIds = new Set();
+
+async function loadDiwaniyaMessages(sessionId, isPoll = false) {
   try {
     const { messages } = await api('GET', `/api/diwaniya/messages/${sessionId}`);
     const room = document.getElementById('chat-room'); if (!room) return;
     room.innerHTML = '';
     messages.forEach(msg => addChatMessage(msg.user_name, msg.message, msg.user_id === state.user?.id));
+    
+    // Popup notification for NEW moderator/system messages (from others)
+    if (isPoll && messages.length > lastMsgCount) {
+      const newMsgs = messages.slice(lastMsgCount);
+      newMsgs.forEach(msg => {
+        if (msg.user_id !== state.user?.id && !notifiedMsgIds.has(msg.id)) {
+          notifiedMsgIds.add(msg.id);
+          // Moderator visit notifications
+          if (msg.message.includes('🕵️') || msg.message.includes('📋') || msg.message.includes('المشرف')) {
+            playNotificationSound();
+            showFamilyNotification('🕵️ إشعار من الديوانية', msg.message);
+          }
+        }
+      });
+    }
+    lastMsgCount = messages.length;
+    // Keep set small
+    if (notifiedMsgIds.size > 100) notifiedMsgIds = new Set(messages.slice(-20).map(m => m.id));
   } catch(e) { console.error(e); }
 }
 
