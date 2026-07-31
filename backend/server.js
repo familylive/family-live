@@ -688,6 +688,13 @@ io.on('connection', (socket) => {
     if (!audioRooms[sessionId]) audioRooms[sessionId] = [];
     const participants = audioRooms[sessionId];
     
+    // Max 6 participants in video/audio call
+    if (participants.length >= 6) {
+      socket.emit('call_full', { message: 'المكالمة ممتلئة - الحد الأقصى 6 مشاركين' });
+      socket.leave(`audio_${sessionId}`);
+      return;
+    }
+    
     // Tell existing participants about new user
     participants.forEach(p => {
       io.to(p.socketId).emit('user_joined_call', { userId, userName });
@@ -700,7 +707,7 @@ io.on('connection', (socket) => {
       participants: participants.filter(p => p.socketId !== socket.id)
     });
     
-    console.log(`🎤 ${userName} joined audio call ${sessionId}`);
+    console.log(`🎤 ${userName} joined audio call ${sessionId} (${participants.length}/6)`);
   });
   
   socket.on('leave_audio_call', (data) => {

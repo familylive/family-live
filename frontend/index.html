@@ -460,13 +460,20 @@
             <span class="speaking-wave"><span></span><span></span><span></span><span></span></span>
             <span id="speaking-name">يتكلم...</span>
           </div>
+          <div class="video-grid" id="video-grid" style="display:none">
+            <div class="video-tile local" id="my-video-tile">
+              <video id="my-video" autoplay playsinline muted style="display:none"></video>
+              <div class="video-name">أنت</div>
+            </div>
+          </div>
           <div class="call-controls" id="call-controls" style="display:none">
             <div class="call-participants" id="call-participants">
               <div class="call-participant"><span class="call-dot"></span> أنت</div>
             </div>
             <div class="call-timer" id="call-timer">00:00</div>
+            <div class="call-limit">👥 الحد الأقصى: 6 مشاركين</div>
           </div>
-          <button class="btn btn-accent btn-full" id="join-audio-btn" onclick="joinLiveAudio()">🎤 انضم للمكالمة الصوتية</button>
+          <button class="btn btn-accent btn-full" id="join-audio-btn" onclick="joinLiveAudio()">🎥 انضم لمكالمة الفيديو</button>
         </div>
         <div class="chat-room" id="chat-room"><div class="empty-state"><div class="empty-text">افتح الديوانية لبدء المحادثة</div></div></div>
         <div class="chat-input">

@@ -327,6 +327,10 @@ function connectSocket() {
     }
   });
   socket.on('user_left_call', (data) => removeRemoteAudio(data.userId));
+  socket.on('call_full', (data) => {
+    showToast(data.message || 'المكالمة ممتلئة', 'error');
+    leaveLiveAudio();
+  });
   socket.on('call_participants', (data) => {
     // Join existing participants
     data.participants.forEach(p => {
@@ -774,7 +778,7 @@ async function joinLiveAudio() {
   if (inLiveCall) return leaveLiveAudio();
   
   try {
-    localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
     inLiveCall = true;
     
     // Notify server we're joining
@@ -899,9 +903,11 @@ async function handleIceCandidate(fromId, candidate) {
 }
 
 function addRemoteAudio(peerId, peerName, stream) {
-  // Remove old audio element if exists
+  // Remove old elements if exist
   const old = document.getElementById('audio-' + peerId);
   if (old) old.remove();
+  const oldV = document.getElementById('video-' + peerId);
+  if (oldV) oldV.remove();
   
   const audio = document.createElement('audio');
   audio.id = 'audio-' + peerId;
@@ -910,6 +916,19 @@ function addRemoteAudio(peerId, peerName, stream) {
   audio.controls = false;
   audio.style.display = 'none';
   document.body.appendChild(audio);
+  
+  // Create video tile
+  const videoGrid = document.getElementById('video-grid');
+  if (videoGrid) {
+    const tile = document.createElement('div');
+    tile.id = 'video-' + peerId;
+    tile.className = 'video-tile';
+    tile.innerHTML = '<video autoplay playsinline muted></video><div class="video-name">' + peerName + '</div>';
+    const video = tile.querySelector('video');
+    const videoStream = new MediaStream(stream.getVideoTracks());
+    video.srcObject = videoStream;
+    videoGrid.appendChild(tile);
+  }
   
   // Setup speaking detection for this peer
   setupSpeakingDetection(peerId, peerName, stream);
@@ -928,6 +947,8 @@ function addRemoteAudio(peerId, peerName, stream) {
 function removeRemoteAudio(peerId) {
   const audio = document.getElementById('audio-' + peerId);
   if (audio) { audio.pause(); audio.remove(); }
+  const video = document.getElementById('video-' + peerId);
+  if (video) video.remove();
   const p = document.getElementById('participant-' + peerId);
   if (p) p.remove();
   
@@ -943,10 +964,18 @@ function updateAudioCallUI(inCall) {
     btn.textContent = '🔴 إنهاء المكالمة';
     btn.className = 'btn btn-danger btn-full';
     document.getElementById('call-controls').style.display = 'block';
+    document.getElementById('video-grid').style.display = 'grid';
+    // Show my local video
+    const myVideo = document.getElementById('my-video');
+    if (myVideo && localStream) {
+      myVideo.srcObject = localStream;
+      myVideo.style.display = 'block';
+    }
   } else {
-    btn.textContent = '🎤 انضم للمكالمة الصوتية';
+    btn.textContent = '🎥 انضم لمكالمة الفيديو';
     btn.className = 'btn btn-accent btn-full';
     document.getElementById('call-controls').style.display = 'none';
+    document.getElementById('video-grid').style.display = 'none';
   }
 }
 
