@@ -59,6 +59,8 @@ function initDb() {
       role TEXT NOT NULL DEFAULT 'member' CHECK(role IN ('founder', 'member', 'admin', 'moderator')),
       avatar TEXT DEFAULT '👤',
       points INTEGER DEFAULT 0,
+      stars INTEGER DEFAULT 0,
+      moderator_tier TEXT DEFAULT 'none',
       last_seen TEXT,
       can_open_diwaniya INTEGER DEFAULT 0,
       created_at TEXT DEFAULT (datetime('now')),
@@ -305,6 +307,19 @@ function initDb() {
       replied_at TEXT,
       created_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  `);
+  db.run(`
+    CREATE TABLE IF NOT EXISTS moderator_ratings (
+      id TEXT PRIMARY KEY,
+      moderator_id TEXT NOT NULL,
+      visit_id TEXT,
+      family_id TEXT,
+      rating INTEGER NOT NULL CHECK(rating BETWEEN 1 AND 5),
+      comment TEXT,
+      rated_by TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (moderator_id) REFERENCES users(id)
     )
   `);
   db.run(`
@@ -788,6 +803,59 @@ function replyTicket(ticketId, adminReply) {
 function closeTicket(ticketId) {
   run("UPDATE support_tickets SET status = 'closed' WHERE id = ?", [ticketId]);
   return queryOne('SELECT * FROM support_tickets WHERE id = ?', [ticketId]);
+}
+
+// =============== MODERATOR STARS & TIERS ===============
+function addModeratorStars(userId, stars) {
+  run('UPDATE users SET stars = stars + ? WHERE id = ?', [stars, userId]);
+  return getModeratorProfile(userId);
+}
+
+function getModeratorProfile(userId) {
+  const user = queryOne('SELECT id, name, email, stars, moderator_tier, points, created_at FROM users WHERE id = ?', [userId]);
+  if (!user) return null;
+  const visits = queryOne("SELECT COUNT(*) as c FROM moderator_visits WHERE moderator_id = ? AND status = 'exited'", [userId]);
+  const ratings = queryAll('SELECT rating FROM moderator_ratings WHERE moderator_id = ?', [userId]);
+  const avg = ratings.length ? (ratings.reduce((s, r) => s + r.rating, 0) / ratings.length).toFixed(1) : 0;
+  return { ...user, visits: visits ? visits.c : 0, ratings_count: ratings.length, avg_rating: avg };
+}
+
+function rateModerator(moderatorId, visitId, familyId, rating, comment, ratedBy) {
+  run('INSERT INTO moderator_ratings (id, moderator_id, visit_id, family_id, rating, comment, rated_by) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [uuidv4(), moderatorId, visitId, familyId, rating, comment || '', ratedBy]);
+  return queryOne('SELECT * FROM moderator_ratings WHERE id = (SELECT MAX(rowid) FROM moderator_ratings)');
+}
+
+// Tier calculation based on settings
+function getModeratorTier(stars) {
+  const t1 = parseInt(getSetting('tier_black', '1000'));
+  const t2 = parseInt(getSetting('tier_blue', '5000'));
+  const t3 = parseInt(getSetting('tier_silver', '10000'));
+  const t4 = parseInt(getSetting('tier_gold', '20000'));
+  const t5 = parseInt(getSetting('tier_platinum', '40000'));
+  if (stars >= t5) return 'platinum';
+  if (stars >= t4) return 'gold';
+  if (stars >= t3) return 'silver';
+  if (stars >= t2) return 'blue';
+  if (stars >= t1) return 'black';
+  return 'none';
+}
+
+function updateModeratorTier(userId, tier) {
+  run('UPDATE users SET moderator_tier = ? WHERE id = ?', [tier, userId]);
+  return getUserById(userId);
+}
+
+function getTierSettings() {
+  return {
+    black: parseInt(getSetting('tier_black', '1000')),
+    blue: parseInt(getSetting('tier_blue', '5000')),
+    silver: parseInt(getSetting('tier_silver', '10000')),
+    gold: parseInt(getSetting('tier_gold', '20000')),
+    platinum: parseInt(getSetting('tier_platinum', '40000')),
+    stars_per_visit: parseInt(getSetting('stars_per_visit', '10')),
+    stars_per_500_visits: parseInt(getSetting('stars_per_500_visits', '5000')),
+  };
 }
 
 // =============== MODERATION ===============

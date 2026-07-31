@@ -772,6 +772,55 @@ app.post('/api/admin/users/delete', authMiddleware, adminMiddleware, (req, res) 
   res.json({ message: '🗑️ تم حذف المستخدم' });
 });
 
+// =============== MODERATOR STARS & TIERS ===============
+
+// Moderator profile (stars, tier, visits, rating)
+app.get('/api/moderator/profile', authMiddleware, (req, res) => {
+  const profile = db.getModeratorProfile(req.user.id);
+  const tier = profile ? db.getModeratorTier(profile.stars || 0) : 'none';
+  res.json({ profile, tier, tierSettings: db.getTierSettings() });
+});
+
+// Award stars on visit exit (every visit = stars)
+// Rate moderator (family members rate 1-5 after moderator exits)
+app.post('/api/moderator/rate', authMiddleware, (req, res) => {
+  const { moderatorId, visitId, rating, comment } = req.body;
+  if (!moderatorId || !rating || rating < 1 || rating > 5) {
+    return res.status(400).json({ error: 'التقييم من 1 إلى 5 نجوم' });
+  }
+  db.rateModerator(moderatorId, visitId, req.user.familyId, parseInt(rating), comment, req.user.id);
+  // Stars based on rating: rating * 10 stars
+  const stars = parseInt(rating) * 10;
+  db.addModeratorStars(moderatorId, stars);
+  res.json({ message: '⭐ تم تقييم المشرف', stars_added: stars });
+});
+
+// Admin: tier settings management
+app.get('/api/admin/tier-settings', authMiddleware, adminMiddleware, (req, res) => {
+  res.json({ settings: db.getTierSettings() });
+});
+app.post('/api/admin/tier-settings', authMiddleware, adminMiddleware, (req, res) => {
+  const { black, blue, silver, gold, platinum, stars_per_visit } = req.body;
+  if (black) db.setSetting('tier_black', black);
+  if (blue) db.setSetting('tier_blue', blue);
+  if (silver) db.setSetting('tier_silver', silver);
+  if (gold) db.setSetting('tier_gold', gold);
+  if (platinum) db.setSetting('tier_platinum', platinum);
+  if (stars_per_visit) db.setSetting('stars_per_visit', stars_per_visit);
+  res.json({ message: '✅ تم حفظ إعدادات التوثيق', settings: db.getTierSettings() });
+});
+
+// Admin: upgrade moderator tier manually
+app.post('/api/admin/moderator/tier', authMiddleware, adminMiddleware, (req, res) => {
+  const { userId, tier } = req.body;
+  if (!userId || !['none','black','blue','silver','gold','platinum'].includes(tier)) {
+    return res.status(400).json({ error: 'بيانات غير صحيحة' });
+  }
+  db.updateModeratorTier(userId, tier);
+  res.json({ message: '🏅 تم تحديث توثيق المشرف إلى ' + tier });
+});
+
+// Award stars for visit completion (called in exitModeratorVisit flow)
 // =============== MODERATOR VISITS ===============
 
 // Moderator: request visit to diwaniya (with reason)
@@ -812,10 +861,24 @@ app.post('/api/moderator/visit/exit', authMiddleware, (req, res) => {
   const { visitId, report } = req.body;
   const visit = db.exitModeratorVisit(visitId, report);
   if (!visit) return res.status(400).json({ error: 'الزيارة غير موجودة' });
+  // Award stars for completed visit
+  const starsPerVisit = parseInt(db.getSetting('stars_per_visit', '10'));
+  const profile = db.addModeratorStars(visit.moderator_id, starsPerVisit);
+  const tier = db.getModeratorTier(profile.stars || 0);
   if (visit.family_id) {
-    io.to(`family_${visit.family_id}`).emit('moderator_exited', { moderatorName: visit.moderator_name });
+    io.to(`family_${visit.family_id}`).emit('moderator_exited', { 
+      moderatorName: visit.moderator_name, 
+      moderatorId: visit.moderator_id,
+      visitId: visit.id
+    });
+    // Notify family to rate the moderator
+    io.to(`family_${visit.family_id}`).emit('moderator_rate_request', { 
+      moderatorId: visit.moderator_id,
+      moderatorName: visit.moderator_name,
+      visitId: visit.id
+    });
   }
-  res.json({ message: '📋 تم إرسال تقرير الزيارة للإدارة', visit });
+  res.json({ message: '📋 تم إرسال تقرير الزيارة + ⭐ ' + starsPerVisit + ' نجوم', visit, stars: profile.stars, tier });
 });
 
 // Moderator: online families with active diwaniya (only these can be visited)

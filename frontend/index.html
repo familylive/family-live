@@ -788,6 +788,18 @@
       <div class="page-title">🕵️ زيارات المودريتر</div>
       <div class="page-subtitle">زيارة تفقدية للديوانيات (دقيقة واحدة انتظار + دقيقتين زيارة)</div>
       
+      <div class="card" id="moderator-profile-card">
+        <div class="moderator-profile-header">
+          <span class="moderator-rainbow-name" id="moderator-rainbow-name">مشرف الديوانيات 🕵️</span>
+          <span class="mod-badge" id="moderator-tier-badge">بدون توثيق</span>
+        </div>
+        <div class="moderator-stats" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+          <div class="admin-stat-box"><div class="admin-stat-num" id="mod-stars">0</div><div class="admin-stat-label">⭐ نجوم</div></div>
+          <div class="admin-stat-box"><div class="admin-stat-num" id="mod-visits-count">0</div><div class="admin-stat-label">🕵️ زيارات</div></div>
+          <div class="admin-stat-box"><div class="admin-stat-num" id="mod-rating">0</div><div class="admin-stat-label">⭐ تقييم</div></div>
+        </div>
+      </div>
+      
       <div class="card">
         <div class="card-title">🔍 طلب زيارة تفقدية</div>
         <div class="form-group">
@@ -898,6 +910,30 @@
         <div class="card-title">📋 كل المزادات</div>
         <div id="admin-auctions-list">
           <div class="empty-state"><div class="empty-text">لا توجد مزادات</div></div>
+        </div>
+      </div>
+
+      <div class="card" id="admin-tiers-card">
+        <div class="card-title">🏅 نظام توثيق المودريتر</div>
+        <div id="tier-settings-form">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div class="form-group"><label>⬛ أسود (نجوم)</label><input class="form-input" id="tier-black" type="number" value="1000"></div>
+            <div class="form-group"><label>🟦 أزرق (نجوم)</label><input class="form-input" id="tier-blue" type="number" value="5000"></div>
+            <div class="form-group"><label>⬜ فضي (نجوم)</label><input class="form-input" id="tier-silver" type="number" value="10000"></div>
+            <div class="form-group"><label>🟨 ذهبي (نجوم)</label><input class="form-input" id="tier-gold" type="number" value="20000"></div>
+            <div class="form-group"><label>💎 بلاتيني (نجوم)</label><input class="form-input" id="tier-platinum" type="number" value="40000"></div>
+            <div class="form-group"><label>⭐ نجوم كل زيارة</label><input class="form-input" id="tier-per-visit" type="number" value="10"></div>
+          </div>
+          <button class="btn btn-accent btn-full" onclick="saveTierSettings()">💾 حفظ الإعدادات</button>
+        </div>
+        <div class="tier-preview" style="margin-top:12px">
+          <p style="font-size:13px;color:var(--text-secondary);margin-bottom:6px">معاينة التوثيق (مثل توثيق تويتر):</p>
+          <div class="mod-badge" data-tier="none">بدون توثيق</div>
+          <div class="mod-badge" data-tier="black">⬛ توثيق أسود</div>
+          <div class="mod-badge" data-tier="blue">🟦 توثيق أزرق</div>
+          <div class="mod-badge" data-tier="silver">⬜ توثيق فضي</div>
+          <div class="mod-badge" data-tier="gold">🟨 توثيق ذهبي</div>
+          <div class="mod-badge" data-tier="platinum">💎 توثيق بلاتيني</div>
         </div>
       </div>
 
@@ -1169,7 +1205,8 @@ function navigateTo(pageName) {
   if (pageName === 'admin' && state.user?.role === 'admin') loadAdminSupport();
   if (pageName === 'family' && state.isLoggedIn) { loadAnnouncements(); populateAnnTarget(); populateManagerSelect(); }
   if (pageName === 'admin' && state.user?.role === 'admin') { loadBannedWords(); loadAdminBans(); loadAIUsers(); loadViolations(); loadAdminAgreements(); loadAdminUsers(); loadModeratorVisitsAdmin(); }
-  if (pageName === 'moderator' && (state.user?.role === 'moderator' || state.user?.role === 'admin')) { loadModeratorFamilies(); loadModeratorVisitsHistory(); }
+  if (pageName === 'moderator' && (state.user?.role === 'moderator' || state.user?.role === 'admin')) { loadModeratorFamilies(); loadModeratorVisitsHistory(); loadModeratorProfile(); }
+  if (pageName === 'admin' && state.user?.role === 'admin') loadTierSettings();
   if (pageName === 'codes' && state.isLoggedIn) loadCodesPage();
   if (pageName === 'auctions' && state.isLoggedIn) loadAuctionsPage();
   if (pageName === 'admin' && state.user?.role === 'admin') { loadAdminPage(); loadAdminAuctions(); }
@@ -2364,6 +2401,95 @@ async function deleteUserAdmin(id) {
     await api('POST', '/api/admin/users/delete', { userId: id });
     showToast('🗑️ تم الحذف', 'success');
     loadAdminUsers();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+// ==================== MODERATOR STARS & TIERS ====================
+const tierColors = {
+  none: { color: '#9a9384', label: 'بدون توثيق' },
+  black: { color: '#000', label: '⬛ توثيق أسود' },
+  blue: { color: '#2196f3', label: '🟦 توثيق أزرق' },
+  silver: { color: '#c0c0c0', label: '⬜ توثيق فضي' },
+  gold: { color: '#e8b830', label: '🟨 توثيق ذهبي' },
+  platinum: { color: '#7c4dff', label: '💎 توثيق بلاتيني' },
+};
+
+async function loadModeratorProfile() {
+  try {
+    const { profile, tier } = await api('GET', '/api/moderator/profile');
+    if (!profile) return;
+    document.getElementById('mod-stars').textContent = profile.stars || 0;
+    document.getElementById('mod-visits-count').textContent = profile.visits || 0;
+    document.getElementById('mod-rating').textContent = profile.avg_rating || 0;
+    // Set tier badge
+    const badge = document.getElementById('moderator-tier-badge');
+    const tierInfo = tierColors[tier] || tierColors.none;
+    badge.textContent = tierInfo.label;
+    badge.style.background = tierInfo.color;
+    badge.style.color = tier === 'black' ? '#fff' : '#fff';
+    // Rainbow name always for moderators
+    document.getElementById('moderator-rainbow-name').classList.add('rainbow-text');
+  } catch(e) {}
+}
+
+async function saveTierSettings() {
+  const black = document.getElementById('tier-black').value;
+  const blue = document.getElementById('tier-blue').value;
+  const silver = document.getElementById('tier-silver').value;
+  const gold = document.getElementById('tier-gold').value;
+  const platinum = document.getElementById('tier-platinum').value;
+  const stars_per_visit = document.getElementById('tier-per-visit').value;
+  try {
+    await api('POST', '/api/admin/tier-settings', { black, blue, silver, gold, platinum, stars_per_visit });
+    showToast('✅ تم حفظ إعدادات التوثيق', 'success');
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function loadTierSettings() {
+  try {
+    const { settings } = await api('GET', '/api/admin/tier-settings');
+    document.getElementById('tier-black').value = settings.black;
+    document.getElementById('tier-blue').value = settings.blue;
+    document.getElementById('tier-silver').value = settings.silver;
+    document.getElementById('tier-gold').value = settings.gold;
+    document.getElementById('tier-platinum').value = settings.platinum;
+    document.getElementById('tier-per-visit').value = settings.stars_per_visit;
+  } catch(e) {}
+}
+
+// Upgrade moderator tier from users management
+async function upgradeModeratorTier(userId) {
+  const tier = prompt('اختر فئة التوثيق:\n(none / black / blue / silver / gold / platinum)');
+  if (!tier) return;
+  try {
+    await api('POST', '/api/admin/moderator/tier', { userId, tier });
+    showToast('🏅 تم تحديث التوثيق', 'success');
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+// Rate moderator (shown to family after moderator exits)
+function showRateModeratorBanner(moderatorId, moderatorName, visitId) {
+  playNotificationSound();
+  let banner = document.getElementById('rate-moderator-banner');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'rate-moderator-banner';
+    banner.className = 'rate-moderator-banner';
+    document.body.appendChild(banner);
+  }
+  banner.innerHTML = '<div class="rate-title">⭐ قيّم المشرف ' + (moderatorName || '') + '</div>' +
+    '<div class="rate-stars" id="rate-stars">' +
+      [1,2,3,4,5].map(i => '<span class="rate-star" data-v="' + i + '" onclick="rateModerator(' + moderatorId + ', ' + visitId + ', ' + i + ')">⭐</span>').join('') +
+    '</div>' +
+    '<button class="violation-close" onclick="this.parentElement.classList.remove(\'show\')">✕</button>';
+  banner.classList.add('show');
+}
+
+async function rateModerator(moderatorId, visitId, rating) {
+  try {
+    await api('POST', '/api/moderator/rate', { moderatorId, visitId, rating });
+    document.getElementById('rate-moderator-banner').classList.remove('show');
+    showToast('⭐ تم تقييم المشرف: ' + rating + ' نجوم', 'success');
   } catch(e) { showToast(e.message, 'error'); }
 }
 
