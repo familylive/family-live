@@ -887,6 +887,7 @@
           </div>
         </div>
         <button class="btn btn-accent btn-full" onclick="createAuctionFromAuctionsPage()">🏷️ فتح المزاد</button>
+        <button class="btn btn-secondary btn-full" style="margin-top:6px" onclick="generateCodeAndAuction()">➕ توليد رمز مميز وفتح مزاد</button>
       </div>
 
       <div id="auctions-list">
@@ -926,6 +927,7 @@
           </div>
         </div>
         <button class="btn btn-accent btn-full" onclick="createAuction()">🏷️ فتح المزاد</button>
+        <button class="btn btn-secondary btn-full" style="margin-top:6px" onclick="generateCodeAndAuction()">➕ توليد رمز مميز وفتح مزاد</button>
       </div>
 
       <div class="card" id="admin-auctions-list-card">
@@ -2883,7 +2885,7 @@ async function loadAuctionsPage() {
         '<div class="auction-actions">' +
           '<button class="btn btn-accent btn-full" onclick="joinAuction(\'' + a.id + '\')">🎟️ دخول المزاد</button>' +
           '<div class="bid-row">' +
-            '<input type="number" class="form-input" id="bid-' + a.id + '" placeholder="مبلغ المزايدة" min="' + ((a.current_price||a.starting_price) + (a.min_increment||10)) + '">' +
+            '<input type="number" class="form-input" id="bid-' + a.id + '" placeholder="الحد الأدنى ' + ((a.current_price||a.starting_price) + (a.min_increment||10)) + '" min="' + ((a.current_price||a.starting_price) + (a.min_increment||10)) + '" value="' + ((a.current_price||a.starting_price) + (a.min_increment||10)) + '">' +
             '<button class="btn btn-primary" onclick="placeBid(\'' + a.id + '\')">💥 مزايدة</button>' +
           '</div>' +
         '</div>' +
@@ -2901,9 +2903,15 @@ async function loadAuctionsPage() {
       auctionTimers[id] = setInterval(() => {
         const now = Date.now();
         const diff = Math.max(0, end - now);
-        const m = Math.floor(diff / 60000);
+        const d = Math.floor(diff / 86400000);
+        const h = Math.floor((diff % 86400000) / 3600000);
+        const m = Math.floor((diff % 3600000) / 60000);
         const s = Math.floor((diff % 60000) / 1000);
-        el.querySelector('.countdown').textContent = String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+        if (d > 0) {
+          el.querySelector('.countdown').textContent = d + 'يوم ' + String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+        } else {
+          el.querySelector('.countdown').textContent = String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+        }
         if (diff <= 0) {
           clearInterval(auctionTimers[id]);
           el.querySelector('.countdown').textContent = 'انتهى';
@@ -2961,6 +2969,21 @@ async function createAuctionFromAuctionsPage() {
     showToast(result.message, 'success');
     document.getElementById('auction-code-2').value = '';
     loadAuctionsPage();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function generateCodeAndAuction() {
+  try {
+    const gen = await api('POST', '/api/codes/generate-premium');
+    const code = gen.code;
+    const startingPrice = parseInt(document.getElementById('auction-starting')?.value || document.getElementById('auction-starting-2')?.value || '100');
+    const entryFee = parseInt(document.getElementById('auction-entry')?.value || document.getElementById('auction-entry-2')?.value || '50');
+    const durationMinutes = parseInt(document.getElementById('auction-duration')?.value || document.getElementById('auction-duration-2')?.value || '30');
+    const minIncrement = parseInt(document.getElementById('auction-increment')?.value || document.getElementById('auction-increment-2')?.value || '10');
+    const result = await api('POST', '/api/admin/auctions/create', { code, startingPrice, entryFee, durationMinutes, minIncrement });
+    showToast('✅ تم توليد ' + code + ' وفتح مزاد عليه', 'success');
+    loadAuctionsPage();
+    loadAdminAuctions();
   } catch(e) { showToast(e.message, 'error'); }
 }
 
