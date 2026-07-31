@@ -2568,6 +2568,7 @@ async function moderatorEnterFamily(familyId, familyName) {
       '<p style="color:var(--info);font-size:13px">سيتم دخولك تلقائياً بعد دقيقة للزيارة التفقدية (دقيقتين كحد أقصى)</p>' +
       '<p style="color:var(--info);font-size:20px;font-weight:900;direction:ltr" id="mod-enter-countdown">01:00</p>' +
       '<button class="btn btn-accent btn-full" style="margin-top:8px" onclick="enterModeratorVisit()">🕵️ دخول الآن</button></div>';
+    if (window._enterTimer) { clearInterval(window._enterTimer); window._enterTimer = null; }
     let sec = 60;
     window._enterTimer = setInterval(() => {
       sec--;
@@ -2575,6 +2576,7 @@ async function moderatorEnterFamily(familyId, familyName) {
       if (el) el.textContent = String(Math.floor(sec/60)).padStart(2,'0') + ':' + String(sec%60).padStart(2,'0');
       if (sec <= 0) {
         clearInterval(window._enterTimer);
+        window._enterTimer = null;
         enterModeratorVisit();
       }
     }, 1000);
@@ -2625,6 +2627,9 @@ async function enterModeratorVisit() {
       '<p style="font-size:12px;color:var(--text-muted)">سيخرجك النظام تلقائياً</p>' +
       '<button class="btn btn-danger btn-full" style="margin-top:8px" onclick="exitModeratorVisit()">🚪 إنهاء الزيارة</button></div>';
     isEnteringVisit = false;
+    // Clear any previous timers to avoid double countdown
+    if (window._modTimer) { clearInterval(window._modTimer); window._modTimer = null; }
+    if (window._enterTimer) { clearInterval(window._enterTimer); window._enterTimer = null; }
     let sec = 120;
     window._modTimer = setInterval(() => {
       sec--;
@@ -2632,6 +2637,7 @@ async function enterModeratorVisit() {
       if (el) el.textContent = String(Math.floor(sec/60)).padStart(2,'0') + ':' + String(sec%60).padStart(2,'0');
       if (sec <= 0) {
         clearInterval(window._modTimer);
+        window._modTimer = null;
         exitModeratorVisit();
       }
     }, 1000);
