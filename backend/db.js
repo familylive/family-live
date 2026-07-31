@@ -38,6 +38,7 @@ function initDb() {
       name TEXT NOT NULL,
       subscription_code TEXT NOT NULL UNIQUE,
       founder_id TEXT,
+      status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'inactive')),
       created_at TEXT DEFAULT (datetime('now'))
     )
   `);
@@ -49,7 +50,7 @@ function initDb() {
       password TEXT NOT NULL,
       phone TEXT,
       family_id TEXT,
-      role TEXT NOT NULL DEFAULT 'member' CHECK(role IN ('founder', 'member')),
+      role TEXT NOT NULL DEFAULT 'member' CHECK(role IN ('founder', 'member', 'admin')),
       avatar TEXT DEFAULT '👤',
       points INTEGER DEFAULT 0,
       created_at TEXT DEFAULT (datetime('now')),
@@ -394,6 +395,66 @@ function getFirstAvailablePremiumCode() {
   return r ? r.code : null;
 }
 
+// =============== ADMIN FUNCTIONS ===============
+function createAdminUser(email, password, name = 'مدير التطبيق') {
+  const existing = queryOne('SELECT * FROM users WHERE email = ?', [email]);
+  if (existing) return existing;
+  const id = uuidv4();
+  run("INSERT INTO users (id, name, email, password, role) VALUES (?, ?, ?, ?, 'admin')", [id, name, email, password]);
+  return queryOne('SELECT id, name, email, role FROM users WHERE id = ?', [id]);
+}
+
+function getAdminStats() {
+  const families = queryOne('SELECT COUNT(*) as c FROM families');
+  const users = queryOne('SELECT COUNT(*) as c FROM users');
+  const challenges = queryOne('SELECT COUNT(*) as c FROM challenges');
+  return {
+    families: families ? families.c : 0,
+    users: users ? users.c : 0,
+    challenges: challenges ? challenges.c : 0,
+  };
+}
+
+function getAllFamilies() {
+  return queryAll(`
+    SELECT f.*, 
+      (SELECT COUNT(*) FROM users WHERE family_id = f.id) as members_count,
+      u.name as founder_name
+    FROM families f
+    LEFT JOIN users u ON f.founder_id = u.id
+    ORDER BY f.created_at DESC
+  `);
+}
+
+function updateFamilyData(familyId, data) {
+  const { name, subscription_code, status } = data;
+  if (name !== undefined) run('UPDATE families SET name = ? WHERE id = ?', [name, familyId]);
+  if (status !== undefined) run('UPDATE families SET status = ? WHERE id = ?', [status, familyId]);
+  if (subscription_code !== undefined) {
+    // Check code not used by another family
+    const existing = queryOne('SELECT * FROM families WHERE subscription_code = ? AND id != ?', [subscription_code, familyId]);
+    if (existing) return { error: 'رمز العائلة مستخدم من عائلة أخرى' };
+    run('UPDATE families SET subscription_code = ? WHERE id = ?', [subscription_code, familyId]);
+  }
+  return queryOne('SELECT * FROM families WHERE id = ?', [familyId]);
+}
+
+function setFamilyStatus(familyId, status) {
+  run('UPDATE families SET status = ? WHERE id = ?', [status, familyId]);
+  // If inactive, block family members login
+  return queryOne('SELECT * FROM families WHERE id = ?', [familyId]);
+}
+
+function deleteFamily(familyId) {
+  run('DELETE FROM challenges WHERE family_id = ?', [familyId]);
+  run('DELETE FROM diwaniya_messages WHERE session_id IN (SELECT id FROM diwaniya_sessions WHERE family_id = ?)', [familyId]);
+  run('DELETE FROM diwaniya_sessions WHERE family_id = ?', [familyId]);
+  run('DELETE FROM invitations WHERE family_id = ?', [familyId]);
+  run('UPDATE users SET family_id = NULL WHERE family_id = ?', [familyId]);
+  run('DELETE FROM families WHERE id = ?', [familyId]);
+  return true;
+}
+
 function updatePrice(code, price) {
   run('UPDATE subscription_codes SET price = ? WHERE code = ?', [price, code]);
 }
@@ -409,4 +470,5 @@ module.exports = {
   generateSubscriptionCodes, updateFamilyFounder,
   generatePremiumCode, getAvailablePremiumCodes, purchaseCode, getUserCodes, userHasFamily, updatePassword,
   updatePrice, getFirstAvailablePremiumCode,
+  getAllFamilies, updateFamilyData, setFamilyStatus, deleteFamily, createAdminUser, getAdminStats,
 };

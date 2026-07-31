@@ -213,6 +213,12 @@ function updateAllUI() {
   if (joinMenu) {
     joinMenu.style.display = state.isLoggedIn && !state.family ? 'flex' : 'none';
   }
+  
+  // Show/hide admin menu for admin role
+  const adminMenu = document.getElementById('menu-admin');
+  if (adminMenu) {
+    adminMenu.style.display = state.user?.role === 'admin' ? 'flex' : 'none';
+  }
 
   const inviteSection = document.getElementById('invite-section');
   const diwCtrl = document.getElementById('diwaniya-controls-card');

@@ -258,6 +258,55 @@ app.post('/api/codes/admin/update-price', authMiddleware, (req, res) => {
   res.json({ message: '✅ تم تحديث السعر', code, price: parseInt(price) });
 });
 
+// Admin middleware - only admin role can access
+function adminMiddleware(req, res, next) {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'هذه الصلاحية للمدير فقط' });
+  }
+  next();
+}
+
+// =============== ADMIN: FAMILY MANAGEMENT ===============
+
+// List all families (admin)
+app.get('/api/admin/families', authMiddleware, adminMiddleware, (req, res) => {
+  const families = db.getAllFamilies();
+  res.json({ families });
+});
+
+// Update family (admin)
+app.post('/api/admin/families/update', authMiddleware, adminMiddleware, (req, res) => {
+  const { familyId, name, subscription_code, status } = req.body;
+  if (!familyId) return res.status(400).json({ error: 'معرف العائلة مطلوب' });
+  const result = db.updateFamilyData(familyId, { name, subscription_code, status });
+  if (result?.error) return res.status(400).json(result);
+  res.json({ message: '✅ تم تحديث العائلة', family: result });
+});
+
+// Set family status active/inactive (admin)
+app.post('/api/admin/families/status', authMiddleware, adminMiddleware, (req, res) => {
+  const { familyId, status } = req.body;
+  if (!familyId || !['active', 'inactive'].includes(status)) {
+    return res.status(400).json({ error: 'بيانات غير صحيحة' });
+  }
+  const family = db.setFamilyStatus(familyId, status);
+  res.json({ message: status === 'active' ? '✅ تم تفعيل العائلة' : '⛔ تم إيقاف العائلة', family });
+});
+
+// Delete family (admin)
+app.post('/api/admin/families/delete', authMiddleware, adminMiddleware, (req, res) => {
+  const { familyId } = req.body;
+  if (!familyId) return res.status(400).json({ error: 'معرف العائلة مطلوب' });
+  db.deleteFamily(familyId);
+  res.json({ message: '🗑️ تم حذف العائلة' });
+});
+
+// Admin dashboard stats
+app.get('/api/admin/stats', authMiddleware, adminMiddleware, (req, res) => {
+  const stats = db.getAdminStats();
+  res.json({ stats });
+});
+
 // =============== FAMILY ROUTES ===============
 
 // Get family info
@@ -574,6 +623,18 @@ async function seedData() {
 // =============== START SERVER ===============
 
 seedData().then(() => {
+  // Create default admin account
+  try {
+    const adminEmail = process.env.ADMIN_EMAIL || 'admin@familylive.com';
+    const adminPass = process.env.ADMIN_PASSWORD || 'admin123456';
+    const existingAdmin = db.getUserByEmail(adminEmail);
+    if (!existingAdmin) {
+      const hashedPass = bcrypt.hashSync(adminPass, 10);
+      db.createAdminUser(adminEmail, hashedPass);
+      console.log('✅ Created admin account: ' + adminEmail);
+    }
+  } catch(e) { console.log('Admin seed error:', e.message); }
+  
   // Create default user if not exists
   try {
     const existing = db.getUserByEmail('abdrit9@gmail.com');

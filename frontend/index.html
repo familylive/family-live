@@ -84,6 +84,9 @@
       <div class="menu-nav-item" data-page="codes" onclick="navigateTo('codes');toggleMenu()">
         <span class="nav-icon">🔑</span> رموزي
       </div>
+      <div class="menu-nav-item" id="menu-admin" data-page="admin" onclick="navigateTo('admin');toggleMenu()" style="display:none">
+        <span class="nav-icon">⚙️</span> لوحة الإدارة
+      </div>
     </div>
     <div class="menu-footer">
       <button class="logout-btn" onclick="logout()">
@@ -467,6 +470,45 @@
       </div>
     </div>
 
+    <!-- Admin Page - لوحة الإدارة -->
+    <div id="page-admin" class="page-content">
+      <div class="page-title">⚙️ لوحة الإدارة</div>
+      <div class="page-subtitle">إدارة جميع العوائل</div>
+      
+      <div class="card">
+        <div class="card-title">👨‍👩‍👧‍👦 جميع العوائل <span id="admin-families-count" class="badge"></span></div>
+        <div id="admin-families-list">
+          <div class="empty-state"><div class="empty-text">جاري التحميل...</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit Family Modal -->
+    <div id="edit-family-modal" class="modal-overlay" style="display:none" onclick="closeEditModal(event)">
+      <div class="modal-box" onclick="event.stopPropagation()">
+        <h3 style="color:var(--gold);margin-bottom:16px">✏️ تعديل بيانات العائلة</h3>
+        <div class="form-group">
+          <label>اسم العائلة</label>
+          <input class="form-input" id="edit-family-name" type="text">
+        </div>
+        <div class="form-group">
+          <label>رمز العائلة</label>
+          <input class="form-input" id="edit-family-code" type="text" dir="ltr" style="letter-spacing:3px">
+        </div>
+        <div class="form-group">
+          <label>الحالة</label>
+          <select class="form-input" id="edit-family-status">
+            <option value="active">🟢 نشطة</option>
+            <option value="inactive">⛔ موقوفة</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:16px">
+          <button class="btn btn-primary" style="flex:1" onclick="saveFamilyEdit()">💾 حفظ</button>
+          <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('edit-family-modal').style.display='none'">إلغاء</button>
+        </div>
+      </div>
+    </div>
+
   </main>
 </div>
 
@@ -502,6 +544,7 @@ function navigateTo(pageName) {
   
   // Load page-specific data
   if (pageName === 'codes' && state.isLoggedIn) loadCodesPage();
+  if (pageName === 'admin' && state.user?.role === 'admin') loadAdminPage();
 }
 
 function toggleHeaderVisibility(pageName) {
@@ -594,6 +637,122 @@ async function updateCodePrice(code) {
   } catch(e) {
     showToast(e.message || 'فشل', 'error');
   }
+}
+
+// ==================== ADMIN: FAMILIES MANAGEMENT ====================
+let editingFamilyId = null;
+
+async function loadAdminPage() {
+  try {
+    // Load stats
+    const { stats } = await api('GET', '/api/admin/stats');
+    // Insert stats box if not exists
+    let statsBox = document.getElementById('admin-stats-box');
+    if (!statsBox) {
+      const card = document.querySelector('#page-admin .card');
+      statsBox = document.createElement('div');
+      statsBox.id = 'admin-stats-box';
+      statsBox.className = 'admin-stats';
+      card.parentNode.insertBefore(statsBox, card);
+    }
+    statsBox.innerHTML = 
+      '<div class="admin-stat-box"><div class="admin-stat-num">' + (stats.families||0) + '</div><div class="admin-stat-label">👨‍👩‍👧‍👦 عائلة</div></div>' +
+      '<div class="admin-stat-box"><div class="admin-stat-num">' + (stats.users||0) + '</div><div class="admin-stat-label">👥 مستخدم</div></div>' +
+      '<div class="admin-stat-box"><div class="admin-stat-num">' + (stats.challenges||0) + '</div><div class="admin-stat-label">🏆 تحدي</div></div>';
+  } catch(e) { console.error('Stats error:', e); }
+  loadAdminFamilies();
+}
+
+async function loadAdminFamilies() {
+  try {
+    const { families } = await api('GET', '/api/admin/families');
+    const list = document.getElementById('admin-families-list');
+    const count = document.getElementById('admin-families-count');
+    
+    if (!families?.length) {
+      list.innerHTML = '<div class="empty-state"><div class="empty-text">لا توجد عوائل</div></div>';
+      if (count) count.textContent = '0';
+      return;
+    }
+    
+    if (count) count.textContent = families.length;
+    
+    list.innerHTML = families.map(f => {
+      const status = f.status === 'active' 
+        ? '<span class="fam-status active">🟢 نشطة</span>' 
+        : '<span class="fam-status inactive">⛔ موقوفة</span>';
+      return '<div class="admin-family-item">' +
+        '<div class="admin-family-info">' +
+          '<div class="admin-family-name">' + (f.name || '') + '</div>' +
+          '<div class="admin-family-meta">' +
+            '👑 ' + (f.founder_name || '-') + ' · 👥 ' + (f.members_count || 0) + ' عضو · ' +
+            '<span style="direction:ltr;letter-spacing:2px;color:var(--gold)">' + (f.subscription_code || '') + '</span>' +
+          '</div>' +
+          status +
+        '</div>' +
+        '<div class="admin-family-actions">' +
+          '<button class="btn btn-sm" onclick="openEditFamily(\'' + f.id + '\', \'' + (f.name||'').replace(/'/g,"\\'") + '\', \'' + (f.subscription_code||'') + '\', \'' + (f.status||'active') + '\')">✏️ تعديل</button>' +
+          (f.status === 'active' 
+            ? '<button class="btn btn-sm btn-danger" onclick="toggleFamilyStatus(\'' + f.id + '\', \'inactive\')">⛔ إيقاف</button>' 
+            : '<button class="btn btn-sm btn-success" onclick="toggleFamilyStatus(\'' + f.id + '\', \'active\')">🟢 تفعيل</button>') +
+          '<button class="btn btn-sm btn-danger" onclick="deleteFamilyAdmin(\'' + f.id + '\')">🗑️ حذف</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  } catch(e) {
+    const list = document.getElementById('admin-families-list');
+    if (list) list.innerHTML = '<div class="empty-state"><div class="empty-text">' + (e.message || 'خطأ') + '</div></div>';
+  }
+}
+
+function openEditFamily(id, name, code, status) {
+  editingFamilyId = id;
+  document.getElementById('edit-family-name').value = name;
+  document.getElementById('edit-family-code').value = code;
+  document.getElementById('edit-family-status').value = status;
+  document.getElementById('edit-family-modal').style.display = 'flex';
+}
+
+function closeEditModal(e) {
+  if (e?.target === e?.currentTarget) {
+    document.getElementById('edit-family-modal').style.display = 'none';
+  }
+}
+
+async function saveFamilyEdit() {
+  if (!editingFamilyId) return;
+  const name = document.getElementById('edit-family-name').value.trim();
+  const code = document.getElementById('edit-family-code').value.trim();
+  const status = document.getElementById('edit-family-status').value;
+  if (!name) return showToast('اسم العائلة مطلوب', 'error');
+  try {
+    await api('POST', '/api/admin/families/update', { familyId: editingFamilyId, name, subscription_code: code, status });
+    showToast('✅ تم حفظ التعديلات', 'success');
+    document.getElementById('edit-family-modal').style.display = 'none';
+    loadAdminFamilies();
+    if (state.family?.id === editingFamilyId) {
+      state.family.name = name;
+      state.family.subscription_code = code;
+      updateAllUI();
+    }
+  } catch(e) { showToast(e.message || 'فشل', 'error'); }
+}
+
+async function toggleFamilyStatus(id, status) {
+  try {
+    await api('POST', '/api/admin/families/status', { familyId: id, status });
+    showToast(status === 'active' ? '🟢 تم التفعيل' : '⛔ تم الإيقاف', 'success');
+    loadAdminFamilies();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function deleteFamilyAdmin(id) {
+  if (!confirm('⚠️ متأكد من حذف هذه العائلة نهائياً؟')) return;
+  try {
+    await api('POST', '/api/admin/families/delete', { familyId: id });
+    showToast('🗑️ تم حذف العائلة', 'success');
+    loadAdminFamilies();
+  } catch(e) { showToast(e.message, 'error'); }
 }
 
 async function generateNewPremiumCode() {
