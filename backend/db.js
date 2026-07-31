@@ -257,6 +257,18 @@ function initDb() {
     )
   `);
   db.run(`
+    CREATE TABLE IF NOT EXISTS agreements (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      family_id TEXT,
+      role_at_agreement TEXT NOT NULL DEFAULT 'member' CHECK(role_at_agreement IN ('founder', 'manager', 'member')),
+      agreed INTEGER NOT NULL DEFAULT 0,
+      agreed_at TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  `);
+  db.run(`
     CREATE TABLE IF NOT EXISTS user_codes (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,
@@ -583,6 +595,51 @@ function getDiwaniyaLock(familyId) {
     reason: family.diwaniya_lock_reason,
     locked_by: family.diwaniya_locked_by
   };
+}
+
+// =============== AGREEMENTS ===============
+function getAgreement(userId) {
+  return queryOne('SELECT * FROM agreements WHERE user_id = ? ORDER BY created_at DESC LIMIT 1', [userId]);
+}
+function acceptAgreement(userId, familyId, role) {
+  const existing = getAgreement(userId);
+  if (existing && existing.agreed == 1) return existing;
+  if (existing && existing.agreed == 0) return existing; // rejected - permanent
+  const id = uuidv4();
+  run("INSERT INTO agreements (id, user_id, family_id, role_at_agreement, agreed, agreed_at) VALUES (?, ?, ?, ?, 1, datetime('now'))",
+    [id, userId, familyId, role]);
+  return queryOne('SELECT * FROM agreements WHERE id = ?', [id]);
+}
+function rejectAgreement(userId, familyId, role) {
+  const existing = getAgreement(userId);
+  if (existing) return existing; // permanent - cannot change
+  const id = uuidv4();
+  run("INSERT INTO agreements (id, user_id, family_id, role_at_agreement, agreed, agreed_at) VALUES (?, ?, ?, ?, 0, datetime('now'))",
+    [id, userId, familyId, role]);
+  return queryOne('SELECT * FROM agreements WHERE id = ?', [id]);
+}
+function canOpenDiwaniya(userId) {
+  const ag = getAgreement(userId);
+  if (!ag) return true; // not decided yet - show terms
+  return ag.agreed == 1;
+}
+function getFamilyAgreements(familyId) {
+  return queryAll(`
+    SELECT a.*, u.name as user_name, u.role as user_role
+    FROM agreements a
+    JOIN users u ON a.user_id = u.id
+    WHERE a.family_id = ?
+    ORDER BY a.role_at_agreement, a.created_at DESC
+  `, [familyId]);
+}
+function getAllAgreements() {
+  return queryAll(`
+    SELECT a.*, u.name as user_name, u.email as user_email, u.role as user_role, f.name as family_name
+    FROM agreements a
+    JOIN users u ON a.user_id = u.id
+    LEFT JOIN families f ON a.family_id = f.id
+    ORDER BY a.role_at_agreement, a.created_at DESC
+  `);
 }
 
 // =============== MODERATION ===============
@@ -1020,6 +1077,6 @@ module.exports = {
   updatePrice, getFirstAvailablePremiumCode,
   getAllFamilies, updateFamilyData, setFamilyStatus, deleteFamily, createAdminUser, getAdminStats,
   getActiveAds, getAllAds, addAd, updateAd, deleteAd, trackAdView, trackAdClick, getAdsStats, getFeaturedFamilies,
-  lockDiwaniya, getDiwaniyaLock, getBannedWords, addBannedWord, deleteBannedWord, checkBannedWord, addViolation, getAllViolations, getViolationStats, getModerationSettings, setModerationSetting, banUser, getActiveBan, getAllBans, unbanUser, setDiwaniyaManager, countDiwaniyaManagers, updateProfile, leaveFamily, updateLastSeen, getLastSeen, createAnnouncement, getFamilyAnnouncements, getAnnouncementsForUser, deleteAnnouncement, getUserFamilies, getUserFamilyCount, addUserToFamily, setCurrentFamily, getSetting, setSetting, createAuction, getActiveAuctions, getAllAuctions, getAuctionById, joinAuction, placeBid, getAvailableAuctionCodes,
+  lockDiwaniya, getDiwaniyaLock, getAgreement, acceptAgreement, rejectAgreement, canOpenDiwaniya, getFamilyAgreements, getAllAgreements, getBannedWords, addBannedWord, deleteBannedWord, checkBannedWord, addViolation, getAllViolations, getViolationStats, getModerationSettings, setModerationSetting, banUser, getActiveBan, getAllBans, unbanUser, setDiwaniyaManager, countDiwaniyaManagers, updateProfile, leaveFamily, updateLastSeen, getLastSeen, createAnnouncement, getFamilyAnnouncements, getAnnouncementsForUser, deleteAnnouncement, getUserFamilies, getUserFamilyCount, addUserToFamily, setCurrentFamily, getSetting, setSetting, createAuction, getActiveAuctions, getAllAuctions, getAuctionById, joinAuction, placeBid, getAvailableAuctionCodes,
   endAuction, confirmAuctionPayment, cancelAuction, getAuctionBids, isAuctionParticipant,
 };

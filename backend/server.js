@@ -625,6 +625,47 @@ app.post('/api/admin/moderation-settings', authMiddleware, adminMiddleware, (req
   res.json({ message: '✅ تم حفظ الإعدادات', settings: db.getModerationSettings() });
 });
 
+// =============== AGREEMENTS ROUTES ===============
+
+// Get my agreement status
+app.get('/api/agreements/status', authMiddleware, (req, res) => {
+  const ag = db.getAgreement(req.user.id);
+  res.json({ agreement: ag, canOpenDiwaniya: db.canOpenDiwaniya(req.user.id) });
+});
+
+// Accept agreement (permanent)
+app.post('/api/agreements/accept', authMiddleware, (req, res) => {
+  const user = db.getUserById(req.user.id);
+  const role = user && user.can_open_diwaniya == 1 ? 'manager' : (req.user.role === 'founder' ? 'founder' : 'member');
+  const ag = db.acceptAgreement(req.user.id, req.user.familyId, role);
+  if (ag.agreed == 0) return res.status(403).json({ error: 'لا يمكن تغيير قرار الرفض' });
+  res.json({ message: '✅ تم تسجيل موافقتك على اتفاقية استخدام البرنامج', agreement: ag });
+});
+
+// Reject agreement (permanent - cannot open diwaniya ever)
+app.post('/api/agreements/reject', authMiddleware, (req, res) => {
+  const user = db.getUserById(req.user.id);
+  const role = user && user.can_open_diwaniya == 1 ? 'manager' : (req.user.role === 'founder' ? 'founder' : 'member');
+  const ag = db.rejectAgreement(req.user.id, req.user.familyId, role);
+  res.json({ message: 'تم تسجيل رفضك - لن تستطيع فتح الديوانية', agreement: ag });
+});
+
+// Get family agreements (founder)
+app.get('/api/agreements/family', authMiddleware, (req, res) => {
+  if (!req.user.familyId) return res.json({ agreements: [] });
+  const agreements = db.getFamilyAgreements(req.user.familyId);
+  res.json({ agreements });
+});
+
+// Get all agreements (admin)
+app.get('/api/admin/agreements', authMiddleware, adminMiddleware, (req, res) => {
+  const agreements = db.getAllAgreements();
+  const founders = agreements.filter(a => a.role_at_agreement === 'founder');
+  const managers = agreements.filter(a => a.role_at_agreement === 'manager');
+  const members = agreements.filter(a => a.role_at_agreement === 'member');
+  res.json({ founders, managers, members, total: agreements.length });
+});
+
 // =============== MODERATION ROUTES ===============
 
 // Banned words (admin)
@@ -811,6 +852,12 @@ app.post('/api/diwaniya/open', authMiddleware, (req, res) => {
   const isManager = userFull && userFull.can_open_diwaniya == 1;
   if (!isFounder && !isManager) {
     return res.status(403).json({ error: 'فقط المؤسس أو من منحه الصلاحية يمكنه فتح الديوانية' });
+  }
+  
+  // Check agreement - rejected users can NEVER open diwaniya
+  const ag = db.getAgreement(req.user.id);
+  if (ag && ag.agreed == 0) {
+    return res.status(403).json({ error: '❌ لم توافق على اتفاقية استخدام البرنامج، لا يمكنك فتح الديوانية أبداً' });
   }
   
   // Check diwaniya lockdown
