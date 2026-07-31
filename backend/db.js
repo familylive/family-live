@@ -286,6 +286,28 @@ function initDb() {
     )
   `);
   db.run(`
+    CREATE TABLE IF NOT EXISTS support_messages (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      content TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+  db.run(`
+    CREATE TABLE IF NOT EXISTS support_tickets (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      user_name TEXT,
+      subject TEXT,
+      message TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open', 'answered', 'closed')),
+      admin_reply TEXT,
+      replied_at TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  `);
+  db.run(`
     CREATE TABLE IF NOT EXISTS user_codes (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,
@@ -719,6 +741,41 @@ function getModeratorVisitsByUser(userId) {
 }
 function getPendingVisitByModerator(userId) {
   return queryOne("SELECT * FROM moderator_visits WHERE moderator_id = ? AND status IN ('requested', 'approved', 'entered') ORDER BY requested_at DESC LIMIT 1", [userId]);
+}
+
+// =============== SUPPORT SYSTEM ===============
+function addSupportMessage(title, content) {
+  const id = uuidv4();
+  run('INSERT INTO support_messages (id, title, content) VALUES (?, ?, ?)', [id, title, content]);
+  return queryOne('SELECT * FROM support_messages WHERE id = ?', [id]);
+}
+function getSupportMessages() {
+  return queryAll('SELECT * FROM support_messages ORDER BY created_at DESC');
+}
+function deleteSupportMessage(id) {
+  run('DELETE FROM support_messages WHERE id = ?', [id]);
+  return true;
+}
+
+function createSupportTicket(userId, userName, subject, message) {
+  const id = uuidv4();
+  run('INSERT INTO support_tickets (id, user_id, user_name, subject, message) VALUES (?, ?, ?, ?, ?)',
+    [id, userId, userName, subject, message]);
+  return queryOne('SELECT * FROM support_tickets WHERE id = ?', [id]);
+}
+function getSupportTickets() {
+  return queryAll('SELECT * FROM support_tickets ORDER BY created_at DESC LIMIT 100');
+}
+function getMyTickets(userId) {
+  return queryAll('SELECT * FROM support_tickets WHERE user_id = ? ORDER BY created_at DESC', [userId]);
+}
+function replyTicket(ticketId, adminReply) {
+  run("UPDATE support_tickets SET status = 'answered', admin_reply = ?, replied_at = datetime('now') WHERE id = ?", [adminReply, ticketId]);
+  return queryOne('SELECT * FROM support_tickets WHERE id = ?', [ticketId]);
+}
+function closeTicket(ticketId) {
+  run("UPDATE support_tickets SET status = 'closed' WHERE id = ?", [ticketId]);
+  return queryOne('SELECT * FROM support_tickets WHERE id = ?', [ticketId]);
 }
 
 // =============== MODERATION ===============
@@ -1156,6 +1213,6 @@ module.exports = {
   updatePrice, getFirstAvailablePremiumCode,
   getAllFamilies, updateFamilyData, setFamilyStatus, deleteFamily, createAdminUser, getAdminStats,
   getActiveAds, getAllAds, addAd, updateAd, deleteAd, trackAdView, trackAdClick, getAdsStats, getFeaturedFamilies,
-  lockDiwaniya, getDiwaniyaLock, getAllUsersDetailed, updateUserByAdmin, deleteUserByAdmin, requestModeratorVisit, approveModeratorVisit, enterModeratorVisit, exitModeratorVisit, getModeratorVisits, getModeratorVisitsByUser, getPendingVisitByModerator, getAgreement, acceptAgreement, rejectAgreement, canOpenDiwaniya, getFamilyAgreements, getAllAgreements, getBannedWords, addBannedWord, deleteBannedWord, checkBannedWord, addViolation, getAllViolations, getViolationStats, getModerationSettings, setModerationSetting, banUser, getActiveBan, getAllBans, unbanUser, setDiwaniyaManager, countDiwaniyaManagers, updateProfile, leaveFamily, updateLastSeen, getLastSeen, createAnnouncement, getFamilyAnnouncements, getAnnouncementsForUser, deleteAnnouncement, getUserFamilies, getUserFamilyCount, addUserToFamily, setCurrentFamily, getSetting, setSetting, createAuction, getActiveAuctions, getAllAuctions, getAuctionById, joinAuction, placeBid, getAvailableAuctionCodes,
+  lockDiwaniya, getDiwaniyaLock, addSupportMessage, getSupportMessages, deleteSupportMessage, createSupportTicket, getSupportTickets, getMyTickets, replyTicket, closeTicket, getAllUsersDetailed, updateUserByAdmin, deleteUserByAdmin, requestModeratorVisit, approveModeratorVisit, enterModeratorVisit, exitModeratorVisit, getModeratorVisits, getModeratorVisitsByUser, getPendingVisitByModerator, getAgreement, acceptAgreement, rejectAgreement, canOpenDiwaniya, getFamilyAgreements, getAllAgreements, getBannedWords, addBannedWord, deleteBannedWord, checkBannedWord, addViolation, getAllViolations, getViolationStats, getModerationSettings, setModerationSetting, banUser, getActiveBan, getAllBans, unbanUser, setDiwaniyaManager, countDiwaniyaManagers, updateProfile, leaveFamily, updateLastSeen, getLastSeen, createAnnouncement, getFamilyAnnouncements, getAnnouncementsForUser, deleteAnnouncement, getUserFamilies, getUserFamilyCount, addUserToFamily, setCurrentFamily, getSetting, setSetting, createAuction, getActiveAuctions, getAllAuctions, getAuctionById, joinAuction, placeBid, getAvailableAuctionCodes,
   endAuction, confirmAuctionPayment, cancelAuction, getAuctionBids, isAuctionParticipant,
 };

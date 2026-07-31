@@ -1547,3 +1547,30 @@ body {
   border-radius: var(--radius-sm);
   margin: 6px 0;
 }
+
+/* Moderator predefined message in chat */
+.moderator-message {
+  background: linear-gradient(135deg, rgba(59,130,196,.1), rgba(59,130,196,.04));
+  border: 1px solid rgba(59,130,196,.3);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  margin: 8px 0;
+  max-width: 90%;
+}
+.mod-msg-header {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--info);
+  margin-bottom: 4px;
+}
+.mod-msg-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.mod-msg-content {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+  line-height: 1.7;
+}

@@ -675,6 +675,79 @@ app.post('/api/admin/moderation-settings', authMiddleware, adminMiddleware, (req
   res.json({ message: '✅ تم حفظ الإعدادات', settings: db.getModerationSettings() });
 });
 
+// =============== SUPPORT SYSTEM ROUTES ===============
+
+// Admin: support messages CRUD
+app.get('/api/admin/support-messages', authMiddleware, adminMiddleware, (req, res) => {
+  res.json({ messages: db.getSupportMessages() });
+});
+app.post('/api/admin/support-messages/add', authMiddleware, adminMiddleware, (req, res) => {
+  const { title, content } = req.body;
+  if (!title || !content) return res.status(400).json({ error: 'العنوان والنص مطلوبان' });
+  db.addSupportMessage(title, content);
+  res.json({ message: '✅ تمت إضافة الرسالة' });
+});
+app.post('/api/admin/support-messages/delete', authMiddleware, adminMiddleware, (req, res) => {
+  const { id } = req.body;
+  db.deleteSupportMessage(id);
+  res.json({ message: '🗑️ تم الحذف' });
+});
+
+// Get support messages for moderator (during visits)
+app.get('/api/support-messages', authMiddleware, (req, res) => {
+  res.json({ messages: db.getSupportMessages() });
+});
+
+// Moderator: send predefined message in diwaniya during visit
+app.post('/api/moderator/send-message', authMiddleware, (req, res) => {
+  const user = db.getUserById(req.user.id);
+  if (user.role !== 'moderator' && user.role !== 'admin') {
+    return res.status(403).json({ error: 'فقط المشرفون' });
+  }
+  const { sessionId, messageId } = req.body;
+  if (!sessionId || !messageId) return res.status(400).json({ error: 'الرسالة المطلوبة' });
+  const msg = db.getDb().exec('SELECT * FROM support_messages WHERE id = ?', [messageId]);
+  if (!msg.length || !msg[0].values.length) return res.status(400).json({ error: 'الرسالة غير موجودة' });
+  const cols = msg[0].columns;
+  const row = msg[0].values[0];
+  const content = row[cols.indexOf('content')];
+  const title = row[cols.indexOf('title')];
+  
+  // Post as moderator observer message (visible, not chat message)
+  io.to(`session_${sessionId}`).emit('moderator_message', {
+    moderatorName: user.name,
+    title: title,
+    content: content
+  });
+  res.json({ message: '💬 تم إرسال رسالة المشرف' });
+});
+
+// Support tickets (users → admin only)
+app.post('/api/support/ticket', authMiddleware, (req, res) => {
+  const { subject, message } = req.body;
+  if (!message) return res.status(400).json({ error: 'نص الرسالة مطلوب' });
+  const user = db.getUserById(req.user.id);
+  const ticket = db.createSupportTicket(req.user.id, user.name, subject || 'استفسار', message);
+  res.json({ message: '📨 تم إرسال رسالتك للإدارة', ticket });
+});
+app.get('/api/support/my-tickets', authMiddleware, (req, res) => {
+  res.json({ tickets: db.getMyTickets(req.user.id) });
+});
+app.get('/api/admin/support-tickets', authMiddleware, adminMiddleware, (req, res) => {
+  res.json({ tickets: db.getSupportTickets() });
+});
+app.post('/api/admin/support-tickets/reply', authMiddleware, adminMiddleware, (req, res) => {
+  const { ticketId, reply } = req.body;
+  if (!ticketId || !reply) return res.status(400).json({ error: 'الرد مطلوب' });
+  db.replyTicket(ticketId, reply);
+  res.json({ message: '✅ تم إرسال الرد' });
+});
+app.post('/api/admin/support-tickets/close', authMiddleware, adminMiddleware, (req, res) => {
+  const { ticketId } = req.body;
+  db.closeTicket(ticketId);
+  res.json({ message: 'تم إغلاق التذكرة' });
+});
+
 // =============== USERS MANAGEMENT (ADMIN) ===============
 
 // Get all users detailed (admin)
@@ -1349,6 +1422,18 @@ seedData().then(() => {
       console.log('✅ Created moderator account: ' + modEmail);
     }
   } catch(e) { console.log('Moderator seed error:', e.message); }
+  
+  // Seed default support messages
+  try {
+    const existingMsg = db.getDb().exec('SELECT COUNT(*) c FROM support_messages');
+    let cnt = 0;
+    if (existingMsg.length && existingMsg[0].values.length) cnt = existingMsg[0].values[0][0];
+    if (cnt === 0) {
+      db.addSupportMessage('تحية مراقب الديوانيات', 'السلام عليكم ورحمة الله وبركاته، أنا مراقب الديوانيات جئت للسماع منكم عن مشاكل التطبيق ومقترحاتكم.');
+      db.addSupportMessage('التواصل مع الدعم الفني', 'تنبيه: عند وجود مقترحات أو شكاوى أو مشاكل فنية بالحساب، يرجى مراسلة الإدارة عبر برنامج الدعم الفني فقط.');
+      console.log('✅ Seeded default support messages');
+    }
+  } catch(e) { console.log('Support seed error:', e.message); }
   
   // Create default user if not exists
   try {

@@ -93,6 +93,9 @@
       <div class="menu-nav-item" id="menu-moderator" data-page="moderator" onclick="navigateTo('moderator');toggleMenu()" style="display:none">
         <span class="nav-icon">🕵️</span> زيارات المودريتر
       </div>
+      <div class="menu-nav-item" data-page="support" onclick="navigateTo('support');toggleMenu()">
+        <span class="nav-icon">🎧</span> الدعم الفني
+      </div>
       <div class="menu-nav-item" id="menu-login-item" onclick="showAuth('login');toggleMenu()" style="display:none">
         <span class="nav-icon">🔐</span> تسجيل الدخول
       </div>
@@ -749,6 +752,37 @@
       </div>
     </div>
 
+    <!-- Support Page -->
+    <div id="page-support" class="page-content">
+      <div class="page-title">🎧 الدعم الفني والمساعدة</div>
+      <div class="page-subtitle">راسل الإدارة فقط - الشكاوى والمقترحات والمشاكل الفنية</div>
+      
+      <div class="card">
+        <div class="card-title">📨 إرسال رسالة للإدارة</div>
+        <div class="form-group">
+          <label>الموضوع</label>
+          <select class="form-input" id="support-subject">
+            <option value="استفسار">❓ استفسار</option>
+            <option value="شكوى">⚠️ شكوى</option>
+            <option value="اقتراح">💡 اقتراح</option>
+            <option value="مشكلة فنية">🔧 مشكلة فنية بالحساب</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>الرسالة</label>
+          <textarea class="form-input" id="support-message" rows="4" placeholder="اكتب رسالتك..."></textarea>
+        </div>
+        <button class="btn btn-accent btn-full" onclick="sendSupportTicket()">📨 إرسال</button>
+      </div>
+
+      <div class="card">
+        <div class="card-title">💬 رسائلي للإدارة</div>
+        <div id="my-support-tickets">
+          <div class="empty-state"><div class="empty-text">لا توجد رسائل</div></div>
+        </div>
+      </div>
+    </div>
+
     <!-- Moderator Page -->
     <div id="page-moderator" class="page-content">
       <div class="page-title">🕵️ زيارات المودريتر</div>
@@ -768,6 +802,15 @@
         </div>
         <button class="btn btn-accent btn-full" onclick="requestModeratorVisit()">🕵️ طلب الزيارة</button>
         <div id="moderator-visit-status" style="margin-top:10px"></div>
+        <div id="moderator-send-box" style="display:none;margin-top:12px">
+          <div class="form-group">
+            <label>💬 رسالة جاهزة للمشرف (اختر من القائمة)</label>
+            <select class="form-input" id="moderator-message-select">
+              <option value="">اختر رسالة...</option>
+            </select>
+          </div>
+          <button class="btn btn-primary btn-full" onclick="sendModeratorMessage()">💬 إرسال الرسالة</button>
+        </div>
       </div>
 
       <div class="card">
@@ -855,6 +898,21 @@
         <div class="card-title">📋 كل المزادات</div>
         <div id="admin-auctions-list">
           <div class="empty-state"><div class="empty-text">لا توجد مزادات</div></div>
+        </div>
+      </div>
+
+      <div class="card" id="admin-support-card">
+        <div class="card-title">🎧 الدعم الفني والمساعدة</div>
+        <div class="card-title" style="font-size:14px;margin-top:8px">💬 رسائل المودريتر الجاهزة</div>
+        <div style="display:flex;gap:8px;margin-bottom:8px">
+          <input class="form-input" id="support-msg-title" type="text" placeholder="عنوان الرسالة" style="flex:1">
+        </div>
+        <textarea class="form-input" id="support-msg-content" rows="3" placeholder="نص الرسالة..." style="margin-bottom:8px"></textarea>
+        <button class="btn btn-accent btn-full" onclick="addSupportMsg()">➕ إضافة رسالة</button>
+        <div id="support-messages-list" style="margin-top:10px"></div>
+        <div class="card-title" style="font-size:14px;margin-top:16px">📨 رسائل الأعضاء للإدارة</div>
+        <div id="admin-support-tickets-list">
+          <div class="empty-state"><div class="empty-text">لا توجد رسائل</div></div>
         </div>
       </div>
 
@@ -1107,6 +1165,8 @@ function navigateTo(pageName) {
   if (pageName === 'diwaniya' && state.isLoggedIn) checkDiwaniyaLock();
   if (pageName === 'dashboard' && state.isLoggedIn) { loadDashboardAuctions(); loadDashboardAds(); }
   if (pageName === 'profile' && state.isLoggedIn) { loadProfilePage(); loadMyFamilies(); }
+  if (pageName === 'support' && state.isLoggedIn) loadMyTickets();
+  if (pageName === 'admin' && state.user?.role === 'admin') loadAdminSupport();
   if (pageName === 'family' && state.isLoggedIn) { loadAnnouncements(); populateAnnTarget(); populateManagerSelect(); }
   if (pageName === 'admin' && state.user?.role === 'admin') { loadBannedWords(); loadAdminBans(); loadAIUsers(); loadViolations(); loadAdminAgreements(); loadAdminUsers(); loadModeratorVisitsAdmin(); }
   if (pageName === 'moderator' && (state.user?.role === 'moderator' || state.user?.role === 'admin')) { loadModeratorFamilies(); loadModeratorVisitsHistory(); }
@@ -2108,6 +2168,125 @@ function showAgreementTab(tab) {
     ).join('');
 }
 
+// ==================== SUPPORT SYSTEM ====================
+let activeVisitSession = null;
+
+async function sendSupportTicket() {
+  const subject = document.getElementById('support-subject').value;
+  const message = document.getElementById('support-message').value.trim();
+  if (!message) return showToast('اكتب رسالتك', 'error');
+  try {
+    await api('POST', '/api/support/ticket', { subject, message });
+    showToast('📨 تم إرسال رسالتك للإدارة', 'success');
+    document.getElementById('support-message').value = '';
+    loadMyTickets();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function loadMyTickets() {
+  try {
+    const { tickets } = await api('GET', '/api/support/my-tickets');
+    const list = document.getElementById('my-support-tickets');
+    if (!tickets?.length) {
+      list.innerHTML = '<div class="empty-state"><div class="empty-text">لا توجد رسائل</div></div>';
+      return;
+    }
+    list.innerHTML = tickets.map(t => {
+      const status = t.status === 'answered' ? '<span style="color:var(--success)">✅ ردت الإدارة</span>' : (t.status === 'closed' ? '<span style="color:var(--text-muted)">مغلقة</span>' : '<span style="color:var(--info)">⏳ بانتظار الرد</span>');
+      return '<div class="admin-family-item"><div class="admin-family-name">' + (t.subject||'') + ' ' + status + '</div>' +
+        '<div class="admin-family-meta">' + (t.message||'') + (t.admin_reply ? '<br>📨 رد الإدارة: ' + t.admin_reply : '') + '</div></div>';
+    }).join('');
+  } catch(e) {}
+}
+
+// Admin: support messages + tickets
+async function loadAdminSupport() {
+  try {
+    const { messages } = await api('GET', '/api/admin/support-messages');
+    const list = document.getElementById('support-messages-list');
+    if (!messages?.length) {
+      list.innerHTML = '<div class="empty-state"><div class="empty-text">لا توجد رسائل جاهزة</div></div>';
+    } else {
+      list.innerHTML = messages.map(m =>
+        '<div class="admin-family-item" style="display:flex;justify-content:space-between;align-items:center">' +
+          '<div><div class="admin-family-name">' + (m.title||'') + '</div><div class="admin-family-meta">' + (m.content||'').substring(0,80) + '...</div></div>' +
+          '<button class="btn btn-sm btn-danger" onclick="deleteSupportMsg(\'' + m.id + '\')">🗑️</button>' +
+        '</div>'
+      ).join('');
+    }
+  } catch(e) {}
+  try {
+    const { tickets } = await api('GET', '/api/admin/support-tickets');
+    const list = document.getElementById('admin-support-tickets-list');
+    if (!tickets?.length) {
+      list.innerHTML = '<div class="empty-state"><div class="empty-text">لا توجد رسائل</div></div>';
+      return;
+    }
+    list.innerHTML = tickets.map(t => {
+      const status = t.status === 'answered' ? '✅ مجاب' : (t.status === 'closed' ? 'مغلقة' : '⏳ مفتوحة');
+      return '<div class="admin-family-item">' +
+        '<div class="admin-family-name">' + (t.user_name||'') + ' · ' + (t.subject||'') + ' <span style="font-size:11px">' + status + '</span></div>' +
+        '<div class="admin-family-meta">' + (t.message||'') + (t.admin_reply ? '<br>📨 ردك: ' + t.admin_reply : '') + '</div>' +
+        '<div class="admin-family-actions">' +
+          (t.status !== 'answered' ? '<button class="btn btn-sm btn-success" onclick="replyTicketAdmin(\'' + t.id + '\')">📨 رد</button>' : '') +
+          '<button class="btn btn-sm btn-secondary" onclick="closeTicketAdmin(\'' + t.id + '\')">إغلاق</button>' +
+        '</div></div>';
+    }).join('');
+  } catch(e) {}
+}
+
+async function addSupportMsg() {
+  const title = document.getElementById('support-msg-title').value.trim();
+  const content = document.getElementById('support-msg-content').value.trim();
+  if (!title || !content) return showToast('العنوان والنص مطلوبان', 'error');
+  try {
+    await api('POST', '/api/admin/support-messages/add', { title, content });
+    showToast('✅ تمت إضافة الرسالة', 'success');
+    document.getElementById('support-msg-title').value = '';
+    document.getElementById('support-msg-content').value = '';
+    loadAdminSupport();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function deleteSupportMsg(id) {
+  try { await api('POST', '/api/admin/support-messages/delete', { id }); loadAdminSupport(); } catch(e) {}
+}
+
+async function replyTicketAdmin(id) {
+  const reply = prompt('📨 اكتب ردك للعضو:');
+  if (!reply) return;
+  try {
+    await api('POST', '/api/admin/support-tickets/reply', { ticketId: id, reply });
+    showToast('✅ تم إرسال الرد', 'success');
+    loadAdminSupport();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function closeTicketAdmin(id) {
+  try { await api('POST', '/api/admin/support-tickets/close', { ticketId: id }); loadAdminSupport(); } catch(e) {}
+}
+
+// Moderator: load predefined messages + send in diwaniya
+async function loadModeratorMessages() {
+  try {
+    const { messages } = await api('GET', '/api/support-messages');
+    const select = document.getElementById('moderator-message-select');
+    if (!select) return;
+    select.innerHTML = '<option value="">اختر رسالة...</option>' +
+      messages.map(m => '<option value="' + m.id + '">' + (m.title || m.content.substring(0,50)) + '</option>').join('');
+  } catch(e) {}
+}
+
+async function sendModeratorMessage() {
+  const messageId = document.getElementById('moderator-message-select').value;
+  if (!messageId) return showToast('اختر رسالة', 'error');
+  if (!activeVisitSession) return showToast('لا يوجد زيارة نشطة', 'error');
+  try {
+    await api('POST', '/api/moderator/send-message', { sessionId: activeVisitSession, messageId });
+    showToast('💬 تم إرسال رسالة المشرف', 'success');
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
 // ==================== USERS MANAGEMENT ====================
 let usersData = { admin: [], moderator: [], founder: [], member: [] };
 
@@ -2223,6 +2402,15 @@ async function requestModeratorVisit() {
 
 async function enterModeratorVisit() {
   if (!pendingVisit) return showToast('لا يوجد طلب زيارة', 'error');
+  // Find active diwaniya session for this family
+  try {
+    const { session } = await api('GET', '/api/diwaniya/active');
+    if (session) activeVisitSession = session.id;
+  } catch(e) {}
+  // Show send box + load messages
+  const sendBox = document.getElementById('moderator-send-box');
+  if (sendBox) sendBox.style.display = 'block';
+  loadModeratorMessages();
   try {
     await api('POST', '/api/moderator/visit/enter', { visitId: pendingVisit.id });
     showToast('🕵️ دخلت كمراقب - لا يحق لك المشاركة', 'success');
@@ -2254,7 +2442,10 @@ async function exitModeratorVisit() {
     showToast('📋 تم إرسال التقرير للإدارة', 'success');
     if (window._modTimer) clearInterval(window._modTimer);
     pendingVisit = null;
+    activeVisitSession = null;
     loadModeratorVisitsHistory();
+    const sendBox = document.getElementById('moderator-send-box');
+    if (sendBox) sendBox.style.display = 'none';
     const status = document.getElementById('moderator-visit-status');
     if (status) status.innerHTML = '';
   } catch(e) { showToast(e.message, 'error'); }
