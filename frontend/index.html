@@ -1497,6 +1497,13 @@ function switchRegTab(tab) {
   document.querySelectorAll('.reg-form').forEach(f => f.classList.remove('active'));
   document.querySelector(`.reg-tab[data-tab="${tab}"]`)?.classList.add('active');
   document.getElementById(`reg-form-${tab}`)?.classList.add('active');
+  // Show code-only join box for logged-in users
+  if (tab === 'join') {
+    const loggedBox = document.getElementById('logged-join-box');
+    const guestBox = document.getElementById('guest-join-box');
+    if (loggedBox) loggedBox.style.display = state.isLoggedIn ? 'block' : 'none';
+    if (guestBox) guestBox.style.display = state.isLoggedIn ? 'none' : 'block';
+  }
 }
 
 function handlePricingAction(type) {

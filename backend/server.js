@@ -468,6 +468,48 @@ app.get('/api/admin/online', authMiddleware, adminMiddleware, (req, res) => {
   res.json({ onlineUsers: [...onlineUsers], families: famData });
 });
 
+// Join family by subscription code (logged-in user, no registration needed)
+app.post('/api/family/join-by-code', authMiddleware, (req, res) => {
+  const { code, paid } = req.body;
+  if (!code) return res.status(400).json({ error: 'رمز العائلة مطلوب' });
+  
+  // Find family by code
+  const families = db.getDb().exec("SELECT id, name, status FROM families WHERE subscription_code = ?", [code.toUpperCase()]);
+  if (!families.length || !families[0].values.length) {
+    return res.status(404).json({ error: 'رمز العائلة غير صحيح' });
+  }
+  const family = { id: families[0].values[0][0], name: families[0].values[0][1], status: families[0].values[0][2] };
+  if (family.status === 'inactive') return res.status(400).json({ error: 'هذه العائلة موقوفة' });
+  
+  const count = db.getUserFamilyCount(req.user.id);
+  const joinPrice = parseInt(db.getSetting('join_family_price', '20'));
+  
+  // Already in this family?
+  const existing = db.getUserFamilies(req.user.id).find(f => f.family_id === family.id);
+  if (existing) return res.status(400).json({ error: 'أنت بالفعل في هذه العائلة' });
+  
+  if (count >= 5) return res.status(400).json({ error: 'وصلت للحد الأقصى 5 عوائل' });
+  
+  // Check premium code (auction winners get 5 families free)
+  let hasPremium = false;
+  try {
+    const pc = db.getDb().exec("SELECT COUNT(*) c FROM user_codes WHERE user_id = ? AND type = 'premium'", [req.user.id]);
+    if (pc.length && pc[0].values.length) hasPremium = pc[0].values[0][0] > 0;
+  } catch(e) {}
+  
+  // 1st family free (or premium holder), 2nd+ requires 20 SAR
+  const needsPayment = count >= 1 && !hasPremium;
+  if (needsPayment && !paid) {
+    return res.json({ requiresPayment: true, price: joinPrice, family: { id: family.id, name: family.name, code: code.toUpperCase() } });
+  }
+  
+  db.addUserToFamily(req.user.id, family.id, 1);
+  db.setCurrentFamily(req.user.id, family.id);
+  db.getDb().run('UPDATE users SET family_id = ? WHERE id = ?', [family.id, req.user.id]);
+  
+  res.json({ message: '✅ تم الانضمام لعائلة ' + family.name, family: { ...family, code: code.toUpperCase() } });
+});
+
 // Join another family (with payment for 2nd+)
 app.post('/api/family/join', authMiddleware, (req, res) => {
   const { familyId } = req.body;
