@@ -453,7 +453,12 @@ async function toggleDiwaniya() {
   const duration = parseInt(document.getElementById('diwaniya-duration').value);
   const topic = document.getElementById('diwaniya-topic').value.trim();
   const mode = document.getElementById('diwaniya-mode')?.value || 'text';
+  const capacity = parseInt(document.getElementById('diwaniya-capacity-select')?.value || '15');
   try {
+    // Set capacity first if founder
+    if (state.isFounder) {
+      await api('POST', '/api/diwaniya/capacity/set', { capacity }).catch(() => {});
+    }
     const session = await api('POST', '/api/diwaniya/open', { durationMinutes: duration, topic, mode });
     state.diwaniyaOpen = true; state.activeSession = session;
     state.diwaniyaMode = mode;

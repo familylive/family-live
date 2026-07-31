@@ -565,6 +565,9 @@
             <option value="15">15 دقيقة</option><option value="30" selected>30 دقيقة</option>
             <option value="45">45 دقيقة</option><option value="60">60 دقيقة</option>
           </select>
+          <select class="form-input" id="diwaniya-capacity-select">
+            <option value="15">👥 الحد الأقصى: 15 عضو</option>
+          </select>
           <input class="form-input" id="diwaniya-topic" type="text" placeholder="موضوع الجلسة (اختياري)" style="flex:1">
           <select class="form-input" id="diwaniya-mode">
             <option value="text">✍️ كتابي فقط</option>
@@ -574,6 +577,22 @@
             <option value="all">📝🎥🎤 كل شي</option>
           </select>
           <button class="btn btn-primary" id="diwaniya-toggle-btn" onclick="diwaniyaOpenHandler()">🔓 فتح الديوانية</button>
+        </div>
+        <div id="capacity-info" style="font-size:12px;color:var(--text-muted);margin-top:8px">👥 الحد الأقصى للعائلة: 15</div>
+        <div id="capacity-packages" style="margin-top:8px;display:none">
+          <p style="font-size:13px;color:var(--text-secondary);margin-bottom:6px">💳 باقات توسعة سعة الديوانية:</p>
+          <div style="display:flex;gap:8px">
+            <div style="flex:1;background:var(--bg-hover);border-radius:var(--radius-sm);padding:10px;text-align:center">
+              <div style="font-size:15px;font-weight:800">👥 20 عضو</div>
+              <div style="color:var(--gold);font-weight:700">50 ريال</div>
+              <button class="btn btn-sm btn-accent" style="margin-top:6px" onclick="purchaseCapacity(20)">💳 شراء</button>
+            </div>
+            <div style="flex:1;background:var(--bg-hover);border-radius:var(--radius-sm);padding:10px;text-align:center">
+              <div style="font-size:15px;font-weight:800">👥 40 عضو</div>
+              <div style="color:var(--gold);font-weight:700">100 ريال</div>
+              <button class="btn btn-sm btn-accent" style="margin-top:6px" onclick="purchaseCapacity(40)">💳 شراء</button>
+            </div>
+          </div>
         </div>
       </div>
       <div class="timer-display idle" id="timer-display">

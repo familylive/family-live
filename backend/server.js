@@ -1069,6 +1069,37 @@ app.post('/api/family/diwaniya-manager', authMiddleware, (req, res) => {
   res.json({ message: canOpen ? '✅ تم منح الصلاحية' : 'تم سحب الصلاحية' });
 });
 
+// =============== DIWANIYA CAPACITY ===============
+
+// Get capacity info + packages
+app.get('/api/diwaniya/capacity', authMiddleware, (req, res) => {
+  if (!req.user.familyId) return res.json({ capacity: 15, packages: [] });
+  const capacity = db.getFamilyCapacity(req.user.familyId);
+  res.json({ capacity, packages: db.getCapacityPackages(), defaultMax: 15 });
+});
+
+// Purchase capacity package
+app.post('/api/diwaniya/capacity/purchase', authMiddleware, (req, res) => {
+  const { capacity } = req.body;
+  if (!req.user.familyId) return res.status(400).json({ error: 'لا يوجد عائلة' });
+  if (req.user.role !== 'founder') return res.status(403).json({ error: 'فقط المؤسس' });
+  if (capacity !== 20 && capacity !== 40) return res.status(400).json({ error: 'الباقة غير متاحة' });
+  const current = db.getFamilyCapacity(req.user.familyId);
+  if (capacity <= current) return res.status(400).json({ error: 'سعتك الحالية ' + current + ' أكبر أو تساوي هذه الباقة' });
+  const newCap = db.purchaseCapacity(req.user.familyId, capacity);
+  res.json({ message: '✅ تم شراء توسعة الديوانية إلى ' + newCap + ' عضو', capacity: newCap });
+});
+
+// Set diwaniya capacity for a session (founder picks number)
+app.post('/api/diwaniya/capacity/set', authMiddleware, (req, res) => {
+  const { capacity } = req.body;
+  if (!req.user.familyId) return res.status(400).json({ error: 'لا يوجد عائلة' });
+  if (req.user.role !== 'founder') return res.status(403).json({ error: 'فقط المؤسس' });
+  const result = db.setDiwaniyaCapacity(req.user.familyId, parseInt(capacity));
+  if (result.error) return res.status(400).json(result);
+  res.json({ message: '✅ تم تحديد سعة الديوانية: ' + capacity, capacity });
+});
+
 // =============== AUCTIONS ROUTES ===============
 
 // Get active auctions (public - visitors can view, login to bid)
@@ -1486,9 +1517,12 @@ io.on('connection', (socket) => {
     if (!audioRooms[sessionId]) audioRooms[sessionId] = [];
     const participants = audioRooms[sessionId];
     
-    // Observers (moderators) don't count toward the 6-participant limit
-    if (!isObserver && participants.filter(p => !p.isObserver).length >= 6) {
-      socket.emit('call_full', { message: 'المكالمة ممتلئة - الحد الأقصى 6 مشاركين' });
+    // Observers (moderators) don't count toward the capacity limit
+    const familyId = db.getActiveDiwaniya(sessionId)?.family_id;
+    const maxCap = familyId ? db.getFamilyCapacity(familyId) : 15;
+    const activeCount = participants.filter(p => !p.isObserver).length;
+    if (!isObserver && activeCount >= maxCap) {
+      socket.emit('call_full', { message: 'المكالمة ممتلئة - الحد الأقصى للعائلة ' + maxCap + ' عضو' });
       socket.leave(`audio_${sessionId}`);
       return;
     }

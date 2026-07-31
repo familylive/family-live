@@ -44,6 +44,7 @@ function initDb() {
       diwaniya_locked_by TEXT,
       name_changed_at TEXT,
       name_changes_count INTEGER DEFAULT 0,
+      diwaniya_capacity INTEGER DEFAULT 15,
       created_at TEXT DEFAULT (datetime('now'))
     )
   `);
@@ -309,6 +310,16 @@ function initDb() {
       replied_at TEXT,
       created_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  `);
+  db.run(`
+    CREATE TABLE IF NOT EXISTS capacity_purchases (
+      id TEXT PRIMARY KEY,
+      family_id TEXT NOT NULL,
+      capacity INTEGER NOT NULL,
+      price INTEGER NOT NULL,
+      purchased_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (family_id) REFERENCES families(id)
     )
   `);
   db.run(`
@@ -846,6 +857,32 @@ function getModeratorTier(stars) {
 function updateModeratorTier(userId, tier) {
   run('UPDATE users SET moderator_tier = ? WHERE id = ?', [tier, userId]);
   return getUserById(userId);
+}
+
+function getFamilyCapacity(familyId) {
+  const family = queryOne('SELECT diwaniya_capacity FROM families WHERE id = ?', [familyId]);
+  return family ? (family.diwaniya_capacity || 15) : 15;
+}
+
+function purchaseCapacity(familyId, capacity) {
+  const price = capacity === 20 ? 50 : (capacity === 40 ? 100 : 50);
+  run('INSERT INTO capacity_purchases (id, family_id, capacity, price) VALUES (?, ?, ?, ?)', [uuidv4(), familyId, capacity, price]);
+  run('UPDATE families SET diwaniya_capacity = ? WHERE id = ?', [capacity, familyId]);
+  return getFamilyCapacity(familyId);
+}
+
+function setDiwaniyaCapacity(familyId, capacity) {
+  const current = getFamilyCapacity(familyId);
+  if (capacity > current) return { error: 'الحد الأقصى المشترى ' + current + ' - اشترِ باقة توسعة أولاً' };
+  run('UPDATE families SET diwaniya_capacity = ? WHERE id = ?', [capacity, familyId]);
+  return { capacity };
+}
+
+function getCapacityPackages() {
+  return [
+    { capacity: 20, price: 50 },
+    { capacity: 40, price: 100 }
+  ];
 }
 
 function getFamilyEditInfo(familyId) {
