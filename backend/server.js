@@ -307,6 +307,50 @@ app.get('/api/admin/stats', authMiddleware, adminMiddleware, (req, res) => {
   res.json({ stats });
 });
 
+// =============== ADS & PUBLIC ROUTES ===============
+
+// Get active ads (public)
+app.get('/api/ads', (req, res) => {
+  const ads = db.getActiveAds();
+  res.json({ ads });
+});
+
+// Get featured families (public)
+app.get('/api/featured-families', (req, res) => {
+  const families = db.getFeaturedFamilies(5);
+  res.json({ families });
+});
+
+// Admin: all ads
+app.get('/api/admin/ads', authMiddleware, adminMiddleware, (req, res) => {
+  const ads = db.getAllAds();
+  res.json({ ads });
+});
+
+// Admin: add ad
+app.post('/api/admin/ads/add', authMiddleware, adminMiddleware, (req, res) => {
+  const { title, image_url, link_url, position } = req.body;
+  if (!title) return res.status(400).json({ error: 'عنوان الإعلان مطلوب' });
+  const ad = db.addAd(title, image_url || '', link_url || '', position || 'banner');
+  res.json({ message: '✅ تم إضافة الإعلان', ad });
+});
+
+// Admin: update ad
+app.post('/api/admin/ads/update', authMiddleware, adminMiddleware, (req, res) => {
+  const { id, title, image_url, link_url, status } = req.body;
+  if (!id) return res.status(400).json({ error: 'معرف الإعلان مطلوب' });
+  const ad = db.updateAd(id, title, image_url || '', link_url || '', status || 'active');
+  res.json({ message: '✅ تم تحديث الإعلان', ad });
+});
+
+// Admin: delete ad
+app.post('/api/admin/ads/delete', authMiddleware, adminMiddleware, (req, res) => {
+  const { id } = req.body;
+  if (!id) return res.status(400).json({ error: 'معرف الإعلان مطلوب' });
+  db.deleteAd(id);
+  res.json({ message: '🗑️ تم حذف الإعلان' });
+});
+
 // =============== FAMILY ROUTES ===============
 
 // Get family info

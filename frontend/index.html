@@ -101,7 +101,83 @@
     <!-- ==================== AUTH PAGES ==================== -->
 
     <!-- Login Page -->
-    <div id="page-login" class="page-content auth-page active">
+    <!-- Landing Page - Visitor View -->
+    <div id="page-landing" class="page-content auth-page active">
+      <!-- Top Auth Buttons -->
+      <div class="landing-auth-bar">
+        <button class="btn btn-accent" onclick="showAuth('login')">🔐 تسجيل الدخول</button>
+        <button class="btn btn-primary" onclick="showAuth('register')">📝 تسجيل</button>
+      </div>
+      <div class="landing-logo">👪</div>
+      <h1 class="landing-title">العائلة</h1>
+      <p class="landing-subtitle">تواصل عائلتنا في كل مكان</p>
+
+      <!-- Ads Slider -->
+      <div class="landing-section">
+        <h3 class="landing-section-title">📢 إعلانات</h3>
+        <div class="ads-slider" id="ads-slider">
+          <div class="empty-state"><div class="empty-text">لا توجد إعلانات</div></div>
+        </div>
+      </div>
+
+      <!-- Featured Families -->
+      <div class="landing-section">
+        <h3 class="landing-section-title">🌟 عوائل مميزة</h3>
+        <div class="featured-families" id="featured-families">
+          <div class="empty-state"><div class="empty-text">لا توجد عوائل بعد</div></div>
+        </div>
+      </div>
+
+      <!-- Premium Packages -->
+      <div class="landing-section">
+        <h3 class="landing-section-title">💎 باقات الرموز المميزة</h3>
+        <div class="pricing-cards">
+          <div class="pricing-card">
+            <div class="pricing-type">🎁 مجاني</div>
+            <div class="pricing-code-example">0X7K9M2F</div>
+            <div class="pricing-price">0 ريال</div>
+            <ul class="pricing-features">
+              <li>✅ رمز عشوائي 8 أحرف</li>
+              <li>✅ تأسيس عائلة واحدة</li>
+            </ul>
+            <button class="btn btn-primary btn-full" onclick="showAuth('register');switchRegTab('found')">ابدأ مجاناً</button>
+          </div>
+          <div class="pricing-card premium">
+            <div class="pricing-type">💎 مميز</div>
+            <div class="pricing-code-example">AAAAAAAA</div>
+            <div class="pricing-price"><span class="price-amount" id="landing-premium-price">200</span> ريال</div>
+            <ul class="pricing-features">
+              <li>✅ رمز مميز 8 أحرف متكررة</li>
+              <li>✅ رمز سهل الحفظ</li>
+            </ul>
+            <button class="btn btn-accent btn-full" onclick="showAuth('register');switchRegTab('found')">اشتري الآن</button>
+          </div>
+          <div class="pricing-card">
+            <div class="pricing-type">👑 مخصص</div>
+            <div class="pricing-code-example">FAMILY88</div>
+            <div class="pricing-price">500 ريال</div>
+            <ul class="pricing-features">
+              <li>✅ رمز مخصص من اختيارك</li>
+              <li>👑 رمز فريد لعائلتك</li>
+            </ul>
+            <button class="btn btn-primary btn-full" onclick="showAuth('register');switchRegTab('found')">تواصل معنا</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Services -->
+      <div class="landing-section">
+        <h3 class="landing-section-title">🕌 خدماتنا</h3>
+        <div class="services-grid">
+          <div class="service-item"><span class="service-icon">🕌</span><span>الديوانية</span><span class="service-desc">غرفة سوالف خاصة بالعائلة</span></div>
+          <div class="service-item"><span class="service-icon">🎮</span><span>الألعاب</span><span class="service-desc">تحديات بين العائلة</span></div>
+          <div class="service-item"><span class="service-icon">🏆</span><span>النقاط</span><span class="service-desc">متصدرون وجوائز</span></div>
+          <div class="service-item"><span class="service-icon">👨‍👩‍👧‍👦</span><span>العائلة</span><span class="service-desc">تواصل وترابط</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="page-login" class="page-content auth-page">
       <div class="auth-logo">👪</div>
       <div class="auth-welcome">مرحباً بعودتك</div>
       <div class="auth-desc">سجل الدخول للتواصل مع عائلتك</div>
@@ -549,7 +625,7 @@ function navigateTo(pageName) {
 
 function toggleHeaderVisibility(pageName) {
   const header = document.getElementById('app-header');
-  if (pageName === 'login' || pageName === 'register') {
+  if (pageName === 'login' || pageName === 'register' || pageName === 'landing' || pageName === 'pricing') {
     if (header) header.style.display = 'none';
     document.querySelector('.main-content').style.paddingTop = '0';
   } else {
@@ -559,6 +635,43 @@ function toggleHeaderVisibility(pageName) {
 }
 
 function showAuth(page) { navigateTo(page); }
+
+async function loadLandingPage() {
+  try {
+    // Load ads
+    const { ads } = await api('GET', '/api/ads');
+    const adsSlider = document.getElementById('ads-slider');
+    if (ads?.length) {
+      adsSlider.innerHTML = ads.map(a =>
+        '<div class="ad-card">' +
+          (a.image_url ? '<img src="' + a.image_url + '" alt="' + (a.title||'') + '" onerror="this.style.display=\'none\'">' : '<div style="height:120px;display:flex;align-items:center;justify-content:center;background:var(--bg-input);border-radius:var(--radius-sm);font-size:40px">📢</div>') +
+          '<div class="ad-title">' + (a.title || '') + '</div>' +
+          (a.link_url ? '<div class="service-desc" style="margin-top:4px">اضغط للمزيد</div>' : '') +
+        '</div>'
+      ).join('');
+    } else {
+      adsSlider.innerHTML = '<div class="empty-state"><div class="empty-text">لا توجد إعلانات</div></div>';
+    }
+  } catch(e) { console.error('Ads error:', e); }
+  
+  try {
+    // Load featured families
+    const { families } = await api('GET', '/api/featured-families');
+    const featuredDiv = document.getElementById('featured-families');
+    if (families?.length) {
+      featuredDiv.innerHTML = families.map(f =>
+        '<div class="family-card-featured">' +
+          '<div class="fc-name">' + (f.name || '') + '</div>' +
+          '<div class="fc-code">' + (f.subscription_code || '') + '</div>' +
+          '<div class="fc-founder">👑 ' + (f.founder_name || '') + '</div>' +
+          '<div class="fc-members">👥 ' + (f.members_count || 0) + ' عضو</div>' +
+        '</div>'
+      ).join('');
+    } else {
+      featuredDiv.innerHTML = '<div class="empty-state"><div class="empty-text">لا توجد عوائل بعد</div></div>';
+    }
+  } catch(e) { console.error('Featured error:', e); }
+}
 
 async function toggleLang() {
   const newLang = i18n.lang === 'ar' ? 'en' : 'ar';

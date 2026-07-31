@@ -64,7 +64,8 @@ async function api(method, path, body = null) {
       showAuth('login');
     }
   } else {
-    showAuth('login');
+    showAuth('landing');
+    loadLandingPage();
   }
 })();
 

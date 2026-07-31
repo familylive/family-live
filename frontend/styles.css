@@ -717,3 +717,145 @@ html.ltr .invitation-status { margin-right: 0; margin-left: auto; }
   font-size: 12px;
   color: var(--text-secondary);
 }
+
+/* ==================== LANDING PAGE ==================== */
+.landing-auth-bar {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  padding: 16px;
+}
+.landing-auth-bar .btn {
+  min-width: 130px;
+}
+.landing-logo {
+  font-size: 64px;
+  text-align: center;
+  margin-top: 12px;
+}
+.landing-title {
+  text-align: center;
+  color: var(--gold);
+  font-size: 34px;
+  font-weight: 900;
+  margin: 8px 0 4px;
+}
+.landing-subtitle {
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 14px;
+  margin-bottom: 20px;
+}
+.landing-section {
+  margin: 16px 0;
+}
+.landing-section-title {
+  color: var(--gold);
+  font-size: 17px;
+  font-weight: 700;
+  margin-bottom: 10px;
+  padding-right: 4px;
+}
+
+/* Ads slider */
+.ads-slider {
+  overflow-x: auto;
+  display: flex;
+  gap: 10px;
+  padding: 4px 0 10px;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+.ad-card {
+  min-width: 85%;
+  max-width: 85%;
+  scroll-snap-align: center;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  text-align: center;
+}
+.ad-card img {
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  margin-bottom: 8px;
+  background: var(--bg-input);
+}
+.ad-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* Featured families */
+.featured-families {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 4px 0 10px;
+  -webkit-overflow-scrolling: touch;
+}
+.family-card-featured {
+  min-width: 130px;
+  background: linear-gradient(135deg, rgba(232,184,48,.1), var(--bg-card));
+  border: 1px solid rgba(232,184,48,.3);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  text-align: center;
+}
+.family-card-featured .fc-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--gold);
+  margin-bottom: 4px;
+}
+.family-card-featured .fc-code {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-family: monospace;
+  letter-spacing: 2px;
+  direction: ltr;
+}
+.family-card-featured .fc-members {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+.family-card-featured .fc-founder {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Services grid */
+.services-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.service-item {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+  text-align: center;
+}
+.service-icon {
+  font-size: 26px;
+  display: block;
+  margin-bottom: 6px;
+}
+.service-item span:nth-child(2) {
+  font-size: 14px;
+  font-weight: 700;
+  display: block;
+  color: var(--text-primary);
+}
+.service-desc {
+  font-size: 11px !important;
+  color: var(--text-muted) !important;
+  font-weight: 400 !important;
+  margin-top: 2px;
+}

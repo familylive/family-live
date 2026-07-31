@@ -128,6 +128,17 @@ function initDb() {
     )
   `);
   db.run(`
+    CREATE TABLE IF NOT EXISTS ads (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      image_url TEXT,
+      link_url TEXT,
+      status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'inactive')),
+      position TEXT NOT NULL DEFAULT 'banner',
+      created_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+  db.run(`
     CREATE TABLE IF NOT EXISTS user_codes (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,
@@ -404,6 +415,38 @@ function createAdminUser(email, password, name = 'مدير التطبيق') {
   return queryOne('SELECT id, name, email, role FROM users WHERE id = ?', [id]);
 }
 
+// =============== ADS FUNCTIONS ===============
+function getActiveAds() {
+  return queryAll("SELECT * FROM ads WHERE status = 'active' ORDER BY created_at DESC");
+}
+function getAllAds() {
+  return queryAll('SELECT * FROM ads ORDER BY created_at DESC');
+}
+function addAd(title, imageUrl, linkUrl, position = 'banner') {
+  const id = uuidv4();
+  run('INSERT INTO ads (id, title, image_url, link_url, position) VALUES (?, ?, ?, ?, ?)', [id, title, imageUrl, linkUrl, position]);
+  return queryOne('SELECT * FROM ads WHERE id = ?', [id]);
+}
+function updateAd(id, title, imageUrl, linkUrl, status) {
+  run('UPDATE ads SET title = ?, image_url = ?, link_url = ?, status = ? WHERE id = ?', [title, imageUrl, linkUrl, status, id]);
+  return queryOne('SELECT * FROM ads WHERE id = ?', [id]);
+}
+function deleteAd(id) {
+  run('DELETE FROM ads WHERE id = ?', [id]);
+  return true;
+}
+function getFeaturedFamilies(limit = 5) {
+  return queryAll(`
+    SELECT f.id, f.name, f.subscription_code, 
+      (SELECT COUNT(*) FROM users WHERE family_id = f.id) as members_count,
+      u.name as founder_name
+    FROM families f
+    LEFT JOIN users u ON f.founder_id = u.id
+    WHERE f.status = 'active'
+    ORDER BY members_count DESC LIMIT ?
+  `, [limit]);
+}
+
 function getAdminStats() {
   const families = queryOne('SELECT COUNT(*) as c FROM families');
   const users = queryOne('SELECT COUNT(*) as c FROM users');
@@ -471,4 +514,5 @@ module.exports = {
   generatePremiumCode, getAvailablePremiumCodes, purchaseCode, getUserCodes, userHasFamily, updatePassword,
   updatePrice, getFirstAvailablePremiumCode,
   getAllFamilies, updateFamilyData, setFamilyStatus, deleteFamily, createAdminUser, getAdminStats,
+  getActiveAds, getAllAds, addAd, updateAd, deleteAd, getFeaturedFamilies,
 };
