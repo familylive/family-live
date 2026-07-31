@@ -366,7 +366,7 @@ function createUser(name, email, password, familyId, role = 'member') {
 }
 
 function getUserByEmail(email) {
-  return queryOne('SELECT * FROM users WHERE email = ?', [email]);
+  return queryOne('SELECT * FROM users WHERE email = ? COLLATE NOCASE', [email]);
 }
 
 function getUserById(id) {
@@ -1064,7 +1064,7 @@ function leaveFamily(userId) {
 }
 
 function createUserByRole(email, password, name, role) {
-  const existing = queryOne('SELECT * FROM users WHERE email = ?', [email]);
+  const existing = queryOne('SELECT * FROM users WHERE email = ? COLLATE NOCASE', [email]);
   if (existing) return existing;
   const id = uuidv4();
   run("INSERT INTO users (id, name, email, password, role) VALUES (?, ?, ?, ?, ?)", [id, name, email, password, role]);
