@@ -1719,3 +1719,51 @@ body {
 .tile-state.muted-state {
   color: #ff6b5a;
 }
+
+/* Auctions 2-column grid */
+.auctions-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.auctions-grid .auction-card {
+  padding: 10px;
+  margin-bottom: 0;
+}
+.auctions-grid .auction-code {
+  font-size: 13px;
+  letter-spacing: 1px;
+}
+.auctions-grid .auction-timer {
+  font-size: 18px;
+  margin: 4px 0;
+}
+.auctions-grid .auction-price {
+  font-size: 13px;
+}
+.auctions-grid .current-price {
+  font-size: 16px;
+}
+.auctions-grid .auction-meta {
+  font-size: 10px;
+  flex-direction: column;
+  gap: 2px;
+  margin: 4px 0;
+}
+.auctions-grid .bid-row {
+  flex-direction: column;
+  gap: 4px;
+}
+.auctions-grid .btn {
+  font-size: 11px;
+  padding: 6px;
+}
+.auctions-grid .form-input {
+  font-size: 12px;
+  padding: 6px;
+  width: 100%;
+}
+.auctions-grid .auction-bids {
+  max-height: 80px;
+  font-size: 11px;
+}

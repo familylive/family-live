@@ -192,6 +192,26 @@
               <li>👑 رمز فريد لعائلتك</li>
             </ul>
           </div>
+          <div class="pricing-card">
+            <div class="pricing-type">👥 زيادة الأعضاء</div>
+            <div class="pricing-code-example">20 عضو</div>
+            <div class="pricing-price">50 ريال</div>
+            <ul class="pricing-features">
+              <li>✅ توسعة الديوانية إلى 20 عضو</li>
+              <li>✅ من 15 إلى 20</li>
+            </ul>
+            <button class="btn btn-accent btn-full" onclick="landingCapacityClick()">💳 شراء</button>
+          </div>
+          <div class="pricing-card">
+            <div class="pricing-type">👥 زيادة الأعضاء</div>
+            <div class="pricing-code-example">40 عضو</div>
+            <div class="pricing-price">100 ريال</div>
+            <ul class="pricing-features">
+              <li>✅ توسعة الديوانية إلى 40 عضو</li>
+              <li>✅ من 15 إلى 40</li>
+            </ul>
+            <button class="btn btn-accent btn-full" onclick="landingCapacityClick()">💳 شراء</button>
+          </div>
           <div class="pricing-card" style="grid-column:span 2;background:linear-gradient(135deg,rgba(59,130,196,.08),var(--bg-card))">
             <div class="pricing-type">🔐 للبدء</div>
             <div class="pricing-price" style="font-size:16px;color:var(--text-secondary)">سجل حسابك للانضمام أو تأسيس عائلة</div>
@@ -1391,6 +1411,19 @@ async function loadLandingAuctions() {
       '</div>';
     }).join('');
   } catch(e) { console.error('Landing auctions:', e); }
+}
+
+function landingCapacityClick() {
+  if (state.isLoggedIn) {
+    navigateTo('diwaniya');
+    setTimeout(() => {
+      const pkgs = document.getElementById('capacity-packages');
+      if (pkgs) pkgs.style.display = 'block';
+    }, 500);
+  } else {
+    showToast('📝 سجل دخول أولاً لشراء باقة', 'success');
+    setTimeout(() => showAuth('login'), 600);
+  }
 }
 
 function landingBidClick() {
@@ -2866,7 +2899,8 @@ async function loadAuctionsPage() {
       list.innerHTML = '<div class="empty-state"><div class="empty-text">لا توجد مزادات نشطة حالياً</div></div>';
       return;
     }
-    list.innerHTML = auctions.map(a => {
+    const visible = auctions.slice(0, 4);
+    list.innerHTML = '<div class="auctions-grid">' + visible.map(a => {
       const end = new Date(a.end_time).getTime();
       return '<div class="auction-card">' +
         '<div class="auction-header">' +
@@ -2890,10 +2924,10 @@ async function loadAuctionsPage() {
           '</div>' +
         '</div>' +
       '</div>';
-    }).join('');
+    }).join('') + '</div>';
     
     // Load bid history for each auction
-    auctions.forEach(a => loadBidHistory(a.id));
+    visible.forEach(a => loadBidHistory(a.id));
     
     // Start timers
     document.querySelectorAll('.auction-timer').forEach(el => {
