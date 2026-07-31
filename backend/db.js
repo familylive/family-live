@@ -139,6 +139,45 @@ function initDb() {
     )
   `);
   db.run(`
+    CREATE TABLE IF NOT EXISTS auctions (
+      id TEXT PRIMARY KEY,
+      code TEXT NOT NULL,
+      starting_price INTEGER NOT NULL DEFAULT 100,
+      entry_fee INTEGER NOT NULL DEFAULT 50,
+      current_price INTEGER NOT NULL DEFAULT 100,
+      min_increment INTEGER NOT NULL DEFAULT 10,
+      start_time TEXT DEFAULT (datetime('now')),
+      end_time TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'ended', 'cancelled')),
+      winner_id TEXT,
+      paid INTEGER DEFAULT 0,
+      created_by TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+  db.run(`
+    CREATE TABLE IF NOT EXISTS auction_bids (
+      id TEXT PRIMARY KEY,
+      auction_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      amount INTEGER NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (auction_id) REFERENCES auctions(id),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  `);
+  db.run(`
+    CREATE TABLE IF NOT EXISTS auction_participants (
+      id TEXT PRIMARY KEY,
+      auction_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      paid_entry INTEGER DEFAULT 1,
+      joined_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (auction_id) REFERENCES auctions(id),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  `);
+  db.run(`
     CREATE TABLE IF NOT EXISTS user_codes (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,
@@ -447,6 +486,139 @@ function getFeaturedFamilies(limit = 5) {
   `, [limit]);
 }
 
+// =============== AUCTION FUNCTIONS ===============
+function createAuction(code, startingPrice, entryFee, durationMinutes, minIncrement, createdBy) {
+  // Check code exists and is not already used in another auction
+  const codeCheck = queryOne('SELECT * FROM subscription_codes WHERE code = ?', [code]);
+  if (!codeCheck) {
+    // Create the premium code if it doesn't exist
+    run("INSERT INTO subscription_codes (code, type, price) VALUES (?, 'premium', ?)", [code, startingPrice]);
+  } else if (codeCheck.used == 1) {
+    return { error: 'هذا الرمز مستخدم مسبقاً، اختر رمزاً آخر' };
+  }
+  
+  // Check code not in another active auction
+  const inAuction = queryOne("SELECT * FROM auctions WHERE code = ? AND status = 'active'", [code]);
+  if (inAuction) return { error: 'هذا الرمز في مزاد نشط بالفعل' };
+  
+  const id = uuidv4();
+  const endTime = new Date(Date.now() + durationMinutes * 60000).toISOString();
+  run('INSERT INTO auctions (id, code, starting_price, entry_fee, current_price, min_increment, end_time, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    [id, code, startingPrice, entryFee, startingPrice, minIncrement, endTime, createdBy]);
+  // Mark code as reserved (used in auction)
+  run("UPDATE subscription_codes SET used = 1 WHERE code = ?", [code]);
+  return queryOne('SELECT * FROM auctions WHERE id = ?', [id]);
+}
+
+function getActiveAuctions() {
+  const now = new Date().toISOString();
+  // Auto-end expired auctions
+  run("UPDATE auctions SET status = 'ended' WHERE status = 'active' AND end_time < ?", [now]);
+  return queryAll(`
+    SELECT a.*, u.name as winner_name
+    FROM auctions a
+    LEFT JOIN users u ON a.winner_id = u.id
+    WHERE a.status = 'active'
+    ORDER BY a.created_at DESC
+  `);
+}
+
+function getAllAuctions() {
+  return queryAll(`
+    SELECT a.*, u.name as winner_name
+    FROM auctions a
+    LEFT JOIN users u ON a.winner_id = u.id
+    ORDER BY a.created_at DESC LIMIT 30
+  `);
+}
+
+function getAuctionById(id) {
+  return queryOne(`
+    SELECT a.*, u.name as winner_name
+    FROM auctions a
+    LEFT JOIN users u ON a.winner_id = u.id
+    WHERE a.id = ?
+  `, [id]);
+}
+
+function joinAuction(auctionId, userId) {
+  // Check if already joined
+  const existing = queryOne('SELECT * FROM auction_participants WHERE auction_id = ? AND user_id = ?', [auctionId, userId]);
+  if (existing) return { joined: true };
+  const auction = queryOne("SELECT * FROM auctions WHERE id = ? AND status = 'active'", [auctionId]);
+  if (!auction) return { error: 'المزاد غير متاح' };
+  // Deduct entry fee (simulated payment - in production, real payment)
+  run('INSERT INTO auction_participants (id, auction_id, user_id, paid_entry) VALUES (?, ?, ?, 1)', [uuidv4(), auctionId, userId]);
+  return { joined: true, entry_fee: auction.entry_fee };
+}
+
+function placeBid(auctionId, userId, amount) {
+  const auction = queryOne("SELECT * FROM auctions WHERE id = ? AND status = 'active'", [auctionId]);
+  if (!auction) return { error: 'المزاد غير متاح' };
+  const now = new Date().toISOString();
+  if (auction.end_time <= now) {
+    // End auction
+    run("UPDATE auctions SET status = 'ended', winner_id = ? WHERE id = ?", [auction.winner_id, auctionId]);
+    return { error: 'انتهى المزاد' };
+  }
+  if (amount < auction.current_price + auction.min_increment) {
+    return { error: 'المبلغ أقل من الحد الأدنى للمزايدة (' + (auction.current_price + auction.min_increment) + ' ريال)' };
+  }
+  // Check participant
+  const participant = queryOne('SELECT * FROM auction_participants WHERE auction_id = ? AND user_id = ?', [auctionId, userId]);
+  if (!participant) return { error: 'يجب دفع رسوم الدخول أولاً للمشاركة' };
+  
+  run('INSERT INTO auction_bids (id, auction_id, user_id, amount) VALUES (?, ?, ?, ?)', [uuidv4(), auctionId, userId, amount]);
+  run('UPDATE auctions SET current_price = ? WHERE id = ?', [amount, auctionId]);
+  return getAuctionById(auctionId);
+}
+
+function endAuction(auctionId) {
+  const auction = queryOne("SELECT * FROM auctions WHERE id = ? AND status = 'active'", [auctionId]);
+  if (!auction) return null;
+  // Winner = last bidder
+  const lastBid = queryOne('SELECT * FROM auction_bids WHERE auction_id = ? ORDER BY created_at DESC, amount DESC LIMIT 1', [auctionId]);
+  const winnerId = lastBid ? lastBid.user_id : null;
+  run("UPDATE auctions SET status = 'ended', winner_id = ? WHERE id = ?", [winnerId, auctionId]);
+  // If no winner, free the code
+  if (!winnerId) {
+    run('UPDATE subscription_codes SET used = 0 WHERE code = ?', [auction.code]);
+  }
+  return getAuctionById(auctionId);
+}
+
+function confirmAuctionPayment(auctionId) {
+  run('UPDATE auctions SET paid = 1 WHERE id = ?', [auctionId]);
+  const auction = getAuctionById(auctionId);
+  // Give winner the code
+  if (auction && auction.winner_id && auction.paid) {
+    run('INSERT OR IGNORE INTO user_codes (id, user_id, code, type) VALUES (?, ?, ?, ?)', [uuidv4(), auction.winner_id, auction.code, 'premium']);
+  }
+  return auction;
+}
+
+function cancelAuction(auctionId) {
+  const auction = queryOne('SELECT * FROM auctions WHERE id = ?', [auctionId]);
+  run("UPDATE auctions SET status = 'cancelled' WHERE id = ?", [auctionId]);
+  // Free the code for reuse
+  if (auction) run('UPDATE subscription_codes SET used = 0 WHERE code = ?', [auction.code]);
+  return getAuctionById(auctionId);
+}
+
+function getAuctionBids(auctionId) {
+  return queryAll(`
+    SELECT ab.*, u.name as user_name
+    FROM auction_bids ab
+    JOIN users u ON ab.user_id = u.id
+    WHERE ab.auction_id = ?
+    ORDER BY ab.created_at DESC, ab.amount DESC
+  `, [auctionId]);
+}
+
+function isAuctionParticipant(auctionId, userId) {
+  return queryOne('SELECT * FROM auction_participants WHERE auction_id = ? AND user_id = ?', [auctionId, userId]);
+}
+
 function getAdminStats() {
   const families = queryOne('SELECT COUNT(*) as c FROM families');
   const users = queryOne('SELECT COUNT(*) as c FROM users');
@@ -515,4 +687,6 @@ module.exports = {
   updatePrice, getFirstAvailablePremiumCode,
   getAllFamilies, updateFamilyData, setFamilyStatus, deleteFamily, createAdminUser, getAdminStats,
   getActiveAds, getAllAds, addAd, updateAd, deleteAd, getFeaturedFamilies,
+  createAuction, getActiveAuctions, getAllAuctions, getAuctionById, joinAuction, placeBid,
+  endAuction, confirmAuctionPayment, cancelAuction, getAuctionBids, isAuctionParticipant,
 };

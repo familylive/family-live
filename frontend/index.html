@@ -84,6 +84,9 @@
       <div class="menu-nav-item" data-page="codes" onclick="navigateTo('codes');toggleMenu()">
         <span class="nav-icon">🔑</span> رموزي
       </div>
+      <div class="menu-nav-item" data-page="auctions" onclick="navigateTo('auctions');toggleMenu()">
+        <span class="nav-icon">🏷️</span> المزادات
+      </div>
       <div class="menu-nav-item" id="menu-admin" data-page="admin" onclick="navigateTo('admin');toggleMenu()" style="display:none">
         <span class="nav-icon">⚙️</span> لوحة الإدارة
       </div>
@@ -552,11 +555,55 @@
       </div>
     </div>
 
+    <!-- Auctions Page -->
+    <div id="page-auctions" class="page-content">
+      <div class="page-title">🏷️ مزادات الرموز المميزة</div>
+      <div class="page-subtitle">مزاد علني على رموز مميزة - آخر مزايد يفوز</div>
+      
+      <div id="auctions-list">
+        <div class="empty-state"><div class="empty-text">لا توجد مزادات حالياً</div></div>
+      </div>
+    </div>
+
     <!-- Admin Page - لوحة الإدارة -->
     <div id="page-admin" class="page-content">
       <div class="page-title">⚙️ لوحة الإدارة</div>
       <div class="page-subtitle">إدارة جميع العوائل</div>
       
+      <div class="card" id="admin-auction-section">
+        <div class="card-title">🏷️ فتح مزاد جديد</div>
+        <div class="form-group">
+          <label>رمز الرمز المميز (مثال: AAAAAAAA)</label>
+          <input class="form-input" id="auction-code" type="text" dir="ltr" style="letter-spacing:3px;text-transform:uppercase">
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <div class="form-group" style="flex:1;min-width:100px">
+            <label>سعر البداية (ريال)</label>
+            <input class="form-input" id="auction-starting" type="number" value="100" min="10">
+          </div>
+          <div class="form-group" style="flex:1;min-width:100px">
+            <label>رسوم الدخول (ريال)</label>
+            <input class="form-input" id="auction-entry" type="number" value="50" min="10">
+          </div>
+          <div class="form-group" style="flex:1;min-width:100px">
+            <label>المدة (دقائق)</label>
+            <input class="form-input" id="auction-duration" type="number" value="30" min="5">
+          </div>
+          <div class="form-group" style="flex:1;min-width:100px">
+            <label>أقل زيادة (ريال)</label>
+            <input class="form-input" id="auction-increment" type="number" value="10" min="5">
+          </div>
+        </div>
+        <button class="btn btn-accent btn-full" onclick="createAuction()">🏷️ فتح المزاد</button>
+      </div>
+
+      <div class="card" id="admin-auctions-list-card">
+        <div class="card-title">📋 كل المزادات</div>
+        <div id="admin-auctions-list">
+          <div class="empty-state"><div class="empty-text">لا توجد مزادات</div></div>
+        </div>
+      </div>
+
       <div class="card">
         <div class="card-title">👨‍👩‍👧‍👦 جميع العوائل <span id="admin-families-count" class="badge"></span></div>
         <div id="admin-families-list">
@@ -626,7 +673,8 @@ function navigateTo(pageName) {
   
   // Load page-specific data
   if (pageName === 'codes' && state.isLoggedIn) loadCodesPage();
-  if (pageName === 'admin' && state.user?.role === 'admin') loadAdminPage();
+  if (pageName === 'auctions' && state.isLoggedIn) loadAuctionsPage();
+  if (pageName === 'admin' && state.user?.role === 'admin') { loadAdminPage(); loadAdminAuctions(); }
 }
 
 function toggleHeaderVisibility(pageName) {
@@ -939,3 +987,135 @@ function showToast(message, type) {
 </script>
 </body>
 </html>
+<script>
+// ==================== AUCTIONS ====================
+let auctionTimers = {};
+
+async function loadAuctionsPage() {
+  try {
+    const { auctions } = await api('GET', '/api/auctions/active');
+    const list = document.getElementById('auctions-list');
+    if (!auctions?.length) {
+      list.innerHTML = '<div class="empty-state"><div class="empty-text">لا توجد مزادات نشطة حالياً</div></div>';
+      return;
+    }
+    list.innerHTML = auctions.map(a => {
+      const end = new Date(a.end_time).getTime();
+      return '<div class="auction-card">' +
+        '<div class="auction-header">' +
+          '<span class="auction-code">🏷️ ' + a.code + '</span>' +
+          '<span class="auction-live">🔴 مزاد مباشر</span>' +
+        '</div>' +
+        '<div class="auction-timer" data-end="' + end + '" data-id="' + a.id + '">' +
+          '<span class="timer-icon">⏱️</span> <span class="countdown">--:--</span>' +
+        '</div>' +
+        '<div class="auction-price">💰 <span class="current-price">' + (a.current_price || a.starting_price) + '</span> ريال</div>' +
+        '<div class="auction-meta">' +
+          '<span>رسوم الدخول: ' + a.entry_fee + ' ريال</span>' +
+          '<span>أقل زيادة: ' + (a.min_increment || 10) + ' ريال</span>' +
+        '</div>' +
+        '<div class="auction-actions">' +
+          '<button class="btn btn-accent btn-full" onclick="joinAuction(\'' + a.id + '\')">🎟️ دخول المزاد</button>' +
+          '<div class="bid-row">' +
+            '<input type="number" class="form-input" id="bid-' + a.id + '" placeholder="مبلغك" min="' + ((a.current_price||a.starting_price) + (a.min_increment||10)) + '">' +
+            '<button class="btn btn-primary" onclick="placeBid(\'' + a.id + '\')">💥 مزايدة</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+    
+    // Start timers
+    document.querySelectorAll('.auction-timer').forEach(el => {
+      const id = el.dataset.id;
+      const end = parseInt(el.dataset.end);
+      if (auctionTimers[id]) clearInterval(auctionTimers[id]);
+      auctionTimers[id] = setInterval(() => {
+        const now = Date.now();
+        const diff = Math.max(0, end - now);
+        const m = Math.floor(diff / 60000);
+        const s = Math.floor((diff % 60000) / 1000);
+        el.querySelector('.countdown').textContent = String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+        if (diff <= 0) {
+          clearInterval(auctionTimers[id]);
+          el.querySelector('.countdown').textContent = 'انتهى';
+          loadAuctionsPage();
+        }
+      }, 1000);
+    });
+  } catch(e) { console.error('Auctions error:', e); }
+}
+
+async function joinAuction(auctionId) {
+  if (!confirm('دفع رسوم دخول المزاد؟ (محاكاة دفع)')) return;
+  try {
+    const result = await api('POST', '/api/auctions/join', { auctionId });
+    showToast(result.message, 'success');
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function placeBid(auctionId) {
+  const input = document.getElementById('bid-' + auctionId);
+  const amount = parseInt(input.value);
+  if (!amount) return showToast('أدخل مبلغ المزايدة', 'error');
+  try {
+    const result = await api('POST', '/api/auctions/bid', { auctionId, amount });
+    showToast(result.message, 'success');
+    loadAuctionsPage();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function createAuction() {
+  const code = document.getElementById('auction-code').value.trim().toUpperCase();
+  const startingPrice = parseInt(document.getElementById('auction-starting').value);
+  const entryFee = parseInt(document.getElementById('auction-entry').value);
+  const durationMinutes = parseInt(document.getElementById('auction-duration').value);
+  const minIncrement = parseInt(document.getElementById('auction-increment').value);
+  if (!code) return showToast('أدخل رمز الرمز المميز', 'error');
+  try {
+    const result = await api('POST', '/api/admin/auctions/create', { code, startingPrice, entryFee, durationMinutes, minIncrement });
+    showToast(result.message, 'success');
+    loadAdminAuctions();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function loadAdminAuctions() {
+  try {
+    const { auctions } = await api('GET', '/api/admin/auctions');
+    const list = document.getElementById('admin-auctions-list');
+    if (!auctions?.length) {
+      list.innerHTML = '<div class="empty-state"><div class="empty-text">لا توجد مزادات</div></div>';
+      return;
+    }
+    list.innerHTML = auctions.map(a => {
+      const statusLabel = { active:'🟢 نشط', ended:'🏁 منتهي', cancelled:'❌ ملغي' }[a.status] || a.status;
+      return '<div class="admin-family-item">' +
+        '<div class="admin-family-name">🏷️ ' + a.code + ' <span style="font-size:12px;color:var(--text-muted)">' + statusLabel + '</span></div>' +
+        '<div class="admin-family-meta">' +
+          '💰 ' + (a.current_price||a.starting_price) + ' ريال · 🎟️ دخول: ' + a.entry_fee + ' ريال · ⏱️ ' + a.min_increment + ' ريال زيادة' +
+          (a.winner_name ? ' · 🏆 ' + a.winner_name : '') +
+          (a.paid ? ' · ✅ مسدد' : '') +
+        '</div>' +
+        '<div class="admin-family-actions">' +
+          (a.status === 'active' ? '<button class="btn btn-sm btn-danger" onclick="endAuctionAdmin(\'' + a.id + '\')">🏁 إنهاء</button>' : '') +
+          (a.status === 'ended' && a.winner_id && !a.paid ? '<button class="btn btn-sm btn-success" onclick="confirmPaymentAdmin(\'' + a.id + '\')">💰 تأكيد السداد</button>' : '') +
+          (a.status === 'active' ? '<button class="btn btn-sm btn-danger" onclick="cancelAuctionAdmin(\'' + a.id + '\')">❌ إلغاء</button>' : '') +
+        '</div>' +
+      '</div>';
+    }).join('');
+  } catch(e) { console.error('Admin auctions:', e); }
+}
+
+async function endAuctionAdmin(id) {
+  try { const r = await api('POST', '/api/admin/auctions/end', { auctionId: id }); showToast(r.message, 'success'); loadAdminAuctions(); }
+  catch(e) { showToast(e.message, 'error'); }
+}
+async function confirmPaymentAdmin(id) {
+  try { const r = await api('POST', '/api/admin/auctions/confirm-payment', { auctionId: id }); showToast(r.message, 'success'); loadAdminAuctions(); }
+  catch(e) { showToast(e.message, 'error'); }
+}
+async function cancelAuctionAdmin(id) {
+  if (!confirm('إلغاء المزاد؟ سيتم تحرير الرمز')) return;
+  try { const r = await api('POST', '/api/admin/auctions/cancel', { auctionId: id }); showToast(r.message, 'success'); loadAdminAuctions(); }
+  catch(e) { showToast(e.message, 'error'); }
+}
+</script>

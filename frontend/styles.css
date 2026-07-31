@@ -978,3 +978,71 @@ body {
   background: var(--gold);
   color: #fff;
 }
+
+/* ===== Auctions ===== */
+.auction-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 2px 10px rgba(45,42,36,.05);
+}
+.auction-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.auction-code {
+  font-size: 18px;
+  font-weight: 900;
+  font-family: 'Courier New', monospace;
+  letter-spacing: 3px;
+  color: var(--gold);
+  direction: ltr;
+}
+.auction-live {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--danger);
+  background: rgba(231,76,60,.1);
+  padding: 3px 10px;
+  border-radius: 12px;
+  animation: pulse 1.5s infinite;
+}
+.auction-timer {
+  text-align: center;
+  font-size: 36px;
+  font-weight: 900;
+  color: var(--gold);
+  font-variant-numeric: tabular-nums;
+  margin: 8px 0;
+  direction: ltr;
+}
+.auction-price {
+  text-align: center;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 4px 0;
+}
+.auction-price .current-price {
+  color: var(--gold);
+  font-size: 26px;
+}
+.auction-meta {
+  display: flex;
+  justify-content: space-around;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 8px 0;
+}
+.bid-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.bid-row .form-input {
+  flex: 1;
+}

@@ -351,6 +351,81 @@ app.post('/api/admin/ads/delete', authMiddleware, adminMiddleware, (req, res) =>
   res.json({ message: '🗑️ تم حذف الإعلان' });
 });
 
+// =============== AUCTIONS ROUTES ===============
+
+// Get active auctions (logged in users)
+app.get('/api/auctions/active', authMiddleware, (req, res) => {
+  const auctions = db.getActiveAuctions();
+  res.json({ auctions });
+});
+
+// Get auction details with bids
+app.get('/api/auctions/:id', authMiddleware, (req, res) => {
+  const auction = db.getAuctionById(req.params.id);
+  if (!auction) return res.status(404).json({ error: 'المزاد غير موجود' });
+  const bids = db.getAuctionBids(req.params.id);
+  const participated = !!db.isAuctionParticipant(req.params.id, req.user.id);
+  res.json({ auction, bids, participated });
+});
+
+// Join auction (pay entry fee - simulated)
+app.post('/api/auctions/join', authMiddleware, (req, res) => {
+  const { auctionId } = req.body;
+  if (!auctionId) return res.status(400).json({ error: 'معرف المزاد مطلوب' });
+  const result = db.joinAuction(auctionId, req.user.id);
+  if (result.error) return res.status(400).json(result);
+  res.json({ message: '✅ تم الدخول للمزاد (رسوم الدخول: ' + result.entry_fee + ' ريال)', joined: true });
+});
+
+// Place bid
+app.post('/api/auctions/bid', authMiddleware, (req, res) => {
+  const { auctionId, amount } = req.body;
+  if (!auctionId || !amount) return res.status(400).json({ error: 'المزاد والمبلغ مطلوبان' });
+  const result = db.placeBid(auctionId, req.user.id, parseInt(amount));
+  if (result.error) return res.status(400).json(result);
+  res.json({ message: '✅ تمت المزايدة: ' + amount + ' ريال', auction: result });
+});
+
+// Admin: create auction
+app.post('/api/admin/auctions/create', authMiddleware, adminMiddleware, (req, res) => {
+  const { code, startingPrice, entryFee, durationMinutes, minIncrement } = req.body;
+  if (!code || !startingPrice || !entryFee || !durationMinutes) {
+    return res.status(400).json({ error: 'جميع الحقول مطلوبة' });
+  }
+  const auction = db.createAuction(code, parseInt(startingPrice), parseInt(entryFee), parseInt(durationMinutes), parseInt(minIncrement || 10), req.user.id);
+  res.json({ message: '🏷️ تم فتح المزاد', auction });
+});
+
+// Admin: all auctions
+app.get('/api/admin/auctions', authMiddleware, adminMiddleware, (req, res) => {
+  const auctions = db.getAllAuctions();
+  res.json({ auctions });
+});
+
+// Admin: end auction
+app.post('/api/admin/auctions/end', authMiddleware, adminMiddleware, (req, res) => {
+  const { auctionId } = req.body;
+  const auction = db.endAuction(auctionId);
+  if (!auction) return res.status(400).json({ error: 'المزاد غير متاح' });
+  res.json({ message: '🏁 تم إنهاء المزاد', auction });
+});
+
+// Admin: confirm payment
+app.post('/api/admin/auctions/confirm-payment', authMiddleware, adminMiddleware, (req, res) => {
+  const { auctionId } = req.body;
+  const auction = db.confirmAuctionPayment(auctionId);
+  if (!auction) return res.status(400).json({ error: 'المزاد غير موجود' });
+  res.json({ message: '💰 تم تأكيد السداد، وحصل الفائز على الرمز', auction });
+});
+
+// Admin: cancel auction
+app.post('/api/admin/auctions/cancel', authMiddleware, adminMiddleware, (req, res) => {
+  const { auctionId } = req.body;
+  const auction = db.cancelAuction(auctionId);
+  if (!auction) return res.status(400).json({ error: 'المزاد غير موجود' });
+  res.json({ message: '❌ تم إلغاء المزاد', auction });
+});
+
 // =============== FAMILY ROUTES ===============
 
 // Get family info
