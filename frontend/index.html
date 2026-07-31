@@ -464,6 +464,7 @@
       </div>
       <div class="card">
         <div class="card-title">👥 الأعضاء (<span id="members-count">0</span>)</div>
+        <button class="btn btn-accent btn-full" id="invite-all-btn" onclick="notifyAllMembers()" style="margin-bottom:10px">🔔 دعوة جميع الأعضاء للتواجد</button>
         <div id="members-list"><div class="empty-state"><div class="empty-text">لا يوجد أعضاء بعد</div></div></div>
       </div>
       <div class="card" id="invite-section" style="display:none">
@@ -745,6 +746,13 @@
         <div class="card-title">📋 كل المزادات</div>
         <div id="admin-auctions-list">
           <div class="empty-state"><div class="empty-text">لا توجد مزادات</div></div>
+        </div>
+      </div>
+
+      <div class="card" id="admin-online-card">
+        <div class="card-title">🟢 العوائل المتواجدة أونلاين</div>
+        <div id="admin-online-list">
+          <div class="empty-state"><div class="empty-text">جاري التحميل...</div></div>
         </div>
       </div>
 
@@ -1070,6 +1078,7 @@ let editingFamilyId = null;
 
 async function loadAdminPage() {
   loadAdminAds();
+  loadAdminOnline();
   try {
     // Load stats
     const { stats } = await api('GET', '/api/admin/stats');
@@ -1325,6 +1334,78 @@ async function leaveFamily() {
     updateAllUI();
     navigateTo('dashboard');
   } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function notifyAllMembers() {
+  if (!state.family?.id) return showToast('لا يوجد عائلة', 'error');
+  if (!confirm('🔔 إرسال تنبيه لجميع أعضاء العائلة بالتواجد؟')) return;
+  const message = '📍 ' + (state.user?.name || '') + ' يدعوكم للتواجد الآن';
+  if (socket?.connected) {
+    socket.emit('family_notify', { familyId: state.family.id, message, title: '🔔 دعوة للتواجد' });
+    showToast('🔔 تم إرسال التنبيه لجميع الأعضاء', 'success');
+  } else {
+    showToast('الاتصال غير متاح', 'error');
+  }
+}
+
+function showFamilyNotification(title, message) {
+  // Play notification sound
+  playNotificationSound();
+  // Show banner
+  let banner = document.getElementById('family-notify-banner');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'family-notify-banner';
+    banner.className = 'family-notify-banner';
+    document.body.appendChild(banner);
+  }
+  banner.innerHTML = '<div class="notify-icon">🔔</div><div><div class="notify-title">' + (title || 'تنبيه') + '</div><div class="notify-msg">' + (message || '') + '</div></div>';
+  banner.classList.add('show');
+  clearTimeout(banner._t);
+  banner._t = setTimeout(() => banner.classList.remove('show'), 8000);
+}
+
+function playNotificationSound() {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    const ctx = new AudioCtx();
+    // Play a pleasant notification tone (3 beeps)
+    [0, 0.3, 0.6].forEach(t => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = 880;
+      osc.type = 'sine';
+      gain.gain.setValueAtTime(0.3, ctx.currentTime + t);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.2);
+      osc.start(ctx.currentTime + t);
+      osc.stop(ctx.currentTime + t + 0.25);
+    });
+  } catch(e) { console.error('Sound error:', e); }
+}
+
+async function loadAdminOnline() {
+  try {
+    const { families } = await api('GET', '/api/admin/online');
+    const list = document.getElementById('admin-online-list');
+    if (!families?.length) {
+      list.innerHTML = '<div class="empty-state"><div class="empty-text">لا توجد عوائل</div></div>';
+      return;
+    }
+    list.innerHTML = families.map(f => {
+      const onlineMembers = f.members?.filter(m => m.online) || [];
+      return '<div class="admin-family-item">' +
+        '<div class="admin-family-name">' + (f.name || '') + ' ' +
+          '<span class="online-status ' + (onlineMembers.length > 0 ? 'online' : 'offline') + '">' + (onlineMembers.length > 0 ? '● ' + onlineMembers.length + ' متصل' : '○ غير متصل') + '</span></div>' +
+        '<div class="admin-family-meta">' +
+          (onlineMembers.length > 0
+            ? '🟢 ' + onlineMembers.map(m => m.name || 'عضو').join('، ')
+            : 'لا يوجد أعضاء متصلون حالياً') +
+        '</div>' +
+      '</div>';
+    }).join('');
+  } catch(e) { console.error('Admin online:', e); }
 }
 
 async function loadAuctionsPage() {

@@ -181,6 +181,7 @@ async function loadApp(user, family) {
   } catch (e) { console.error('Load error:', e); }
   updateAllUI();
   connectSocket();
+  loadOnlineStatus();
   // Admin goes directly to admin panel
   navigateTo(user.role === 'admin' ? 'admin' : 'dashboard');
 }
@@ -314,6 +315,21 @@ function connectSocket() {
     stopDiwaniyaTimer(); enableChat(false);
     document.getElementById('diwaniya-toggle-btn').textContent = '🔓 فتح الديوانية';
     document.getElementById('stat-diwaniya').textContent = '🔴 متوقفة';
+  });
+  socket.on('user_online', (data) => {
+    if (state.family?.id && state.onlineMembers) {
+      if (!state.onlineMembers.includes(data.userId)) state.onlineMembers.push(data.userId);
+      updateMembersList();
+    }
+  });
+  socket.on('user_offline', (data) => {
+    if (state.onlineMembers) {
+      state.onlineMembers = state.onlineMembers.filter(id => id !== data.userId);
+      updateMembersList();
+    }
+  });
+  socket.on('family_notification', (data) => {
+    showFamilyNotification(data.title, data.message);
   });
   socket.on('diwaniya_message', (msg) => addChatMessage(msg.user_name, msg.message, msg.user_id === state.user?.id));
   socket.on('diwaniya_audio', (msg) => addAudioMessage(msg.user_name, msg.audio, msg.audioType, msg.user_id === state.user?.id));
@@ -468,11 +484,24 @@ function updateMembersList() {
     document.getElementById('members-count').textContent = '0'; return;
   }
   document.getElementById('members-count').textContent = state.members.length;
-  list.innerHTML = state.members.map(m =>
-    '<div class="member-item"><div class="member-avatar">' + (m.avatar || m.name?.charAt(0) || '👤') +
-    '</div><div class="member-info"><div class="member-name">' + (m.name || '') + '</div>' +
-    (m.role === 'founder' ? '<span class="member-role-tag">المؤسس</span>' : '') + '</div></div>'
-  ).join('');
+  const onlineIds = state.onlineMembers || [];
+  list.innerHTML = state.members.map(m => {
+    const isOnline = onlineIds.includes(m.id);
+    return '<div class="member-item"><div class="member-avatar">' + (m.avatar || m.name?.charAt(0) || '👤') +
+    '</div><div class="member-info"><div class="member-name">' + (m.name || '') + ' ' +
+    '<span class="online-status ' + (isOnline ? 'online' : 'offline') + '">' + (isOnline ? '● متصل الآن' : '○ غير متصل') + '</span></div>' +
+    (m.role === 'founder' ? '<span class="member-role-tag">المؤسس</span>' : '') + '</div></div>';
+  }).join('');
+}
+
+// Load online status for family members
+async function loadOnlineStatus() {
+  if (!state.family?.id) return;
+  try {
+    const { online } = await api('GET', '/api/family/online');
+    state.onlineMembers = online || [];
+    updateMembersList();
+  } catch(e) {}
 }
 
 function updateInvitations() {

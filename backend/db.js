@@ -182,6 +182,23 @@ function initDb() {
     )
   `);
   db.run(`
+    CREATE TABLE IF NOT EXISTS user_families (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      family_id TEXT NOT NULL,
+      is_current INTEGER DEFAULT 0,
+      joined_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id),
+      FOREIGN KEY (family_id) REFERENCES families(id)
+    )
+  `);
+  db.run(`
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT
+    )
+  `);
+  db.run(`
     CREATE TABLE IF NOT EXISTS user_codes (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,
@@ -278,6 +295,8 @@ function acceptInvitation(token, userId) {
   if (!inv) return null;
   run('UPDATE invitations SET status = ? WHERE id = ?', ['accepted', inv.id]);
   run('UPDATE users SET family_id = ? WHERE id = ?', [inv.family_id, userId]);
+  addUserToFamily(userId, inv.family_id, 1);
+  setCurrentFamily(userId, inv.family_id);
   return inv;
 }
 
@@ -450,6 +469,42 @@ function getFirstAvailablePremiumCode() {
 }
 
 // =============== ADMIN FUNCTIONS ===============
+function getUserFamilies(userId) {
+  return queryAll(`
+    SELECT uf.*, f.name as family_name, f.subscription_code
+    FROM user_families uf
+    JOIN families f ON uf.family_id = f.id
+    WHERE uf.user_id = ?
+    ORDER BY uf.joined_at DESC
+  `, [userId]);
+}
+
+function getUserFamilyCount(userId) {
+  const r = queryOne('SELECT COUNT(*) as c FROM user_families WHERE user_id = ?', [userId]);
+  return r ? r.c : 0;
+}
+
+function addUserToFamily(userId, familyId, isCurrent = 0) {
+  const existing = queryOne('SELECT * FROM user_families WHERE user_id = ? AND family_id = ?', [userId, familyId]);
+  if (existing) return false;
+  run('INSERT INTO user_families (id, user_id, family_id, is_current) VALUES (?, ?, ?, ?)', [uuidv4(), userId, familyId, isCurrent]);
+  return true;
+}
+
+function setCurrentFamily(userId, familyId) {
+  run('UPDATE user_families SET is_current = 0 WHERE user_id = ?', [userId]);
+  run('UPDATE user_families SET is_current = 1 WHERE user_id = ? AND family_id = ?', [userId, familyId]);
+}
+
+function getSetting(key, def) {
+  const r = queryOne('SELECT value FROM settings WHERE key = ?', [key]);
+  return r ? r.value : def;
+}
+
+function setSetting(key, value) {
+  run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [key, String(value)]);
+}
+
 function updateProfile(userId, data) {
   const { name, country, city, phone, avatar } = data;
   if (name !== undefined) run('UPDATE users SET name = ? WHERE id = ?', [name, userId]);
@@ -464,9 +519,10 @@ function leaveFamily(userId) {
   const user = queryOne('SELECT * FROM users WHERE id = ?', [userId]);
   if (!user || !user.family_id) return { error: 'أنت لست في عائلة' };
   const family = queryOne('SELECT * FROM families WHERE id = ?', [user.family_id]);
+  // Remove from user_families
+  run('DELETE FROM user_families WHERE user_id = ? AND family_id = ?', [userId, user.family_id]);
   // If founder leaves, remove founder
-  run('UPDATE users SET family_id = NULL, role = ? WHERE id = ?', [user.role === 'founder' ? 'member' : 'member', userId]);
-  // If founder leaves, update family founder to null
+  run('UPDATE users SET family_id = NULL, role = ? WHERE id = ?', ['member', userId]);
   if (user.role === 'founder') {
     run('UPDATE families SET founder_id = NULL WHERE id = ?', [user.family_id]);
   }
@@ -728,6 +784,6 @@ module.exports = {
   updatePrice, getFirstAvailablePremiumCode,
   getAllFamilies, updateFamilyData, setFamilyStatus, deleteFamily, createAdminUser, getAdminStats,
   getActiveAds, getAllAds, addAd, updateAd, deleteAd, trackAdView, trackAdClick, getAdsStats, getFeaturedFamilies,
-  updateProfile, leaveFamily, createAuction, getActiveAuctions, getAllAuctions, getAuctionById, joinAuction, placeBid, getAvailableAuctionCodes,
+  updateProfile, leaveFamily, getUserFamilies, getUserFamilyCount, addUserToFamily, setCurrentFamily, getSetting, setSetting, createAuction, getActiveAuctions, getAllAuctions, getAuctionById, joinAuction, placeBid, getAvailableAuctionCodes,
   endAuction, confirmAuctionPayment, cancelAuction, getAuctionBids, isAuctionParticipant,
 };

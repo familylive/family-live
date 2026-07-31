@@ -1198,3 +1198,45 @@ body {
 .profile-info .info-row:last-child { border-bottom: none; }
 .profile-info .info-row span:first-child { color: var(--text-secondary); }
 .profile-info .info-row span:last-child { font-weight: 600; }
+
+/* Online status */
+.online-status {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 8px;
+  margin-right: 4px;
+}
+.online-status.online {
+  color: #2ecc71;
+  background: rgba(46,204,113,.12);
+}
+.online-status.offline {
+  color: #e74c3c;
+  background: rgba(231,76,60,.1);
+}
+
+/* Family notification banner */
+.family-notify-banner {
+  position: fixed;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-150%);
+  background: var(--bg-card);
+  border: 2px solid var(--gold);
+  border-radius: var(--radius);
+  box-shadow: 0 10px 40px rgba(0,0,0,.2);
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 500;
+  max-width: 90vw;
+  transition: transform .4s cubic-bezier(.34,1.56,.64,1);
+}
+.family-notify-banner.show {
+  transform: translateX(-50%) translateY(0);
+}
+.notify-icon { font-size: 30px; }
+.notify-title { font-size: 16px; font-weight: 800; color: var(--gold); }
+.notify-msg { font-size: 13px; color: var(--text-secondary); }

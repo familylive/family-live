@@ -388,6 +388,104 @@ app.post('/api/profile/leave-family', authMiddleware, (req, res) => {
   res.json({ message: 'تم الخروج من عائلة ' + result.family_name, success: true });
 });
 
+// =============== ONLINE & FAMILY MEMBERSHIP ===============
+
+// Online user IDs (tracked via socket)
+const onlineUsers = new Set();
+
+// Get online status of family members
+app.get('/api/family/online', authMiddleware, (req, res) => {
+  if (!req.user.familyId) return res.json({ online: [] });
+  const members = db.getFamilyMembers(req.user.familyId);
+  const online = members.filter(m => onlineUsers.has(m.id)).map(m => m.id);
+  res.json({ online });
+});
+
+// Get all online users (admin)
+app.get('/api/admin/online', authMiddleware, adminMiddleware, (req, res) => {
+  const allUsers = db.getDb().exec('SELECT id, name, family_id FROM users');
+  let users = [];
+  if (allUsers && allUsers.length > 0) {
+    const cols = allUsers[0].columns;
+    users = allUsers[0].values.map(row => {
+      const o = {};
+      cols.forEach((c, i) => o[c] = row[i]);
+      return o;
+    });
+  }
+  const result = users.map(u => ({ ...u, online: onlineUsers.has(u.id) }));
+  // Group by family
+  const d = db.getDb();
+  let families = [];
+  try {
+    const famRes = d.exec('SELECT * FROM families');
+    if (famRes.length) {
+      const cols = famRes[0].columns;
+      families = famRes[0].values.map(row => {
+        const o = {};
+        cols.forEach((c, i) => o[c] = row[i]);
+        return o;
+      });
+    }
+  } catch(e) {}
+  const famData = families.map(f => {
+    const members = result.filter(u => u.family_id === f.id);
+    const onlineCount = members.filter(m => m.online).length;
+    return { ...f, members, onlineCount };
+  });
+  res.json({ onlineUsers: [...onlineUsers], families: famData });
+});
+
+// Join another family (with payment for 2nd+)
+app.post('/api/family/join', authMiddleware, (req, res) => {
+  const { familyId } = req.body;
+  if (!familyId) return res.status(400).json({ error: 'معرف العائلة مطلوب' });
+  
+  const count = db.getUserFamilyCount(req.user.id);
+  const joinPrice = parseInt(db.getSetting('join_family_price', '20'));
+  
+  // Check if user bought premium from auction (5 families free)
+  const maxFree = 1;
+  const maxFamilies = 5;
+  const hasPremium = count >= 0; // placeholder check
+  
+  if (count >= maxFamilies) {
+    return res.status(400).json({ error: 'وصلت للحد الأقصى 5 عوائل' });
+  }
+  
+  const family = db.getFamily(familyId);
+  if (!family) return res.status(400).json({ error: 'العائلة غير موجودة' });
+  if (family.status === 'inactive') return res.status(400).json({ error: 'العائلة موقوفة' });
+  
+  // Already in this family?
+  const existing = db.getUserFamilies(req.user.id).find(f => f.family_id === familyId);
+  if (existing) return res.status(400).json({ error: 'أنت بالفعل في هذه العائلة' });
+  
+  // 1st family free, 2nd+ requires payment
+  const needsPayment = count >= 1;
+  if (needsPayment) {
+    // Simulate payment check
+    const { paid } = req.body;
+    if (!paid) {
+      return res.json({ requiresPayment: true, price: joinPrice, family: { id: family.id, name: family.name } });
+    }
+  }
+  
+  db.addUserToFamily(req.user.id, familyId, 1);
+  db.setCurrentFamily(req.user.id, familyId);
+  // Update users table to current family
+  db.getDb().run('UPDATE users SET family_id = ? WHERE id = ?', [familyId, req.user.id]);
+  
+  // If user has premium code from auction, they get 5 families free - check user_codes
+  const premiumCodes = db.getDb().exec("SELECT COUNT(*) c FROM user_codes WHERE user_id = ? AND type = 'premium'", [req.user.id]);
+  let hasPremiumCode = false;
+  if (premiumCodes.length && premiumCodes[0].values.length) {
+    hasPremiumCode = premiumCodes[0].values[0][0] > 0;
+  }
+  
+  res.json({ message: '✅ تم الانضمام للعائلة ' + family.name, family, hasPremiumCode });
+});
+
 // =============== AUCTIONS ROUTES ===============
 
 // Get active auctions (logged in users)
@@ -667,8 +765,15 @@ io.on('connection', (socket) => {
   });
 
   socket.on('join_user', (userId) => {
+    socket.userId = userId;
     socket.join(`user_${userId}`);
-    console.log(`Socket ${socket.id} joined user ${userId}`);
+    onlineUsers.add(userId);
+    console.log(`🟢 ${userId} online`);
+    // Notify family members that this user is online
+    const user = db.getUserById(userId);
+    if (user && user.family_id) {
+      io.to(`family_${user.family_id}`).emit('user_online', { userId, name: user.name });
+    }
   });
 
   socket.on('join_session', (sessionId) => {
@@ -713,6 +818,22 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     console.log('Socket disconnected:', socket.id);
+    // Remove user from online if they had joined
+    if (socket.userId) {
+      onlineUsers.delete(socket.userId);
+      const user = db.getUserById(socket.userId);
+      if (user && user.family_id) {
+        io.to(`family_${user.family_id}`).emit('user_offline', { userId: socket.userId });
+      }
+      console.log(`🔴 ${socket.userId} offline`);
+    }
+  });
+
+  // Family notification (invite all members)
+  socket.on('family_notify', (data) => {
+    const { familyId, message, title } = data;
+    io.to(`family_${familyId}`).emit('family_notification', { title: title || '🔔 تنبيه العائلة', message, time: Date.now() });
+    console.log(`🔔 Notification sent to family ${familyId}`);
   });
 
   // WebRTC Audio Call Signaling
