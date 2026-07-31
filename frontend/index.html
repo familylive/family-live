@@ -473,6 +473,43 @@
         <button class="btn btn-secondary btn-sm" onclick="addInviteInput()" style="margin-bottom:10px">+ إضافة بريد آخر</button>
         <button class="btn btn-primary btn-full" onclick="sendInvites()">إرسال الدعوات</button>
       </div>
+      <div class="card" id="announcement-card" style="display:none">
+        <div class="card-title">📢 إعلانات العائلة <button class="btn btn-sm" style="float:left" onclick="toggleAnnouncementForm()">➕ إعلان جديد</button></div>
+        <div id="announcement-form" style="display:none">
+          <div class="form-group">
+            <label>عنوان الإعلان</label>
+            <input class="form-input" id="ann-title" type="text" placeholder="مثال: الديوانية الليلة">
+          </div>
+          <div class="form-group">
+            <label>نص الإعلان</label>
+            <textarea class="form-input" id="ann-content" rows="3" placeholder="اكتب تفاصيل الإعلان..."></textarea>
+          </div>
+          <div class="form-group">
+            <label>نوع الإعلان</label>
+            <select class="form-input" id="ann-type">
+              <option value="text">📝 إعلان عام</option>
+              <option value="diwaniya">🕌 موضوع الديوانية</option>
+              <option value="challenge">🏆 تحدٍ بين الأعضاء</option>
+              <option value="presence">📍 أوقات التواجد</option>
+            </select>
+          </div>
+          <div id="ann-challenge-fields" style="display:none">
+            <div class="form-group">
+              <label>اختر العضو المتحدى</label>
+              <select class="form-input" id="ann-target-user"></select>
+            </div>
+            <div class="form-group">
+              <label>وقت التحدي</label>
+              <input class="form-input" id="ann-time" type="datetime-local">
+            </div>
+          </div>
+          <button class="btn btn-accent btn-full" onclick="createAnnouncement()">📢 نشر الإعلان</button>
+        </div>
+        <div id="announcements-list">
+          <div class="empty-state"><div class="empty-text">لا توجد إعلانات</div></div>
+        </div>
+      </div>
+
       <div class="card">
         <div class="card-title">📬 الدعوات المرسلة</div>
         <div id="invitations-list"><div class="empty-state"><div class="empty-text">لا توجد دعوات مرسلة</div></div></div>
@@ -780,6 +817,17 @@
           <label>رابط الموقع (اختياري - اتركه فارغاً بدون رابط)</label>
           <input class="form-input" id="ad-link" type="text" placeholder="https://example.com" dir="ltr">
         </div>
+        <div style="display:flex;gap:8px">
+          <div class="form-group" style="flex:1">
+            <label>⏰ بداية النشر</label>
+            <input class="form-input" id="ad-start" type="datetime-local">
+          </div>
+          <div class="form-group" style="flex:1">
+            <label>⏰ نهاية النشر</label>
+            <input class="form-input" id="ad-end" type="datetime-local">
+          </div>
+        </div>
+        <p style="font-size:11px;color:var(--text-muted);margin-bottom:8px">اترك الحقل فارغاً للنشر فوراً وبدون انتهاء</p>
         <button class="btn btn-accent btn-full" onclick="addAd()">➕ إضافة إعلان</button>
         <div id="admin-ads-list" style="margin-top:12px"></div>
       </div>
@@ -862,6 +910,7 @@ function navigateTo(pageName) {
   // Load page-specific data
   if (pageName === 'dashboard' && state.isLoggedIn) { loadDashboardAuctions(); loadDashboardAds(); }
   if (pageName === 'profile' && state.isLoggedIn) { loadProfilePage(); loadMyFamilies(); }
+  if (pageName === 'family' && state.isLoggedIn) { loadAnnouncements(); populateAnnTarget(); }
   if (pageName === 'codes' && state.isLoggedIn) loadCodesPage();
   if (pageName === 'auctions' && state.isLoggedIn) loadAuctionsPage();
   if (pageName === 'admin' && state.user?.role === 'admin') { loadAdminPage(); loadAdminAuctions(); }
@@ -970,13 +1019,20 @@ function previewAdImage(input) {
 async function addAd() {
   const title = document.getElementById('ad-title').value.trim();
   const link_url = document.getElementById('ad-link').value.trim();
+  const startRaw = document.getElementById('ad-start').value;
+  const endRaw = document.getElementById('ad-end').value;
   if (!title) return showToast('اسم الإعلان مطلوب', 'error');
+  // Convert datetime-local to ISO
+  const start_time = startRaw ? new Date(startRaw).toISOString() : null;
+  const end_time = endRaw ? new Date(endRaw).toISOString() : null;
   try {
-    await api('POST', '/api/admin/ads/add', { title, image_url: adImageBase64, link_url });
+    await api('POST', '/api/admin/ads/add', { title, image_url: adImageBase64, link_url, start_time, end_time });
     showToast('✅ تم إضافة الإعلان', 'success');
     document.getElementById('ad-title').value = '';
     document.getElementById('ad-link').value = '';
     document.getElementById('ad-image-file').value = '';
+    document.getElementById('ad-start').value = '';
+    document.getElementById('ad-end').value = '';
     const preview = document.getElementById('ad-image-preview');
     if (preview) { preview.style.display = 'none'; preview.src = ''; }
     adImageBase64 = '';
@@ -1458,6 +1514,84 @@ function playNotificationSound() {
       osc.stop(ctx.currentTime + t + 0.25);
     });
   } catch(e) { console.error('Sound error:', e); }
+}
+
+// ==================== ANNOUNCEMENTS ====================
+let annEditing = null;
+
+async function loadAnnouncements() {
+  if (!state.family?.id) return;
+  const card = document.getElementById('announcement-card');
+  if (card) card.style.display = 'block';
+  // Founder sees create button
+  const formBtn = document.getElementById('announcement-form');
+  if (formBtn) formBtn.style.display = 'none';
+  try {
+    const { announcements } = await api('GET', '/api/announcements');
+    const list = document.getElementById('announcements-list');
+    if (!announcements?.length) {
+      list.innerHTML = '<div class="empty-state"><div class="empty-text">لا توجد إعلانات</div></div>';
+      return;
+    }
+    list.innerHTML = announcements.map(a => {
+      const typeIcon = { text:'📝', diwaniya:'🕌', challenge:'🏆', presence:'📍' }[a.announce_type] || '📢';
+      const time = a.event_time ? '<div class="ann-time">⏰ ' + new Date(a.event_time).toLocaleString('ar-SA') + '</div>' : '';
+      return '<div class="announcement-item">' +
+        '<div class="ann-header"><span class="ann-type">' + typeIcon + '</span><span class="ann-title">' + (a.title || '') + '</span></div>' +
+        (a.content ? '<div class="ann-content">' + a.content + '</div>' : '') +
+        time +
+        '<div class="ann-footer"><span class="ann-creator">بواسطة ' + (a.creator_name || '') + '</span>' +
+        '<button class="btn btn-sm btn-secondary" onclick="dismissAnnouncement(\'' + a.id + '\')">تم ✓</button></div>' +
+      '</div>';
+    }).join('');
+  } catch(e) { console.error('Announcements:', e); }
+}
+
+function populateAnnTarget() {
+  const select = document.getElementById('ann-target-user');
+  if (!select) return;
+  select.innerHTML = '<option value="">اختر العضو...</option>';
+  (state.members || []).filter(m => m.id !== state.user?.id).forEach(m => {
+    select.innerHTML += '<option value="' + m.id + '">' + (m.name || '') + '</option>';
+  });
+}
+
+function toggleAnnouncementForm() {
+  const form = document.getElementById('announcement-form');
+  if (form) form.style.display = form.style.display === 'none' ? 'block' : 'none';
+}
+
+function setupAnnouncementType() {
+  const type = document.getElementById('ann-type').value;
+  const challengeFields = document.getElementById('ann-challenge-fields');
+  if (challengeFields) challengeFields.style.display = type === 'challenge' ? 'block' : 'none';
+}
+
+async function createAnnouncement() {
+  const title = document.getElementById('ann-title').value.trim();
+  const content = document.getElementById('ann-content').value.trim();
+  const announceType = document.getElementById('ann-type').value;
+  const targetUserId = document.getElementById('ann-target-user').value || null;
+  const timeRaw = document.getElementById('ann-time').value;
+  const eventTime = timeRaw ? new Date(timeRaw).toISOString() : null;
+  if (!title) return showToast('عنوان الإعلان مطلوب', 'error');
+  try {
+    await api('POST', '/api/announcements/create', { title, content, announceType, targetUserId, eventTime });
+    showToast('📢 تم نشر الإعلان', 'success');
+    document.getElementById('ann-title').value = '';
+    document.getElementById('ann-content').value = '';
+    document.getElementById('ann-type').value = 'text';
+    document.getElementById('ann-time').value = '';
+    toggleAnnouncementForm();
+    loadAnnouncements();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function dismissAnnouncement(id) {
+  try {
+    await api('POST', '/api/announcements/delete', { id });
+    loadAnnouncements();
+  } catch(e) { console.error(e); }
 }
 
 async function loadAdminOnline() {

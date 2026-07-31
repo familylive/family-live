@@ -177,6 +177,7 @@ app.post('/api/auth/login', (req, res) => {
 app.get('/api/auth/verify', authMiddleware, (req, res) => {
   const user = db.getUserById(req.user.id);
   if (!user) return res.status(404).json({ error: 'المستخدم غير موجود' });
+  db.updateLastSeen(req.user.id);
   res.json({ user, family: user.family_id ? db.getFamily(user.family_id) : null });
 });
 
@@ -509,6 +510,43 @@ app.post('/api/family/join', authMiddleware, (req, res) => {
   }
   
   res.json({ message: '✅ تم الانضمام للعائلة ' + family.name, family, hasPremiumCode });
+});
+
+// =============== ANNOUNCEMENTS & LAST SEEN ===============
+
+// Update last seen (call on auth)
+app.get('/api/auth/verify', (req, res, next) => {
+  // Original verify handler runs below - just update last_seen
+  next();
+});
+
+// Create announcement (founder)
+app.post('/api/announcements/create', authMiddleware, (req, res) => {
+  if (!req.user.familyId) return res.status(400).json({ error: 'لا يوجد عائلة' });
+  const { title, content, announceType, targetUserId, eventTime } = req.body;
+  if (!title) return res.status(400).json({ error: 'عنوان الإعلان مطلوب' });
+  const ann = db.createAnnouncement(req.user.familyId, req.user.id, title, content, announceType, targetUserId, eventTime);
+  // Notify family members via socket
+  io.to(`family_${req.user.familyId}`).emit('family_notification', {
+    title: '📢 ' + title,
+    message: content || 'إعلان جديد من مؤسس العائلة',
+    time: Date.now()
+  });
+  res.json({ message: '📢 تم نشر الإعلان', announcement: ann });
+});
+
+// Get announcements for current user
+app.get('/api/announcements', authMiddleware, (req, res) => {
+  if (!req.user.familyId) return res.json({ announcements: [] });
+  const announcements = db.getAnnouncementsForUser(req.user.familyId, req.user.id);
+  res.json({ announcements });
+});
+
+// Delete/dismiss announcement
+app.post('/api/announcements/delete', authMiddleware, (req, res) => {
+  const { id } = req.body;
+  db.deleteAnnouncement(id);
+  res.json({ message: 'تم' });
 });
 
 // =============== AUCTIONS ROUTES ===============

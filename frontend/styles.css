@@ -1345,3 +1345,50 @@ body {
   font-size: 12px;
   padding: 8px;
 }
+
+/* Announcements */
+.announcement-item {
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  margin-bottom: 10px;
+}
+.ann-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.ann-type { font-size: 20px; }
+.ann-title {
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--gold);
+}
+.ann-content {
+  font-size: 13px;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+.ann-time {
+  font-size: 12px;
+  color: var(--info);
+  margin-bottom: 4px;
+}
+.ann-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 6px;
+}
+.ann-creator {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Admin online list last seen */
+.last-seen {
+  font-size: 11px;
+  color: var(--text-muted);
+}

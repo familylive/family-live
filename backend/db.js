@@ -55,6 +55,7 @@ function initDb() {
       role TEXT NOT NULL DEFAULT 'member' CHECK(role IN ('founder', 'member', 'admin')),
       avatar TEXT DEFAULT '👤',
       points INTEGER DEFAULT 0,
+      last_seen TEXT,
       created_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (family_id) REFERENCES families(id)
     )
@@ -137,6 +138,8 @@ function initDb() {
       link_url TEXT,
       status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'inactive')),
       position TEXT NOT NULL DEFAULT 'banner',
+      start_time TEXT,
+      end_time TEXT,
       views INTEGER DEFAULT 0,
       clicks INTEGER DEFAULT 0,
       created_at TEXT DEFAULT (datetime('now'))
@@ -199,6 +202,22 @@ function initDb() {
     )
   `);
   db.run(`
+    CREATE TABLE IF NOT EXISTS announcements (
+      id TEXT PRIMARY KEY,
+      family_id TEXT NOT NULL,
+      created_by TEXT NOT NULL,
+      title TEXT NOT NULL,
+      content TEXT,
+      announce_type TEXT NOT NULL DEFAULT 'text' CHECK(announce_type IN ('text', 'diwaniya', 'challenge', 'presence')),
+      target_user_id TEXT,
+      event_time TEXT,
+      status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'done')),
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (family_id) REFERENCES families(id),
+      FOREIGN KEY (created_by) REFERENCES users(id)
+    )
+  `);
+  db.run(`
     CREATE TABLE IF NOT EXISTS user_codes (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,
@@ -248,7 +267,7 @@ function getUserById(id) {
 }
 
 function getFamilyMembers(familyId) {
-  return queryAll('SELECT id, name, email, role, avatar, points FROM users WHERE family_id = ? ORDER BY role DESC, points DESC', [familyId]);
+  return queryAll('SELECT id, name, email, role, avatar, points, last_seen FROM users WHERE family_id = ? ORDER BY role DESC, points DESC', [familyId]);
 }
 
 // Family functions
@@ -505,6 +524,46 @@ function setSetting(key, value) {
   run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [key, String(value)]);
 }
 
+function updateLastSeen(userId) {
+  run("UPDATE users SET last_seen = datetime('now') WHERE id = ?", [userId]);
+}
+
+function getLastSeen(userId) {
+  const r = queryOne('SELECT last_seen FROM users WHERE id = ?', [userId]);
+  return r ? r.last_seen : null;
+}
+
+// Announcements
+function createAnnouncement(familyId, createdBy, title, content, announceType, targetUserId, eventTime) {
+  const id = uuidv4();
+  run('INSERT INTO announcements (id, family_id, created_by, title, content, announce_type, target_user_id, event_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    [id, familyId, createdBy, title, content || '', announceType || 'text', targetUserId || null, eventTime || null]);
+  return queryOne('SELECT * FROM announcements WHERE id = ?', [id]);
+}
+function getFamilyAnnouncements(familyId) {
+  return queryAll(`
+    SELECT a.*, u.name as creator_name
+    FROM announcements a
+    JOIN users u ON a.created_by = u.id
+    WHERE a.family_id = ? AND a.status = 'active'
+    ORDER BY a.created_at DESC
+  `, [familyId]);
+}
+function getAnnouncementsForUser(familyId, userId) {
+  return queryAll(`
+    SELECT a.*, u.name as creator_name
+    FROM announcements a
+    JOIN users u ON a.created_by = u.id
+    WHERE a.family_id = ? AND a.status = 'active'
+      AND (a.target_user_id IS NULL OR a.target_user_id = ?)
+    ORDER BY a.created_at DESC
+  `, [familyId, userId]);
+}
+function deleteAnnouncement(id) {
+  run("UPDATE announcements SET status = 'done' WHERE id = ?", [id]);
+  return true;
+}
+
 function updateProfile(userId, data) {
   const { name, country, city, phone, avatar } = data;
   if (name !== undefined) run('UPDATE users SET name = ? WHERE id = ?', [name, userId]);
@@ -539,7 +598,8 @@ function createAdminUser(email, password, name = 'مدير التطبيق') {
 
 // =============== ADS FUNCTIONS ===============
 function getActiveAds() {
-  return queryAll("SELECT * FROM ads WHERE status = 'active' ORDER BY created_at DESC");
+  const now = new Date().toISOString();
+  return queryAll("SELECT * FROM ads WHERE status = 'active' AND (start_time IS NULL OR start_time <= ?) AND (end_time IS NULL OR end_time >= ?) ORDER BY created_at DESC", [now, now]);
 }
 function getAllAds() {
   return queryAll('SELECT * FROM ads ORDER BY created_at DESC');
@@ -554,13 +614,13 @@ function getAdsStats() {
   const r = queryOne('SELECT COUNT(*) as total, SUM(views) as views, SUM(clicks) as clicks FROM ads');
   return { total: r ? r.total || 0 : 0, views: r ? r.views || 0 : 0, clicks: r ? r.clicks || 0 : 0 };
 }
-function addAd(title, imageUrl, linkUrl, position = 'banner') {
+function addAd(title, imageUrl, linkUrl, position = 'banner', startTime = null, endTime = null) {
   const id = uuidv4();
-  run('INSERT INTO ads (id, title, image_url, link_url, position) VALUES (?, ?, ?, ?, ?)', [id, title, imageUrl || '', linkUrl || '', position]);
+  run('INSERT INTO ads (id, title, image_url, link_url, position, start_time, end_time) VALUES (?, ?, ?, ?, ?, ?, ?)', [id, title, imageUrl || '', linkUrl || '', position, startTime, endTime]);
   return queryOne('SELECT * FROM ads WHERE id = ?', [id]);
 }
-function updateAd(id, title, imageUrl, linkUrl, status) {
-  run('UPDATE ads SET title = ?, image_url = ?, link_url = ?, status = ? WHERE id = ?', [title, imageUrl || '', linkUrl || '', status, id]);
+function updateAd(id, title, imageUrl, linkUrl, status, startTime, endTime) {
+  run('UPDATE ads SET title = ?, image_url = ?, link_url = ?, status = ?, start_time = ?, end_time = ? WHERE id = ?', [title, imageUrl || '', linkUrl || '', status, startTime, endTime, id]);
   return queryOne('SELECT * FROM ads WHERE id = ?', [id]);
 }
 function deleteAd(id) {
@@ -731,7 +791,8 @@ function getAllFamilies() {
   return queryAll(`
     SELECT f.*, 
       (SELECT COUNT(*) FROM users WHERE family_id = f.id) as members_count,
-      u.name as founder_name
+      u.name as founder_name,
+      u.last_seen as founder_last_seen
     FROM families f
     LEFT JOIN users u ON f.founder_id = u.id
     ORDER BY f.created_at DESC
@@ -784,6 +845,6 @@ module.exports = {
   updatePrice, getFirstAvailablePremiumCode,
   getAllFamilies, updateFamilyData, setFamilyStatus, deleteFamily, createAdminUser, getAdminStats,
   getActiveAds, getAllAds, addAd, updateAd, deleteAd, trackAdView, trackAdClick, getAdsStats, getFeaturedFamilies,
-  updateProfile, leaveFamily, getUserFamilies, getUserFamilyCount, addUserToFamily, setCurrentFamily, getSetting, setSetting, createAuction, getActiveAuctions, getAllAuctions, getAuctionById, joinAuction, placeBid, getAvailableAuctionCodes,
+  updateProfile, leaveFamily, updateLastSeen, getLastSeen, createAnnouncement, getFamilyAnnouncements, getAnnouncementsForUser, deleteAnnouncement, getUserFamilies, getUserFamilyCount, addUserToFamily, setCurrentFamily, getSetting, setSetting, createAuction, getActiveAuctions, getAllAuctions, getAuctionById, joinAuction, placeBid, getAvailableAuctionCodes,
   endAuction, confirmAuctionPayment, cancelAuction, getAuctionBids, isAuctionParticipant,
 };
