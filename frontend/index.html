@@ -162,7 +162,6 @@
               <li>✅ رمز عشوائي 8 أحرف</li>
               <li>✅ تأسيس عائلة واحدة</li>
             </ul>
-            <button class="btn btn-primary btn-full" onclick="showAuth('register');switchRegTab('found')">ابدأ مجاناً</button>
           </div>
           <div class="pricing-card premium">
             <div class="pricing-type">💎 مميز</div>
@@ -172,7 +171,6 @@
               <li>✅ رمز مميز 8 أحرف متكررة</li>
               <li>✅ رمز سهل الحفظ</li>
             </ul>
-            <button class="btn btn-accent btn-full" onclick="showAuth('register');switchRegTab('found')">اشتري الآن</button>
           </div>
           <div class="pricing-card">
             <div class="pricing-type">👑 مخصص</div>
@@ -182,7 +180,11 @@
               <li>✅ رمز مخصص من اختيارك</li>
               <li>👑 رمز فريد لعائلتك</li>
             </ul>
-            <button class="btn btn-primary btn-full" onclick="showAuth('register');switchRegTab('found')">تواصل معنا</button>
+          </div>
+          <div class="pricing-card" style="grid-column:span 2;background:linear-gradient(135deg,rgba(59,130,196,.08),var(--bg-card))">
+            <div class="pricing-type">🔐 للبدء</div>
+            <div class="pricing-price" style="font-size:16px;color:var(--text-secondary)">سجل حسابك للانضمام أو تأسيس عائلة</div>
+            <button class="btn btn-accent btn-full" onclick="showAuth('register')">📝 سجل الآن</button>
           </div>
         </div>
       </div>
@@ -1213,7 +1215,7 @@ async function loadLandingAuctions() {
         '<div class="auction-header"><span class="auction-code">🏷️ ' + a.code + '</span><span class="auction-live">🔴 مباشر</span></div>' +
         '<div class="auction-price">💰 <span class="current-price">' + (a.current_price || a.starting_price) + '</span> ريال</div>' +
         '<div class="auction-meta"><span>رسوم الدخول: ' + a.entry_fee + ' ريال</span></div>' +
-        '<button class="btn btn-accent btn-full" onclick="landingBidClick()">💥 مزايدة</button>' +
+        '<button class="btn btn-accent btn-full" onclick="landingBidClick()">' + (state.isLoggedIn ? '💥 مزايدة' : '🔐 سجل للمزايدة') + '</button>' +
       '</div>';
     }).join('');
   } catch(e) { console.error('Landing auctions:', e); }
