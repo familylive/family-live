@@ -256,6 +256,15 @@ function updateAllUI() {
   if (adminMenu) {
     adminMenu.style.display = state.user?.role === 'admin' ? 'flex' : 'none';
   }
+  
+  // Adapt menu for visitors vs logged-in users
+  const loginItem = document.getElementById('menu-login-item');
+  const registerItem = document.getElementById('menu-register-item');
+  const logoutBtn = document.getElementById('menu-logout-btn');
+  const isLogged = state.isLoggedIn;
+  if (loginItem) loginItem.style.display = isLogged ? 'none' : 'flex';
+  if (registerItem) registerItem.style.display = isLogged ? 'none' : 'flex';
+  if (logoutBtn) logoutBtn.style.display = isLogged ? 'flex' : 'none';
 
   const inviteSection = document.getElementById('invite-section');
   const diwCtrl = document.getElementById('diwaniya-controls-card');

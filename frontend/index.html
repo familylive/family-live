@@ -90,12 +90,18 @@
       <div class="menu-nav-item" data-page="profile" onclick="navigateTo('profile');toggleMenu()">
         <span class="nav-icon">👤</span> ملفي الشخصي
       </div>
+      <div class="menu-nav-item" id="menu-login-item" onclick="showAuth('login');toggleMenu()" style="display:none">
+        <span class="nav-icon">🔐</span> تسجيل الدخول
+      </div>
+      <div class="menu-nav-item" id="menu-register-item" onclick="showAuth('register');toggleMenu()" style="display:none">
+        <span class="nav-icon">📝</span> تسجيل
+      </div>
       <div class="menu-nav-item" id="menu-admin" data-page="admin" onclick="navigateTo('admin');toggleMenu()" style="display:none">
         <span class="nav-icon">⚙️</span> لوحة الإدارة
       </div>
     </div>
     <div class="menu-footer">
-      <button class="logout-btn" onclick="logout()">
+      <button class="logout-btn" id="menu-logout-btn" onclick="logout()">
         تسجيل الخروج ←
       </button>
     </div>
@@ -1057,14 +1063,10 @@ function navigateTo(pageName) {
 }
 
 function toggleHeaderVisibility(pageName) {
+  // Header + menu button always visible on every page
   const header = document.getElementById('app-header');
-  if (pageName === 'login' || pageName === 'register' || pageName === 'landing' || pageName === 'pricing') {
-    if (header) header.style.display = 'none';
-    document.querySelector('.main-content').style.paddingTop = '0';
-  } else {
-    if (header) header.style.display = 'flex';
-    document.querySelector('.main-content').style.paddingTop = 'var(--header-h)';
-  }
+  if (header) header.style.display = 'flex';
+  document.querySelector('.main-content').style.paddingTop = 'var(--header-h)';
 }
 
 function showAuth(page) { navigateTo(page); }
