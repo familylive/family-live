@@ -911,6 +911,23 @@ app.post('/api/moderator/visit/enter', authMiddleware, (req, res) => {
   if (visit.family_id) {
     io.to(`family_${visit.family_id}`).emit('moderator_entered', { moderatorName: visit.moderator_name });
   }
+  // SERVER-SIDE auto-exit after 2 minutes (enforced regardless of client)
+  setTimeout(() => {
+    const current = db.getDb().exec("SELECT * FROM moderator_visits WHERE id = ?", [visitId]);
+    if (current.length && current[0].values.length) {
+      const cols = current[0].columns;
+      const row = current[0].values[0];
+      const status = row[cols.indexOf('status')];
+      if (status === 'entered') {
+        db.exitModeratorVisit(visitId, 'خروج تلقائي بعد انتهاء مدة الزيارة (دقيقتين)');
+        const fam = db.getFamily(visit.family_id);
+        if (fam) {
+          io.to(`family_${fam.id}`).emit('moderator_exited', { moderatorName: visit.moderator_name, auto: true });
+        }
+        console.log('⏱️ Auto-exited moderator visit ' + visitId);
+      }
+    }
+  }, 120000);
   res.json({ message: '🕵️ دخلت كمراقب تفقدي - لا يحق لك المشاركة', visit });
 });
 
@@ -1241,8 +1258,11 @@ app.post('/api/diwaniya/open', authMiddleware, (req, res) => {
 
 // Close diwaniya
 app.post('/api/diwaniya/close/:sessionId', authMiddleware, (req, res) => {
-  if (req.user.role !== 'founder') {
-    return res.status(403).json({ error: 'فقط مؤسس العائلة يمكنه إغلاق الديوانية' });
+  const userFull = db.getUserById(req.user.id);
+  const isFounder = req.user.role === 'founder';
+  const isManager = userFull && userFull.can_open_diwaniya == 1;
+  if (!isFounder && !isManager) {
+    return res.status(403).json({ error: 'فقط المؤسس أو من منحه الصلاحية يمكنه إغلاق الديوانية' });
   }
   
   const result = db.closeDiwaniya(req.params.sessionId, req.user.id);
@@ -1460,32 +1480,32 @@ io.on('connection', (socket) => {
   const audioRooms = {};
   
   socket.on('join_audio_call', (data) => {
-    const { sessionId, userId, userName } = data;
+    const { sessionId, userId, userName, isObserver } = data;
     socket.join(`audio_${sessionId}`);
     
     if (!audioRooms[sessionId]) audioRooms[sessionId] = [];
     const participants = audioRooms[sessionId];
     
-    // Max 6 participants in video/audio call
-    if (participants.length >= 6) {
+    // Observers (moderators) don't count toward the 6-participant limit
+    if (!isObserver && participants.filter(p => !p.isObserver).length >= 6) {
       socket.emit('call_full', { message: 'المكالمة ممتلئة - الحد الأقصى 6 مشاركين' });
       socket.leave(`audio_${sessionId}`);
       return;
     }
     
-    // Tell existing participants about new user
+    // Tell existing participants about new user (observers included so they receive audio)
     participants.forEach(p => {
-      io.to(p.socketId).emit('user_joined_call', { userId, userName });
+      io.to(p.socketId).emit('user_joined_call', { userId, userName, isObserver: !!isObserver });
     });
     
-    participants.push({ socketId: socket.id, userId, userName });
+    participants.push({ socketId: socket.id, userId, userName, isObserver: !!isObserver });
     
     // Send current participants to the new user
     socket.emit('call_participants', { 
       participants: participants.filter(p => p.socketId !== socket.id)
     });
     
-    console.log(`🎤 ${userName} joined audio call ${sessionId} (${participants.length}/6)`);
+    console.log(`${isObserver ? '🕵️ Observer' : '🎤'} ${userName} joined audio call ${sessionId} (${participants.length})`);
   });
   
   socket.on('leave_audio_call', (data) => {

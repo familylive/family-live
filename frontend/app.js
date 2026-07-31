@@ -1004,19 +1004,42 @@ function toggleCamera() {
 async function joinLiveAudio() {
   if (inLiveCall) return leaveLiveAudio();
   
+  const isModeratorVisit = (state.user?.role === 'moderator') || (state.user?.role === 'admin' && document.getElementById('moderator-send-box')?.style.display === 'block');
+  
   try {
-    localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+    // Observer (moderator): audio only to receive, video NEVER requested (camera forced off)
+    localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    
+    if (isModeratorVisit) {
+      // Forced observer: mute mic immediately, no camera at all
+      localStream.getAudioTracks().forEach(t => t.enabled = false);
+      micMuted = true;
+      camOff = true;
+    }
+    
     inLiveCall = true;
     
-    // Notify server we're joining
+    // Notify server we're joining (observer flag for moderators)
     socket.emit('join_audio_call', { 
       sessionId: state.activeSession.id, 
       userId: state.user.id, 
-      userName: state.user.name 
+      userName: state.user.name,
+      isObserver: isModeratorVisit
     });
     
     updateAudioCallUI(true);
-    showToast('🎤 أنت في المكالمة الصوتية الآن', 'success');
+    if (isModeratorVisit) {
+      showToast('🕵️ أنت مراقب - تسمع فقط، كاميرا ومايك مقفلان', 'success');
+      // Force UI state
+      const micBtn = document.getElementById('mic-toggle-btn');
+      const camBtn = document.getElementById('cam-toggle-btn');
+      if (micBtn) { micBtn.textContent = '🔇'; micBtn.classList.add('off'); }
+      if (camBtn) { camBtn.textContent = '🚫'; camBtn.classList.add('off'); }
+      const stateEl = document.getElementById('my-tile-state');
+      if (stateEl) stateEl.textContent = '🕵️ مراقب - يسمع فقط';
+    } else {
+      showToast('🎤 أنت في المكالمة الصوتية الآن', 'success');
+    }
   } catch(e) {
     showToast('الرجاء السماح بالميكروفون', 'error');
     inLiveCall = false;
