@@ -182,6 +182,17 @@ function updateAllUI() {
   document.getElementById('menu-avatar').textContent = state.user?.avatar || '👤';
   document.getElementById('points-display').textContent = state.points || 0;
   document.getElementById('family-badge').textContent = state.family?.name || 'العائلة';
+  
+  // Show family subscription code next to family name
+  const codeBadge = document.getElementById('family-code-badge');
+  if (codeBadge) {
+    if (state.family?.subscription_code) {
+      codeBadge.textContent = '🔑 ' + state.family.subscription_code;
+      codeBadge.style.display = 'inline-flex';
+    } else {
+      codeBadge.style.display = 'none';
+    }
+  }
 
   // Welcome greeting
   const greeting = document.getElementById('dashboard-greeting');
