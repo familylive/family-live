@@ -34,17 +34,14 @@
   <!-- Header -->
   <header class="header" id="app-header">
     <button class="menu-btn" onclick="toggleMenu()" aria-label="القائمة">☰</button>
-    <a class="header-logo" onclick="goHome()" title="الرئيسية">
-      <img src="/assets/logo.png" alt="العائلة">
+    <a class="header-brand" onclick="goHome()" title="الرئيسية">
+      <img src="/assets/logo.png" alt="العائلة" class="header-logo">
+      <span class="header-brand-name">العائلة</span>
     </a>
     <div class="header-title" style="margin-right:auto;text-align:right">
-      <span id="header-title-text">العائلة</span>
-      <span class="family-badge" id="family-badge">العائلة</span>
+      <span id="header-title-text"></span>
+      <span class="family-badge" id="family-badge" style="display:none"></span>
       <span class="family-code-badge" id="family-code-badge" title="رمز العائلة" style="display:none"></span>
-    </div>
-    <div class="header-auth-btns" id="header-auth-btns">
-      <button class="header-auth-btn login" onclick="showAuth('login')">🔐 تسجيل الدخول</button>
-      <button class="header-auth-btn" onclick="showAuth('register')">📝 تسجيل</button>
     </div>
     <div class="header-points" id="header-points" style="display:none">
       <span class="points-icon">⭐</span>

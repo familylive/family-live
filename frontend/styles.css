@@ -1665,3 +1665,17 @@ body {
 .landing-section .ads-slider {
   margin-bottom: 4px;
 }
+
+/* Header brand (logo + name) */
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.header-brand-name {
+  font-size: 17px;
+  font-weight: 900;
+  color: var(--gold);
+}
