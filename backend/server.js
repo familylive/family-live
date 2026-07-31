@@ -1337,6 +1337,19 @@ seedData().then(() => {
     }
   } catch(e) { console.log('Admin seed error:', e.message); }
   
+  // Create default moderator account
+  try {
+    const modEmail = 'abdmmm9@gmail.com';
+    const modPass = 'Koad@055282312';
+    const existingMod = db.getUserByEmail(modEmail);
+    if (!existingMod) {
+      const hashedMod = bcrypt.hashSync(modPass, 10);
+      db.getDb().run("INSERT INTO users (id, name, email, password, role) VALUES (?, ?, ?, ?, 'moderator')",
+        [require('uuid').v4(), 'مشرف الديوانيات', modEmail, hashedMod]);
+      console.log('✅ Created moderator account: ' + modEmail);
+    }
+  } catch(e) { console.log('Moderator seed error:', e.message); }
+  
   // Create default user if not exists
   try {
     const existing = db.getUserByEmail('abdm@live.com');
