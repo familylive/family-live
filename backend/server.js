@@ -372,6 +372,22 @@ app.post('/api/admin/ads/delete', authMiddleware, adminMiddleware, (req, res) =>
   res.json({ message: '🗑️ تم حذف الإعلان' });
 });
 
+// =============== PROFILE ROUTES ===============
+
+// Update profile
+app.post('/api/profile/update', authMiddleware, (req, res) => {
+  const { name, country, city, phone, avatar } = req.body;
+  const user = db.updateProfile(req.user.id, { name, country, city, phone, avatar });
+  res.json({ message: '✅ تم تحديث الملف الشخصي', user });
+});
+
+// Leave family
+app.post('/api/profile/leave-family', authMiddleware, (req, res) => {
+  const result = db.leaveFamily(req.user.id);
+  if (result.error) return res.status(400).json(result);
+  res.json({ message: 'تم الخروج من عائلة ' + result.family_name, success: true });
+});
+
 // =============== AUCTIONS ROUTES ===============
 
 // Get active auctions (logged in users)

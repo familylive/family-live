@@ -87,6 +87,9 @@
       <div class="menu-nav-item" data-page="auctions" onclick="navigateTo('auctions');toggleMenu()">
         <span class="nav-icon">🏷️</span> المزادات
       </div>
+      <div class="menu-nav-item" data-page="profile" onclick="navigateTo('profile');toggleMenu()">
+        <span class="nav-icon">👤</span> ملفي الشخصي
+      </div>
       <div class="menu-nav-item" id="menu-admin" data-page="admin" onclick="navigateTo('admin');toggleMenu()" style="display:none">
         <span class="nav-icon">⚙️</span> لوحة الإدارة
       </div>
@@ -610,6 +613,61 @@
       </div>
     </div>
 
+    <!-- Profile Page -->
+    <div id="page-profile" class="page-content">
+      <div class="page-title">👤 ملفي الشخصي</div>
+      <div class="page-subtitle">بياناتك وإعداداتك</div>
+
+      <div class="card card-glow">
+        <div class="profile-header">
+          <div class="profile-avatar" id="profile-avatar">👤</div>
+          <div>
+            <div class="profile-name" id="profile-name">الاسم</div>
+            <div class="profile-role" id="profile-role">عضو</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">📋 معلوماتي</div>
+        <div class="profile-info">
+          <div class="info-row"><span>🏠 العائلة</span><span id="profile-family">-</span></div>
+          <div class="info-row"><span>🔑 رمز العائلة</span><span id="profile-code" style="direction:ltr;letter-spacing:2px;color:var(--gold)">-</span></div>
+          <div class="info-row"><span>🌍 الدولة</span><span id="profile-country">-</span></div>
+          <div class="info-row"><span>🏙️ المدينة</span><span id="profile-city">-</span></div>
+          <div class="info-row"><span>⭐ النقاط</span><span id="profile-points" style="color:var(--gold);font-weight:700">0</span></div>
+          <div class="info-row"><span>📧 البريد</span><span id="profile-email">-</span></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">✏️ تعديل الملف الشخصي</div>
+        <div class="form-group">
+          <label>الاسم</label>
+          <input class="form-input" id="profile-edit-name" type="text">
+        </div>
+        <div class="form-group">
+          <label>الدولة</label>
+          <input class="form-input" id="profile-edit-country" type="text" placeholder="مثال: السعودية">
+        </div>
+        <div class="form-group">
+          <label>المدينة</label>
+          <input class="form-input" id="profile-edit-city" type="text" placeholder="مثال: الرياض">
+        </div>
+        <div class="form-group">
+          <label>رقم الجوال</label>
+          <input class="form-input" id="profile-edit-phone" type="text" dir="ltr" placeholder="05xxxxxxxx">
+        </div>
+        <button class="btn btn-primary btn-full" onclick="saveProfile()">💾 حفظ التعديلات</button>
+      </div>
+
+      <div class="card" id="leave-family-card">
+        <div class="card-title" style="color:var(--danger)">🚪 الخروج من العائلة</div>
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:10px">بعد الخروج لن تتمكن من الوصول لبيانات العائلة والديوانية</p>
+        <button class="btn btn-danger btn-full" onclick="leaveFamilyConfirm()">🚪 الخروج من العائلة</button>
+      </div>
+    </div>
+
     <!-- Auctions Page -->
     <div id="page-auctions" class="page-content">
       <div class="page-title">🏷️ مزادات الرموز المميزة</div>
@@ -779,13 +837,14 @@ function navigateTo(pageName) {
   const navItem = document.querySelector('.menu-nav-item[data-page="' + pageName + '"]');
   if (page) page.classList.add('active');
   if (navItem) navItem.classList.add('active');
-  const titles = { dashboard:'الرئيسية', family:'العائلة', diwaniya:'الديوانية', games:'الألعاب', challenges:'التحديات', leaderboard:'قادة النقاط', codes:'رموزي', login:'تسجيل الدخول', register:'إنشاء حساب' };
+  const titles = { dashboard:'الرئيسية', family:'العائلة', diwaniya:'الديوانية', games:'الألعاب', challenges:'التحديات', leaderboard:'قادة النقاط', codes:'رموزي', profile:'ملفي الشخصي', login:'تسجيل الدخول', register:'إنشاء حساب' };
   const titleEl = document.getElementById('header-title-text');
   if (titleEl && titles[pageName]) titleEl.textContent = titles[pageName];
   toggleHeaderVisibility(pageName);
   
   // Load page-specific data
   if (pageName === 'dashboard' && state.isLoggedIn) { loadDashboardAuctions(); loadDashboardAds(); }
+  if (pageName === 'profile' && state.isLoggedIn) loadProfilePage();
   if (pageName === 'codes' && state.isLoggedIn) loadCodesPage();
   if (pageName === 'auctions' && state.isLoggedIn) loadAuctionsPage();
   if (pageName === 'admin' && state.user?.role === 'admin') { loadAdminPage(); loadAdminAuctions(); }
@@ -1208,6 +1267,64 @@ async function loadDashboardAuctions() {
       '</div>'
     ).join('');
   } catch(e) { console.error('Dash auctions:', e); }
+}
+
+async function loadProfilePage() {
+  const user = state.user;
+  const family = state.family;
+  
+  document.getElementById('profile-avatar').textContent = user?.avatar || user?.name?.charAt(0) || '👤';
+  document.getElementById('profile-name').textContent = user?.name || '';
+  document.getElementById('profile-role').textContent = user?.role === 'founder' ? 'المؤسس 👑' : (user?.role === 'admin' ? 'مدير التطبيق 🛡️' : 'عضو');
+  document.getElementById('profile-family').textContent = family?.name || '-';
+  document.getElementById('profile-code').textContent = family?.subscription_code || '-';
+  document.getElementById('profile-country').textContent = user?.country || '-';
+  document.getElementById('profile-city').textContent = user?.city || '-';
+  document.getElementById('profile-points').textContent = user?.points || 0;
+  document.getElementById('profile-email').textContent = user?.email || '-';
+  
+  document.getElementById('profile-edit-name').value = user?.name || '';
+  document.getElementById('profile-edit-country').value = user?.country || '';
+  document.getElementById('profile-edit-city').value = user?.city || '';
+  document.getElementById('profile-edit-phone').value = user?.phone || '';
+  
+  // Hide leave family for admin
+  const leaveCard = document.getElementById('leave-family-card');
+  if (leaveCard) leaveCard.style.display = (user?.role === 'admin' || !family) ? 'none' : 'block';
+}
+
+async function saveProfile() {
+  const name = document.getElementById('profile-edit-name').value.trim();
+  const country = document.getElementById('profile-edit-country').value.trim();
+  const city = document.getElementById('profile-edit-city').value.trim();
+  const phone = document.getElementById('profile-edit-phone').value.trim();
+  if (!name) return showToast('الاسم مطلوب', 'error');
+  try {
+    const { user } = await api('POST', '/api/profile/update', { name, country, city, phone });
+    state.user = { ...state.user, ...user };
+    updateAllUI();
+    loadProfilePage();
+    showToast('✅ تم حفظ التعديلات', 'success');
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+function leaveFamilyConfirm() {
+  const familyName = state.family?.name || 'العائلة';
+  if (confirm('⚠️ هل أنت متأكد من الخروج من عائلة ' + familyName + '؟')) {
+    leaveFamily();
+  }
+}
+
+async function leaveFamily() {
+  try {
+    const result = await api('POST', '/api/profile/leave-family');
+    showToast(result.message, 'success');
+    state.family = null;
+    state.user.family_id = null;
+    state.user.role = 'member';
+    updateAllUI();
+    navigateTo('dashboard');
+  } catch(e) { showToast(e.message, 'error'); }
 }
 
 async function loadAuctionsPage() {

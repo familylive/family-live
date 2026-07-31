@@ -49,6 +49,8 @@ function initDb() {
       email TEXT NOT NULL UNIQUE,
       password TEXT NOT NULL,
       phone TEXT,
+      country TEXT,
+      city TEXT,
       family_id TEXT,
       role TEXT NOT NULL DEFAULT 'member' CHECK(role IN ('founder', 'member', 'admin')),
       avatar TEXT DEFAULT '👤',
@@ -448,6 +450,29 @@ function getFirstAvailablePremiumCode() {
 }
 
 // =============== ADMIN FUNCTIONS ===============
+function updateProfile(userId, data) {
+  const { name, country, city, phone, avatar } = data;
+  if (name !== undefined) run('UPDATE users SET name = ? WHERE id = ?', [name, userId]);
+  if (country !== undefined) run('UPDATE users SET country = ? WHERE id = ?', [country, userId]);
+  if (city !== undefined) run('UPDATE users SET city = ? WHERE id = ?', [city, userId]);
+  if (phone !== undefined) run('UPDATE users SET phone = ? WHERE id = ?', [phone, userId]);
+  if (avatar !== undefined) run('UPDATE users SET avatar = ? WHERE id = ?', [avatar, userId]);
+  return getUserById(userId);
+}
+
+function leaveFamily(userId) {
+  const user = queryOne('SELECT * FROM users WHERE id = ?', [userId]);
+  if (!user || !user.family_id) return { error: 'أنت لست في عائلة' };
+  const family = queryOne('SELECT * FROM families WHERE id = ?', [user.family_id]);
+  // If founder leaves, remove founder
+  run('UPDATE users SET family_id = NULL, role = ? WHERE id = ?', [user.role === 'founder' ? 'member' : 'member', userId]);
+  // If founder leaves, update family founder to null
+  if (user.role === 'founder') {
+    run('UPDATE families SET founder_id = NULL WHERE id = ?', [user.family_id]);
+  }
+  return { success: true, family_name: family ? family.name : '' };
+}
+
 function createAdminUser(email, password, name = 'مدير التطبيق') {
   const existing = queryOne('SELECT * FROM users WHERE email = ?', [email]);
   if (existing) return existing;
@@ -703,6 +728,6 @@ module.exports = {
   updatePrice, getFirstAvailablePremiumCode,
   getAllFamilies, updateFamilyData, setFamilyStatus, deleteFamily, createAdminUser, getAdminStats,
   getActiveAds, getAllAds, addAd, updateAd, deleteAd, trackAdView, trackAdClick, getAdsStats, getFeaturedFamilies,
-  createAuction, getActiveAuctions, getAllAuctions, getAuctionById, joinAuction, placeBid, getAvailableAuctionCodes,
+  updateProfile, leaveFamily, createAuction, getActiveAuctions, getAllAuctions, getAuctionById, joinAuction, placeBid, getAvailableAuctionCodes,
   endAuction, confirmAuctionPayment, cancelAuction, getAuctionBids, isAuctionParticipant,
 };
