@@ -1660,3 +1660,8 @@ body {
   background: linear-gradient(135deg, var(--gold), var(--gold-dark));
   color: #fff;
 }
+
+/* Landing ads without heading - keep spacing */
+.landing-section .ads-slider {
+  margin-bottom: 4px;
+}

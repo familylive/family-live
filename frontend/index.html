@@ -37,7 +37,7 @@
     <a class="header-logo" onclick="goHome()" title="الرئيسية">
       <img src="/assets/logo.png" alt="العائلة">
     </a>
-    <div class="header-title">
+    <div class="header-title" style="margin-right:auto;text-align:right">
       <span id="header-title-text">العائلة</span>
       <span class="family-badge" id="family-badge">العائلة</span>
       <span class="family-code-badge" id="family-code-badge" title="رمز العائلة" style="display:none"></span>
@@ -137,12 +137,17 @@
     <!-- Login Page -->
     <!-- Landing Page - Visitor View -->
     <div id="page-landing" class="page-content auth-page active">
-      <h1 class="landing-title">العائلة</h1>
-      <p class="landing-subtitle">تواصل عائلتنا في كل مكان</p>
+
+      <!-- Active Auctions (public) -->
+      <div class="landing-section">
+        <h3 class="landing-section-title">🏷️ مزادات الرموز المميزة</h3>
+        <div id="landing-auctions">
+          <div class="empty-state"><div class="empty-text">لا توجد مزادات نشطة حالياً</div></div>
+        </div>
+      </div>
 
       <!-- Ads Slider -->
       <div class="landing-section">
-        <h3 class="landing-section-title">📢 إعلانات</h3>
         <div class="ads-slider" id="ads-slider">
           <div class="empty-state"><div class="empty-text">لا توجد إعلانات</div></div>
         </div>
@@ -153,14 +158,6 @@
         <h3 class="landing-section-title">🌟 عوائل مميزة</h3>
         <div class="featured-families" id="featured-families">
           <div class="empty-state"><div class="empty-text">لا توجد عوائل بعد</div></div>
-        </div>
-      </div>
-
-      <!-- Active Auctions (public) -->
-      <div class="landing-section">
-        <h3 class="landing-section-title">🏷️ مزادات الرموز المميزة</h3>
-        <div id="landing-auctions">
-          <div class="empty-state"><div class="empty-text">لا توجد مزادات نشطة حالياً</div></div>
         </div>
       </div>
 
