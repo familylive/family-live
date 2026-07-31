@@ -150,6 +150,12 @@ app.post('/api/auth/login', (req, res) => {
   if (!bcrypt.compareSync(password, user.password)) {
     return res.status(400).json({ error: 'كلمة المرور غير صحيحة' });
   }
+  
+  // Check active ban
+  const activeBan = db.getActiveBan(user.id);
+  if (activeBan) {
+    return res.status(403).json({ banned: true, reason: activeBan.reason, banned_until: activeBan.banned_until });
+  }
 
   const token = jwt.sign(
     { id: user.id, email: user.email, familyId: user.family_id, role: user.role },
@@ -549,6 +555,53 @@ app.post('/api/announcements/delete', authMiddleware, (req, res) => {
   res.json({ message: 'تم' });
 });
 
+// =============== MODERATION ROUTES ===============
+
+// Banned words (admin)
+app.get('/api/admin/banned-words', authMiddleware, adminMiddleware, (req, res) => {
+  res.json({ words: db.getBannedWords() });
+});
+app.post('/api/admin/banned-words/add', authMiddleware, adminMiddleware, (req, res) => {
+  const { word } = req.body;
+  if (!word) return res.status(400).json({ error: 'الكلمة مطلوبة' });
+  db.addBannedWord(word);
+  res.json({ message: '🚫 تمت إضافة الكلمة للقائمة السوداء' });
+});
+app.post('/api/admin/banned-words/delete', authMiddleware, adminMiddleware, (req, res) => {
+  const { id } = req.body;
+  db.deleteBannedWord(id);
+  res.json({ message: '✅ تم الحذف' });
+});
+
+// Ban/unban user (admin)
+app.get('/api/admin/bans', authMiddleware, adminMiddleware, (req, res) => {
+  res.json({ bans: db.getAllBans() });
+});
+app.post('/api/admin/bans/ban', authMiddleware, adminMiddleware, (req, res) => {
+  const { userId, reason, durationHours } = req.body;
+  if (!userId || !reason || !durationHours) return res.status(400).json({ error: 'جميع الحقول مطلوبة' });
+  const ban = db.banUser(userId, reason, parseInt(durationHours), req.user.id);
+  res.json({ message: '⛔ تم إيقاف العضوية', ban });
+});
+app.post('/api/admin/bans/unban', authMiddleware, adminMiddleware, (req, res) => {
+  const { userId } = req.body;
+  db.unbanUser(userId);
+  res.json({ message: '✅ تم إلغاء الإيقاف' });
+});
+
+// Diwaniya managers (founder)
+app.post('/api/family/diwaniya-manager', authMiddleware, (req, res) => {
+  if (!req.user.familyId) return res.status(400).json({ error: 'لا يوجد عائلة' });
+  if (req.user.role !== 'founder') return res.status(403).json({ error: 'فقط المؤسس' });
+  const { userId, canOpen } = req.body;
+  if (!userId) return res.status(400).json({ error: 'العضو مطلوب' });
+  if (canOpen && db.countDiwaniyaManagers(req.user.familyId) >= 2) {
+    return res.status(400).json({ error: 'الحد الأقصى عضوان يمكنهم فتح الديوانية' });
+  }
+  db.setDiwaniyaManager(userId, canOpen);
+  res.json({ message: canOpen ? '✅ تم منح الصلاحية' : 'تم سحب الصلاحية' });
+});
+
 // =============== AUCTIONS ROUTES ===============
 
 // Get active auctions (logged in users)
@@ -682,8 +735,11 @@ app.get('/api/family/invitations', authMiddleware, (req, res) => {
 
 // Open diwaniya
 app.post('/api/diwaniya/open', authMiddleware, (req, res) => {
-  if (req.user.role !== 'founder') {
-    return res.status(403).json({ error: 'فقط مؤسس العائلة يمكنه فتح الديوانية' });
+  const userFull = db.getUserById(req.user.id);
+  const isFounder = req.user.role === 'founder';
+  const isManager = userFull && userFull.can_open_diwaniya == 1;
+  if (!isFounder && !isManager) {
+    return res.status(403).json({ error: 'فقط المؤسس أو من منحه الصلاحية يمكنه فتح الديوانية' });
   }
   
   const { durationMinutes, topic, mode } = req.body;
@@ -747,8 +803,13 @@ app.post('/api/diwaniya/message', authMiddleware, (req, res) => {
   const { sessionId, message } = req.body;
   if (!sessionId || !message) return res.status(400).json({ error: 'الرسالة مطلوبة' });
   
+  // Check banned words
+  const banned = db.checkBannedWord(message);
+  if (banned) {
+    return res.status(400).json({ error: '🚫 تحتوي الرسالة على كلمة ممنوعة، تم حجبها', bannedWord: banned });
+  }
+  
   const result = db.addDiwaniyaMessage(sessionId, req.user.id, message);
-  // Socket will also handle this, but this is for REST clients
   io.to(`session_${sessionId}`).emit('diwaniya_message', result);
   res.json(result);
 });
@@ -846,6 +907,15 @@ io.on('connection', (socket) => {
 
   socket.on('diwaniya_message', (data) => {
     const { sessionId, userId, message } = data;
+    // Check banned words - block and warn the writer
+    const banned = db.checkBannedWord(message);
+    if (banned) {
+      io.to(`user_${userId}`).emit('message_blocked', {
+        message: '🚫 رسالتك تحتوي على كلمة ممنوعة ولم تُرسل',
+        bannedWord: banned
+      });
+      return;
+    }
     const result = db.addDiwaniyaMessage(sessionId, userId, message);
     if (result) {
       io.to(`session_${sessionId}`).emit('diwaniya_message', result);

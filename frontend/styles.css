@@ -1392,3 +1392,11 @@ body {
   font-size: 11px;
   color: var(--text-muted);
 }
+
+/* Banned modal */
+.banned-countdown {
+  font-variant-numeric: tabular-nums;
+}
+.terms-content ul li {
+  margin-bottom: 4px;
+}

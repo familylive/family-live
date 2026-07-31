@@ -56,6 +56,7 @@ function initDb() {
       avatar TEXT DEFAULT '👤',
       points INTEGER DEFAULT 0,
       last_seen TEXT,
+      can_open_diwaniya INTEGER DEFAULT 0,
       created_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (family_id) REFERENCES families(id)
     )
@@ -215,6 +216,26 @@ function initDb() {
       created_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (family_id) REFERENCES families(id),
       FOREIGN KEY (created_by) REFERENCES users(id)
+    )
+  `);
+  db.run(`
+    CREATE TABLE IF NOT EXISTS banned_words (
+      id TEXT PRIMARY KEY,
+      word TEXT NOT NULL UNIQUE,
+      created_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+  db.run(`
+    CREATE TABLE IF NOT EXISTS bans (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      reason TEXT,
+      duration_hours INTEGER DEFAULT 24,
+      banned_until TEXT,
+      status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'expired')),
+      created_by TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id)
     )
   `);
   db.run(`
@@ -522,6 +543,72 @@ function getSetting(key, def) {
 
 function setSetting(key, value) {
   run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [key, String(value)]);
+}
+
+// =============== MODERATION ===============
+function getBannedWords() {
+  return queryAll('SELECT * FROM banned_words ORDER BY created_at DESC');
+}
+function addBannedWord(word) {
+  try {
+    run('INSERT OR IGNORE INTO banned_words (id, word) VALUES (?, ?)', [uuidv4(), word.toLowerCase().trim()]);
+    return queryOne('SELECT * FROM banned_words WHERE word = ?', [word.toLowerCase().trim()]);
+  } catch(e) { return null; }
+}
+function deleteBannedWord(id) {
+  run('DELETE FROM banned_words WHERE id = ?', [id]);
+  return true;
+}
+function checkBannedWord(text) {
+  const words = getBannedWords();
+  if (!words.length) return null;
+  const lower = (text || '').toLowerCase();
+  for (const w of words) {
+    if (lower.includes(w.word.toLowerCase())) return w.word;
+  }
+  return null;
+}
+
+function banUser(userId, reason, durationHours, createdBy) {
+  const id = uuidv4();
+  const until = new Date(Date.now() + durationHours * 3600000).toISOString();
+  run("UPDATE bans SET status = 'expired' WHERE user_id = ? AND status = 'active'", [userId]);
+  run('INSERT INTO bans (id, user_id, reason, duration_hours, banned_until, created_by) VALUES (?, ?, ?, ?, ?, ?)',
+    [id, userId, reason, durationHours, until, createdBy]);
+  return queryOne('SELECT * FROM bans WHERE id = ?', [id]);
+}
+function getActiveBan(userId) {
+  const ban = queryOne("SELECT * FROM bans WHERE user_id = ? AND status = 'active'", [userId]);
+  if (!ban) return null;
+  const now = new Date().toISOString();
+  if (ban.banned_until <= now) {
+    run("UPDATE bans SET status = 'expired' WHERE id = ?", [ban.id]);
+    return null;
+  }
+  return ban;
+}
+function getAllBans() {
+  return queryAll(`
+    SELECT b.*, u.name as user_name, u.email as user_email
+    FROM bans b
+    JOIN users u ON b.user_id = u.id
+    WHERE b.status = 'active'
+    ORDER BY b.created_at DESC
+  `);
+}
+function unbanUser(userId) {
+  run("UPDATE bans SET status = 'expired' WHERE user_id = ? AND status = 'active'", [userId]);
+  return true;
+}
+
+// Diwaniya managers
+function setDiwaniyaManager(userId, canOpen) {
+  run('UPDATE users SET can_open_diwaniya = ? WHERE id = ?', [canOpen ? 1 : 0, userId]);
+  return getUserById(userId);
+}
+function countDiwaniyaManagers(familyId) {
+  const r = queryOne('SELECT COUNT(*) as c FROM users WHERE family_id = ? AND can_open_diwaniya = 1', [familyId]);
+  return r ? r.c : 0;
 }
 
 function updateLastSeen(userId) {
@@ -845,6 +932,6 @@ module.exports = {
   updatePrice, getFirstAvailablePremiumCode,
   getAllFamilies, updateFamilyData, setFamilyStatus, deleteFamily, createAdminUser, getAdminStats,
   getActiveAds, getAllAds, addAd, updateAd, deleteAd, trackAdView, trackAdClick, getAdsStats, getFeaturedFamilies,
-  updateProfile, leaveFamily, updateLastSeen, getLastSeen, createAnnouncement, getFamilyAnnouncements, getAnnouncementsForUser, deleteAnnouncement, getUserFamilies, getUserFamilyCount, addUserToFamily, setCurrentFamily, getSetting, setSetting, createAuction, getActiveAuctions, getAllAuctions, getAuctionById, joinAuction, placeBid, getAvailableAuctionCodes,
+  getBannedWords, addBannedWord, deleteBannedWord, checkBannedWord, banUser, getActiveBan, getAllBans, unbanUser, setDiwaniyaManager, countDiwaniyaManagers, updateProfile, leaveFamily, updateLastSeen, getLastSeen, createAnnouncement, getFamilyAnnouncements, getAnnouncementsForUser, deleteAnnouncement, getUserFamilies, getUserFamilyCount, addUserToFamily, setCurrentFamily, getSetting, setSetting, createAuction, getActiveAuctions, getAllAuctions, getAuctionById, joinAuction, placeBid, getAvailableAuctionCodes,
   endAuction, confirmAuctionPayment, cancelAuction, getAuctionBids, isAuctionParticipant,
 };
