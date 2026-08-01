@@ -2318,3 +2318,143 @@ body {
 .gift-family-line { color: #fff; font-size: 11px; opacity: .9; margin-top: 2px; }
 .gift-to-line { color: #8ecfff; font-size: 11px; margin-top: 2px; }
 .gift-coins-line { color: var(--gold); font-weight: 900; font-size: 14px; margin-top: 4px; }
+
+/* ===== Fullscreen TikTok-style gift ===== */
+.gift-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 1400;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(ellipse at 50% 70%, rgba(10,14,30,.55), rgba(5,8,18,.85));
+  pointer-events: none;
+  overflow: hidden;
+}
+.gift-fs-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: giftFsRise 1s cubic-bezier(.2,.8,.2,1) forwards;
+  margin-bottom: 14px;
+}
+.gift-fs-emoji {
+  font-size: 110px;
+  line-height: 1;
+  animation: giftFsFloat 1.6s ease-in-out infinite, giftFsShine 2s linear infinite;
+  filter: drop-shadow(0 0 30px rgba(255,215,0,.9));
+}
+.gift-fs-img {
+  width: 150px;
+  height: 150px;
+  object-fit: contain;
+  animation: giftFsFloat 1.6s ease-in-out infinite, giftFsShine 2s linear infinite;
+  filter: drop-shadow(0 0 30px rgba(255,215,0,.9));
+}
+@keyframes giftFsRise {
+  0% { transform: scale(0) translateY(140px); opacity: 0; }
+  55% { transform: scale(1.25) translateY(-8px); opacity: 1; }
+  75% { transform: scale(.95); }
+  100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+@keyframes giftFsFloat {
+  0%,100% { transform: translateY(0) rotate(0); }
+  50% { transform: translateY(-16px) rotate(-4deg); }
+}
+@keyframes giftFsShine {
+  0%,100% { filter: drop-shadow(0 0 20px rgba(255,215,0,.6)) brightness(1); }
+  50% { filter: drop-shadow(0 0 45px rgba(255,215,0,1)) brightness(1.35); }
+}
+.gift-fs-ring {
+  position: absolute;
+  width: 240px;
+  height: 240px;
+  border-radius: 50%;
+  border: 4px solid rgba(255,215,0,.85);
+  animation: giftFsRing 1.4s ease-out forwards;
+}
+@keyframes giftFsRing {
+  0% { transform: scale(.1); opacity: 1; }
+  100% { transform: scale(3); opacity: 0; }
+}
+.gift-fs-beams {
+  position: absolute;
+  inset: -30%;
+  background: conic-gradient(from 0deg, transparent 0deg, rgba(255,215,0,.18) 15deg, transparent 30deg, transparent 180deg, rgba(255,215,0,.18) 195deg, transparent 210deg);
+  animation: giftFsBeam 4s linear infinite;
+}
+@keyframes giftFsBeam { from { transform: rotate(0); } to { transform: rotate(360deg); } }
+.gift-fs-sparkles span {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff, #ffd700);
+  animation: giftFsSpark 1.8s ease-out infinite;
+}
+.gift-fs-sparkles span:nth-child(1){ left:15%; top:20%; }
+.gift-fs-sparkles span:nth-child(2){ left:80%; top:15%; animation-delay:.2s; }
+.gift-fs-sparkles span:nth-child(3){ left:22%; top:70%; animation-delay:.4s; }
+.gift-fs-sparkles span:nth-child(4){ left:85%; top:65%; animation-delay:.6s; }
+.gift-fs-sparkles span:nth-child(5){ left:10%; top:45%; animation-delay:.8s; }
+.gift-fs-sparkles span:nth-child(6){ left:70%; top:85%; animation-delay:1s; }
+.gift-fs-sparkles span:nth-child(7){ left:45%; top:10%; animation-delay:1.2s; }
+.gift-fs-sparkles span:nth-child(8){ left:55%; top:78%; animation-delay:1.4s; }
+@keyframes giftFsSpark {
+  0% { transform: translateY(0) scale(1); opacity: 1; }
+  100% { transform: translateY(-70px) scale(0); opacity: 0; }
+}
+
+/* TikTok-style gift bar at bottom */
+.gift-fs-bar {
+  position: absolute;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(92vw, 380px);
+  background: rgba(0,0,0,.78);
+  border: 1.5px solid rgba(232,184,48,.6);
+  border-radius: 14px;
+  padding: 10px 14px;
+  text-align: center;
+  backdrop-filter: blur(6px);
+  animation: giftFsBarIn .6s cubic-bezier(.2,.8,.2,1) .2s backwards;
+}
+@keyframes giftFsBarIn {
+  from { transform: translateX(-50%) translateY(60px); opacity: 0; }
+  to { transform: translateX(-50%) translateY(0); opacity: 1; }
+}
+.gift-fs-sender { color: #ffd75e; font-weight: 900; font-size: 15px; text-shadow: 0 0 12px rgba(232,184,48,.7); }
+.gift-fs-name { color: #fff; font-size: 12px; margin-top: 2px; }
+.gift-fs-fill {
+  height: 7px;
+  border-radius: 6px;
+  background: rgba(255,255,255,.12);
+  margin-top: 8px;
+  overflow: hidden;
+}
+.gift-fs-fill-inner {
+  height: 100%;
+  width: 0;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #b8860b, #ffd700, #fff3b0);
+  transition: width 1.8s ease-out;
+  box-shadow: 0 0 10px rgba(255,215,0,.7);
+}
+.gift-fs-coins { color: var(--gold); font-weight: 900; font-size: 13px; margin-top: 6px; }
+.gift-fs-info {
+  position: absolute;
+  top: 20px;
+  right: 14px;
+  text-align: left;
+  background: rgba(0,0,0,.6);
+  border: 1px solid rgba(232,184,48,.35);
+  border-radius: 10px;
+  padding: 6px 10px;
+  animation: giftFsInfo .5s .4s backwards;
+}
+@keyframes giftFsInfo { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: none; } }
+.gift-fs-family { color: #fff; font-size: 11px; }
+.gift-fs-to { color: #8ecfff; font-size: 11px; margin-top: 2px; }
+.gift-fullscreen.out { opacity: 0; transition: opacity .5s; }

@@ -2998,31 +2998,46 @@ async function sendGiftItem(giftId) {
   } catch(e) { showToast(e.message, 'error'); }
 }
 
-// Show gift on camera (socket event) - TikTok style animated
+// Show gift FULL-SCREEN (TikTok style) - covers the whole diwaniya screen
 function showGiftOnCamera(data) {
-  const tile = document.getElementById('video-' + data.toId) || document.getElementById('my-video-tile');
-  if (!tile) return;
-  let giftOverlay = document.createElement('div');
-  giftOverlay.className = 'gift-camera-overlay';
+  // Remove previous fullscreen gift if any
+  const oldOverlay = document.getElementById('gift-fullscreen-overlay');
+  if (oldOverlay) oldOverlay.remove();
   
-  // If animated image provided, use it; else animated emoji with effects
+  const giftOverlay = document.createElement('div');
+  giftOverlay.id = 'gift-fullscreen-overlay';
+  giftOverlay.className = 'gift-fullscreen';
+  
+  // If animated image (GIF) provided, use it; else big animated emoji
   const media = data.giftImage
-    ? '<img class="gift-anim-img" src="' + data.giftImage + '" alt="' + data.giftName + '">'
-    : '<div class="gift-emoji-anim">' + data.giftEmoji + '</div>';
+    ? '<img class="gift-fs-img" src="' + data.giftImage + '" alt="' + data.giftName + '">'
+    : '<div class="gift-fs-emoji">' + data.giftEmoji + '</div>';
   
   giftOverlay.innerHTML =
-    '<div class="gift-ring"></div>' +
-    '<div class="gift-sparkles"><span></span><span></span><span></span><span></span><span></span><span></span></div>' +
-    '<div class="gift-media-wrap">' + media + '</div>' +
-    '<div class="gift-beams"></div>' +
-    '<div class="gift-info-box">' +
-      '<div class="gift-from-name">' + data.fromName + '</div>' +
-      '<div class="gift-family-line">👪 ' + (data.familyName || '') + '</div>' +
-      '<div class="gift-to-line">إلى: ' + data.toName + '</div>' +
-      '<div class="gift-coins-line">🪙 ' + data.giftCoins + '</div>' +
+    '<div class="gift-fs-beams"></div>' +
+    '<div class="gift-fs-ring"></div>' +
+    '<div class="gift-fs-sparkles"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>' +
+    '<div class="gift-fs-wrap">' + media + '</div>' +
+    '<div class="gift-fs-bar">' +
+      '<div class="gift-fs-sender">' + data.fromName + '</div>' +
+      '<div class="gift-fs-name">' + data.giftEmoji + ' ' + (data.giftName || '') + '</div>' +
+      '<div class="gift-fs-fill"><div class="gift-fs-fill-inner"></div></div>' +
+      '<div class="gift-fs-coins">🪙 ' + data.giftCoins + '</div>' +
+    '</div>' +
+    '<div class="gift-fs-info">' +
+      '<div class="gift-fs-family">👪 ' + (data.familyName || '') + '</div>' +
+      '<div class="gift-fs-to">إلى: ' + data.toName + '</div>' +
     '</div>';
-  tile.appendChild(giftOverlay);
-  setTimeout(() => giftOverlay.remove(), 6000);
+  document.body.appendChild(giftOverlay);
+  
+  // Animate the fill bar (TikTok gift bar style)
+  const fill = giftOverlay.querySelector('.gift-fs-fill-inner');
+  if (fill) setTimeout(() => fill.style.width = '100%', 80);
+  
+  setTimeout(() => {
+    giftOverlay.classList.add('out');
+    setTimeout(() => giftOverlay.remove(), 600);
+  }, 6000);
 }
 
 let giftImageBase64 = '';
