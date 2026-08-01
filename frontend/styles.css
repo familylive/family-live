@@ -2577,3 +2577,50 @@ body {
   font-size: 13px;
 }
 .tiktok-send-btn { border-radius: 20px; padding: 0 14px; }
+
+/* ===== Battle challenge (live support) ===== */
+.battle-start-box { text-align: center; }
+.battle-vs {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: rgba(0,0,0,.35);
+  border: 1px solid rgba(232,184,48,.35);
+  border-radius: 14px;
+  padding: 8px;
+}
+.battle-player { text-align: center; flex: 1; }
+.battle-avatar {
+  width: 44px; height: 44px;
+  margin: 0 auto 4px;
+  border-radius: 50%;
+  border: 2px solid var(--gold);
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg-hover);
+  overflow: hidden;
+  font-size: 20px;
+}
+.battle-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.battle-name { font-size: 11px; font-weight: 800; color: #fff; }
+.battle-coins { font-size: 12px; font-weight: 900; color: var(--gold); }
+.battle-vs-text {
+  font-weight: 900;
+  font-size: 18px;
+  color: var(--danger);
+  text-shadow: 0 0 10px rgba(255,95,109,.6);
+  animation: vsPulse 1.2s ease-in-out infinite;
+}
+@keyframes vsPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.25); } }
+.battle-fill {
+  display: flex;
+  height: 8px;
+  border-radius: 6px;
+  overflow: hidden;
+  margin-top: 8px;
+  background: rgba(255,255,255,.1);
+}
+.battle-fill-a { background: linear-gradient(90deg, #e8b830, #ffd75e); transition: width .5s ease; }
+.battle-fill-b { background: linear-gradient(90deg, #8ecfff, #5aa7ff); transition: width .5s ease; }
+.battle-timer { text-align: center; font-size: 12px; font-weight: 800; color: #fff; margin: 6px 0; }
+.battle-support-row { display: flex; gap: 6px; justify-content: center; }

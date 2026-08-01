@@ -72,6 +72,7 @@ async function initDb() {
   await run(`CREATE TABLE IF NOT EXISTS violation_templates (id TEXT PRIMARY KEY, name TEXT NOT NULL, icon TEXT DEFAULT '🚫', status TEXT DEFAULT 'active', created_at TEXT DEFAULT now())`);
   try { await run("ALTER TABLE violations ADD COLUMN IF NOT EXISTS action TEXT"); } catch(e) {}
   try { await run("ALTER TABLE violations ADD COLUMN IF NOT EXISTS by_user_name TEXT"); } catch(e) {}
+  await run(`CREATE TABLE IF NOT EXISTS battles (id TEXT PRIMARY KEY, session_id TEXT, player_a_id TEXT, player_b_id TEXT, status TEXT DEFAULT 'pending', duration_minutes INTEGER DEFAULT 3, coins_a INTEGER DEFAULT 0, coins_b INTEGER DEFAULT 0, winner_id TEXT, start_time TEXT, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS diwaniya_restrictions (id TEXT PRIMARY KEY, session_id TEXT NOT NULL, user_id TEXT NOT NULL, type TEXT DEFAULT 'restrict', created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS gift_items (id TEXT PRIMARY KEY, name TEXT NOT NULL, emoji TEXT DEFAULT '🎁', coins INTEGER DEFAULT 10, price INTEGER DEFAULT 0, status TEXT DEFAULT 'active', gift_image TEXT, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS coin_packages (id TEXT PRIMARY KEY, coins INTEGER NOT NULL, price INTEGER NOT NULL, status TEXT DEFAULT 'active', created_at TEXT DEFAULT now())`);
@@ -638,6 +639,32 @@ async function addFounderViolation(userId, reason, action, byUserId, byUserName)
   return queryOne('SELECT * FROM violations WHERE id = $1', [id]);
 }
 
+async function createBattle(sessionId, playerA, playerB, durationMinutes) {
+  const id = uuidv4();
+  await run('INSERT INTO battles (id, session_id, player_a_id, player_b_id, duration_minutes) VALUES ($1,$2,$3,$4,$5)', [id, sessionId, playerA, playerB, parseInt(durationMinutes) || 3]);
+  return queryOne('SELECT * FROM battles WHERE id = $1', [id]);
+}
+async function getBattleById(id) { return queryOne('SELECT * FROM battles WHERE id = $1', [id]); }
+async function getActiveBattle(sessionId) {
+  return queryOne("SELECT * FROM battles WHERE session_id = $1 AND status IN ('pending','active') ORDER BY created_at DESC LIMIT 1", [sessionId]);
+}
+async function acceptBattle(id, startTime) {
+  await run("UPDATE battles SET status = 'active', start_time = $1 WHERE id = $2", [startTime, id]);
+  return queryOne('SELECT * FROM battles WHERE id = $1', [id]);
+}
+async function rejectBattle(id) {
+  await run("UPDATE battles SET status = 'rejected' WHERE id = $1", [id]);
+  return true;
+}
+async function supportBattle(id, side, coins) {
+  if (side === 'a') await run('UPDATE battles SET coins_a = coins_a + $1 WHERE id = $2', [coins, id]);
+  else await run('UPDATE battles SET coins_b = coins_b + $1 WHERE id = $2', [coins, id]);
+  return queryOne('SELECT * FROM battles WHERE id = $1', [id]);
+}
+async function endBattle(id, winnerId) {
+  await run("UPDATE battles SET status = 'done', winner_id = $1 WHERE id = $2", [winnerId, id]);
+  return queryOne('SELECT * FROM battles WHERE id = $1', [id]);
+}
 async function isDiwaniyaRestricted(sessionId, userId) {
   const r = await queryOne('SELECT * FROM diwaniya_restrictions WHERE session_id = $1 AND user_id = $2', [sessionId, userId]);
   return r || null;
@@ -901,6 +928,7 @@ module.exports = {
   addModeratorStars, getModeratorProfile, rateModerator, getModeratorTier, updateModeratorTier, getTierSettings,
   getActivePackages, getAllPackages, addPackage, updatePackage, deletePackage, getPaymentSettings, savePaymentSettings, createPayment, getAllPayments, getMyPayments, confirmPayment, rejectPayment, getFamilyEditInfo, recordFamilyNameChange, getFamilyCapacity, purchaseCapacity, setDiwaniyaCapacity, getCapacityPackages,
   createAnnouncement, getFamilyAnnouncements, getAnnouncementsForUser, deleteAnnouncement,
+  createBattle, getBattleById, getActiveBattle, acceptBattle, rejectBattle, supportBattle, endBattle,
   isDiwaniyaRestricted, restrictFromDiwaniya, unrestrictFromDiwaniya, getDiwaniyaRestrictions,
   seedViolationTemplates, getViolationTemplates, getAllViolationTemplates, addViolationTemplate, deleteViolationTemplate, addFounderViolation,
   getGiftItems, getAllGiftItems, addGiftItem, updateGiftItem, deleteGiftItem,

@@ -1848,6 +1848,81 @@ app.post('/api/diwaniya/message', authMiddleware, async (req, res) => {
   res.json(result);
 });
 
+// =============== BATTLES (live support challenge) ===============
+
+// Start a battle challenge (challenge a member present in the call)
+app.post('/api/battles/start', authMiddleware, asyncHandler(async (req, res) => {
+  const { opponentId, sessionId, durationMinutes } = req.body;
+  if (!opponentId || !sessionId) return res.status(400).json({ error: 'بيانات ناقصة' });
+  if (opponentId === req.user.id) return res.status(400).json({ error: 'لا يمكنك تحدي نفسك' });
+  const existing = await db.getActiveBattle(sessionId);
+  if (existing) return res.status(400).json({ error: 'هناك تحدي قائم بالفعل في هذه الديوانية' });
+  const me = await db.getUserById(req.user.id);
+  const opp = await db.getUserById(opponentId);
+  if (!opp) return res.status(404).json({ error: 'العضو غير موجود' });
+  const battle = await db.createBattle(sessionId, req.user.id, opponentId, durationMinutes);
+  io.to(`user_${opponentId}`).emit('battle_invite', {
+    battleId: battle.id, sessionId, fromId: req.user.id, fromName: me.name,
+    fromAvatar: me.avatar, duration: battle.duration_minutes
+  });
+  res.json({ message: '⚔️ أرسلت تحدياً إلى ' + opp.name, battle });
+}));
+
+// Accept a battle invite
+app.post('/api/battles/accept', authMiddleware, asyncHandler(async (req, res) => {
+  const { battleId } = req.body;
+  const battle = await db.getBattleById(battleId);
+  if (!battle) return res.status(404).json({ error: 'التحدي غير موجود' });
+  if (battle.player_b_id !== req.user.id) return res.status(403).json({ error: 'هذا التحدي ليس لك' });
+  const updated = await db.acceptBattle(battleId, new Date().toISOString());
+  io.to(`session_${battle.session_id}`).emit('battle_started', updated);
+  res.json({ message: '⚔️ بدأ التحدي! الدعم يفوز', battle: updated });
+}));
+
+// Reject a battle invite
+app.post('/api/battles/reject', authMiddleware, asyncHandler(async (req, res) => {
+  const { battleId } = req.body;
+  await db.rejectBattle(battleId);
+  res.json({ message: 'تم رفض التحدي' });
+}));
+
+// Support a player with coins
+app.post('/api/battles/support', authMiddleware, asyncHandler(async (req, res) => {
+  const { battleId, side, coins } = req.body;
+  const amount = parseInt(coins);
+  if (!battleId || !side || !amount || amount <= 0) return res.status(400).json({ error: 'بيانات غير صحيحة' });
+  const battle = await db.getBattleById(battleId);
+  if (!battle || battle.status !== 'active') return res.status(400).json({ error: 'التحدي غير نشط' });
+  const wallet = await db.deductCoins(req.user.id, amount);
+  if (!wallet) return res.status(400).json({ error: 'رصيدك لا يكفي' });
+  await db.runRaw("INSERT INTO coin_transactions (id, user_id, type, coins, detail) VALUES ($1,$2,'battle_support',$3,$4)", [require('crypto').randomUUID(), req.user.id, amount, 'دعم في تحدي مباشر']);
+  const updated = await db.supportBattle(battleId, side, amount);
+  io.to(`session_${battle.session_id}`).emit('battle_update', updated);
+  res.json({ message: '⚔️ دعمت اللاعب بـ ' + amount + ' كوينز', battle: updated, wallet });
+}));
+
+// End battle (manual) - determines winner by support
+app.post('/api/battles/end', authMiddleware, asyncHandler(async (req, res) => {
+  const { battleId } = req.body;
+  const battle = await db.getBattleById(battleId);
+  if (!battle || battle.status !== 'active') return res.status(400).json({ error: 'التحدي غير نشط' });
+  const a = await db.getUserById(battle.player_a_id);
+  const b = await db.getUserById(battle.player_b_id);
+  const winnerId = battle.coins_a >= battle.coins_b ? battle.player_a_id : battle.player_b_id;
+  const winnerName = winnerId === battle.player_a_id ? a.name : b.name;
+  const final = await db.endBattle(battleId, winnerId);
+  // Reward winner: +500 coins
+  await db.addCoins(winnerId, 500);
+  io.to(`session_${battle.session_id}`).emit('battle_ended', { ...final, winnerName, reward: 500 });
+  res.json({ message: '🏆 فاز ' + winnerName + '!', battle: final });
+}));
+
+// Active battle for a session
+app.get('/api/battles/active', authMiddleware, asyncHandler(async (req, res) => {
+  const battle = await db.getActiveBattle(req.query.sessionId);
+  res.json({ battle });
+}));
+
 // =============== CHALLENGES & GAMES ROUTES ===============
 
 // Create challenge

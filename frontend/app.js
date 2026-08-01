@@ -591,6 +591,22 @@ function connectSocket() {
     playNotificationSound();
     refreshWalletHeader();
   });
+  socket.on('battle_invite', (data) => {
+    pendingBattleInvite = data;
+    document.getElementById('battle-invite-text').textContent = data.fromName + ' يتحداك في الديوانية! ⚔️ المدة: ' + data.duration + ' دقائق';
+    document.getElementById('battle-invite-modal').style.display = 'flex';
+    playNotificationSound();
+  });
+  socket.on('battle_started', (b) => {
+    showToast('⚔️ بدأ التحدي! ادعموا لاعبيكم 🎁', 'success');
+    renderBattle(b);
+  });
+  socket.on('battle_update', (b) => { if (currentBattle?.id === b.id) renderBattle(b); });
+  socket.on('battle_ended', (b) => {
+    showToast('🏆 فاز ' + (b.winnerName || 'أحد اللاعبين') + ' وحصل على 500 كوينز!', 'success');
+    playNotificationSound();
+    renderBattle(null);
+  });
   socket.on('camera_invite', (data) => {
     // I was invited to go on camera
     pendingCameraInvite = data;
@@ -1490,6 +1506,24 @@ async function purchaseSecretRoom() {
   } catch(e) { showToast(e.message, 'error'); }
 }
 
+async function loadBattleStatus() {
+  if (!state.activeSession?.id) return;
+  try {
+    const { battle } = await api('GET', '/api/battles/active?sessionId=' + state.activeSession.id);
+    if (battle) {
+      // enrich names
+      try {
+        const { members } = await api('GET', '/api/family/members');
+        const a = members.find(m => m.id === battle.player_a_id);
+        const b = members.find(m => m.id === battle.player_b_id);
+        battle.player_a_name = a?.name || battle.player_a_id.slice(0,6);
+        battle.player_b_name = b?.name || battle.player_b_id.slice(0,6);
+      } catch(e) {}
+      renderBattle(battle);
+    }
+  } catch(e) {}
+}
+
 async function loadDiwaniyaCapacity() {
   if (!state.family?.id) return;
   try {
@@ -1766,6 +1800,100 @@ function toggleCallFullscreen() {
     if (btn) btn.classList.toggle('zoom', grid.classList.contains('video-zoom'));
   }
 }
+// ==================== BATTLES (live support challenge) ====================
+let currentBattle = null;
+let battleTimer = null;
+
+function openBattleModal() {
+  const sel = document.getElementById('battle-opponent');
+  sel.innerHTML = '<option value="">اختر الخصم...</option>';
+  const members = state.callMembers || {};
+  const pool = Object.keys(members).length ? members : (state.members || []);
+  Object.entries(pool).forEach(([id, name]) => {
+    if (id !== state.user?.id) sel.innerHTML += '<option value="' + id + '">' + (typeof name === 'string' ? name : name.name || 'عضو') + '</option>';
+  });
+  if (sel.options.length <= 1) return showToast('لا يوجد أعضاء لتحديهم - ادخلوا المكالمة أولاً', 'error');
+  document.getElementById('battle-modal').style.display = 'flex';
+}
+
+async function startBattle() {
+  const opponentId = document.getElementById('battle-opponent')?.value;
+  const duration = document.getElementById('battle-duration')?.value || '3';
+  if (!opponentId) return showToast('اختر الخصم', 'error');
+  if (!state.activeSession?.id) return showToast('الديوانية غير مفتوحة', 'error');
+  try {
+    const result = await api('POST', '/api/battles/start', { opponentId, sessionId: state.activeSession.id, durationMinutes: duration });
+    showToast(result.message, 'success');
+    document.getElementById('battle-modal').style.display = 'none';
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+let pendingBattleInvite = null;
+function respondBattle(accept) {
+  const battleId = pendingBattleInvite?.battleId;
+  if (!battleId) return;
+  const endpoint = accept ? '/api/battles/accept' : '/api/battles/reject';
+  api('POST', endpoint, { battleId }).then(r => {
+    showToast(r.message, 'success');
+  }).catch(e => showToast(e.message, 'error'));
+  document.getElementById('battle-invite-modal').style.display = 'none';
+  pendingBattleInvite = null;
+}
+
+function renderBattle(b) {
+  currentBattle = b;
+  const bar = document.getElementById('battle-bar');
+  const startBox = document.getElementById('battle-start-box');
+  if (!bar || !b || (b.status !== 'active' && b.status !== 'pending')) { if (bar) bar.style.display = 'none'; if (startBox) startBox.style.display = 'block'; return; }
+  if (startBox) startBox.style.display = 'none';
+  bar.style.display = 'block';
+  // Players names/avatars
+  const na = b.player_a_name || 'لاعب أ', nb = b.player_b_name || 'لاعب ب';
+  document.getElementById('battle-name-a').textContent = na;
+  document.getElementById('battle-name-b').textContent = nb;
+  document.getElementById('battle-coins-a').textContent = '🪙 ' + (b.coins_a || 0);
+  document.getElementById('battle-coins-b').textContent = '🪙 ' + (b.coins_b || 0);
+  const total = (b.coins_a || 0) + (b.coins_b || 0);
+  const pctA = total ? Math.round(b.coins_a / total * 100) : 50;
+  const fa = bar.querySelector('.battle-fill-a');
+  const fb = bar.querySelector('.battle-fill-b');
+  if (fa) fa.style.width = pctA + '%';
+  if (fb) fb.style.width = (100 - pctA) + '%';
+  // Timer
+  if (b.status === 'active' && b.start_time) {
+    const dur = (b.duration_minutes || 3) * 60;
+    const elapsed = Math.floor((Date.now() - new Date(b.start_time).getTime()) / 1000);
+    const left = Math.max(0, dur - elapsed);
+    const m = Math.floor(left / 60), s = left % 60;
+    document.getElementById('battle-timer').textContent = '⏱️ ' + m + ':' + String(s).padStart(2, '0');
+    if (battleTimer) clearInterval(battleTimer);
+    battleTimer = setInterval(() => {
+      const e = Math.floor((Date.now() - new Date(b.start_time).getTime()) / 1000);
+      const l = Math.max(0, dur - e);
+      document.getElementById('battle-timer').textContent = '⏱️ ' + Math.floor(l / 60) + ':' + String(l % 60).padStart(2, '0');
+      if (l <= 0) { clearInterval(battleTimer); endBattleNow(); }
+    }, 1000);
+  }
+}
+
+async function supportBattle(side) {
+  if (!currentBattle) return;
+  const coins = prompt('🎁 كم كوينز تدعم به؟', '100');
+  if (!coins || parseInt(coins) <= 0) return;
+  if (!confirm('⚔️ دعم اللاعب بـ ' + coins + ' كوينز؟')) return;
+  try {
+    const r = await api('POST', '/api/battles/support', { battleId: currentBattle.id, side, coins });
+    showToast(r.message, 'success');
+    refreshWalletHeader();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function endBattleNow() {
+  if (!currentBattle || currentBattle.status !== 'active') return;
+  if (!confirm('🏁 إنهاء التحدي الآن؟')) return;
+  try { await api('POST', '/api/battles/end', { battleId: currentBattle.id }); } catch(e) { showToast(e.message, 'error'); }
+}
+
 // ==================== TIKTOK CHAT (on the black screen) ====================
 function sendTikTokChat() {
   const input = document.getElementById('tiktok-chat-input');
