@@ -437,6 +437,9 @@ function connectSocket() {
     showToast(data.message || 'المكالمة ممتلئة', 'error');
     leaveLiveAudio();
   });
+  socket.on('recording_attempt_announce', (data) => {
+    showRecordingAttemptAnnounce(data);
+  });
   socket.on('video_limit_updated', (data) => {
     const el = document.getElementById('video-limit-display');
     if (el) el.textContent = data.videoLimit || 6;

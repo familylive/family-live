@@ -29,7 +29,7 @@ async function getDb() { return getPool(); }
 
 async function initDb() {
   await run(`CREATE TABLE IF NOT EXISTS families (id TEXT PRIMARY KEY, name TEXT NOT NULL, subscription_code TEXT NOT NULL UNIQUE, founder_id TEXT, status TEXT DEFAULT 'active', diwaniya_locked_until TEXT, diwaniya_lock_reason TEXT, diwaniya_locked_by TEXT, name_changed_at TEXT, name_changes_count INTEGER DEFAULT 0, diwaniya_capacity INTEGER DEFAULT 15, secret_room_enabled INTEGER DEFAULT 0, secret_room_purchased_at TEXT, created_at TEXT DEFAULT now())`);
-  await run(`CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, password TEXT NOT NULL, phone TEXT, whatsapp TEXT, country TEXT, city TEXT, family_id TEXT, role TEXT DEFAULT 'member', avatar TEXT DEFAULT '👤', points INTEGER DEFAULT 0, stars INTEGER DEFAULT 0, moderator_tier TEXT DEFAULT 'none', last_seen TEXT, can_open_diwaniya INTEGER DEFAULT 0, currency TEXT DEFAULT 'sar', created_at TEXT DEFAULT now())`);
+  await run(`CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, password TEXT NOT NULL, phone TEXT, whatsapp TEXT, country TEXT, city TEXT, family_id TEXT, role TEXT DEFAULT 'member', avatar TEXT DEFAULT '👤', points INTEGER DEFAULT 0, stars INTEGER DEFAULT 0, moderator_tier TEXT DEFAULT 'none', last_seen TEXT, can_open_diwaniya INTEGER DEFAULT 0, currency TEXT DEFAULT 'sar', recording_attempts INTEGER DEFAULT 0, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS invitations (id TEXT PRIMARY KEY, family_id TEXT NOT NULL, email TEXT NOT NULL, invited_by TEXT NOT NULL, status TEXT DEFAULT 'pending', token TEXT NOT NULL UNIQUE, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS diwaniya_sessions (id TEXT PRIMARY KEY, family_id TEXT NOT NULL, opened_by TEXT NOT NULL, opened_at TEXT DEFAULT now(), closed_at TEXT, duration_minutes INTEGER DEFAULT 30, status TEXT DEFAULT 'open', topic TEXT, mode TEXT DEFAULT 'text', capacity INTEGER DEFAULT 15, secret_code TEXT, video_limit INTEGER DEFAULT 6)`);
   await run(`CREATE TABLE IF NOT EXISTS diwaniya_messages (id TEXT PRIMARY KEY, session_id TEXT NOT NULL, user_id TEXT NOT NULL, message TEXT NOT NULL, created_at TEXT DEFAULT now())`);
@@ -59,6 +59,7 @@ async function initDb() {
   try { await run("ALTER TABLE users ADD COLUMN IF NOT EXISTS stars INTEGER DEFAULT 0"); } catch(e) {}
   try { await run("ALTER TABLE users ADD COLUMN IF NOT EXISTS moderator_tier TEXT DEFAULT 'none'"); } catch(e) {}
   try { await run("ALTER TABLE users ADD COLUMN IF NOT EXISTS whatsapp TEXT"); } catch(e) {}
+  try { await run("ALTER TABLE users ADD COLUMN IF NOT EXISTS recording_attempts INTEGER DEFAULT 0"); } catch(e) {}
   try { await run("ALTER TABLE families ADD COLUMN IF NOT EXISTS diwaniya_capacity INTEGER DEFAULT 15"); } catch(e) {}
   try { await run("ALTER TABLE families ADD COLUMN IF NOT EXISTS secret_room_enabled INTEGER DEFAULT 0"); } catch(e) {}
   try { await run("ALTER TABLE families ADD COLUMN IF NOT EXISTS secret_room_purchased_at TEXT"); } catch(e) {}
@@ -591,6 +592,26 @@ async function rejectPayment(paymentId) { await run("UPDATE payments SET status 
 async function setVideoLimit(sessionId, limit) {
   await run('UPDATE diwaniya_sessions SET video_limit = $1 WHERE id = $2', [limit, sessionId]);
   return queryOne('SELECT * FROM diwaniya_sessions WHERE id = $1', [sessionId]);
+}
+
+async function recordRecordingAttempt(userId) {
+  await run('UPDATE users SET recording_attempts = recording_attempts + 1 WHERE id = $1', [userId]);
+  const user = await queryOne('SELECT recording_attempts FROM users WHERE id = $1', [userId]);
+  const attempts = user ? user.recording_attempts : 1;
+  const reason = 'محاولة تصوير الشاشة (' + attempts + ' مرات)';
+  
+  // Ban thresholds: 3 -> 24h, 6 -> 28h, 7-10 -> 30 days
+  let durationHours = null;
+  if (attempts >= 7) durationHours = 720; // 30 days
+  else if (attempts >= 6) durationHours = 28;
+  else if (attempts >= 3) durationHours = 24;
+  
+  let banned = false;
+  if (durationHours) {
+    await banUser(userId, reason, durationHours, 'system');
+    banned = true;
+  }
+  return { attempts, banned, durationHours, reason };
 }
 
 async function getSecretRoomStatus(familyId) {

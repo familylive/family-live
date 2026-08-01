@@ -1879,3 +1879,44 @@ body {
   text-align: center;
   padding: 20px;
 }
+
+/* Recording attempt announcement */
+.recording-attempt-announce {
+  position: fixed;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-200%);
+  background: linear-gradient(135deg, #8e1e1e, #c0392b);
+  color: #fff;
+  border-radius: var(--radius);
+  box-shadow: 0 10px 40px rgba(0,0,0,.5);
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  z-index: 750;
+  max-width: 92vw;
+  width: 460px;
+  transition: transform .4s cubic-bezier(.34,1.56,.64,1);
+}
+.recording-attempt-announce.show { transform: translateX(-50%) translateY(0); }
+.ra-icon { font-size: 40px; }
+.ra-title { font-size: 17px; font-weight: 800; }
+.ra-msg { font-size: 13px; color: #ffd9d4; margin-top: 2px; }
+
+/* Camera overlay announcement */
+.camera-announce {
+  position: absolute;
+  bottom: 40px;
+  left: 8px;
+  right: 8px;
+  background: rgba(192,57,43,.85);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 10px;
+  border-radius: 6px;
+  text-align: center;
+  z-index: 100;
+  animation: pulse 1.5s infinite;
+}

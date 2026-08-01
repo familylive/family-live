@@ -1405,6 +1405,27 @@ app.post('/api/diwaniya/close/:sessionId', authMiddleware, async (req, res) => {
   res.json(result);
 });
 
+// Record screen-recording attempt + announce + auto-ban
+app.post('/api/diwaniya/recording-attempt', authMiddleware, async (req, res) => {
+  const user = await db.getUserById(req.user.id);
+  const result = await db.recordRecordingAttempt(req.user.id);
+  const attemptLabel = ['الأولى','الثانية','الثالثة','الرابعة','الخامسة','السادسة','السابعة','الثامنة','التاسعة','العاشرة'][result.attempts - 1] || 'المرة ' + result.attempts;
+  
+  // Announce to family (founder + members) - shows on camera too
+  if (user && user.family_id) {
+    io.to(`family_${user.family_id}`).emit('recording_attempt_announce', {
+      userName: user.name,
+      attempts: result.attempts,
+      attemptLabel: attemptLabel,
+      banned: result.banned,
+      durationHours: result.durationHours,
+      reason: result.reason
+    });
+  }
+  
+  res.json({ ...result, attemptLabel });
+});
+
 // Set video limit (founder, after opening)
 app.post('/api/diwaniya/video-limit', authMiddleware, async (req, res) => {
   const { sessionId, limit } = req.body;
