@@ -722,9 +722,18 @@ async function sendInvites() {
       resultsDiv.className = 'invite-results';
       document.getElementById('invite-section')?.appendChild(resultsDiv);
     }
-    resultsDiv.innerHTML = invitations.map(inv =>
-      `<div class="invite-result ${inv.status === 'sent' ? 'success' : 'error'}">${inv.email}: ${inv.status === 'sent' ? '✅ تم' : '⏳ موجود'}</div>`
-    ).join('');
+    resultsDiv.innerHTML = invitations.map(inv => {
+      const link = inv.inviteUrl || '';
+      return '<div class="invite-result ' + (inv.status === 'sent' ? 'success' : 'error') + '">' +
+        '<div><strong>' + inv.email + '</strong>: ' + (inv.status === 'sent' ? '✅ تم إنشاء الرابط' : '⏳ موجود بالفعل') + '</div>' +
+        (inv.status === 'sent' && link ?
+          '<div style="display:flex;gap:6px;margin-top:6px;align-items:center">' +
+            '<input class="form-input" dir="ltr" readonly style="flex:1;font-size:11px" value="' + link + '">' +
+            '<button class="btn btn-sm btn-accent" onclick="copyInviteLink(this)">📋 نسخ</button>' +
+            '<a class="btn btn-sm" target="_blank" href="https://wa.me/?text=' + encodeURIComponent('انضم لعائلتنا عبر هذا الرابط: ' + link) + '">🟢 واتساب</a>' +
+          '</div>' : '') +
+      '</div>';
+    }).join('');
     const { invitations: updated } = await api('GET', '/api/family/invitations');
     state.invites = updated; updateInvitations();
     showToast('📨 تم إرسال الدعوات!', 'success');
@@ -791,17 +800,33 @@ async function loadOnlineStatus() {
   } catch(e) {}
 }
 
+function copyInviteLink(btn) {
+  const input = btn?.previousElementSibling;
+  if (!input?.value) return;
+  if (navigator.clipboard) { navigator.clipboard.writeText(input.value).then(() => showToast('📋 تم نسخ الرابط', 'success')).catch(() => selectCopy(input)); }
+  else selectCopy(input);
+}
+function selectCopy(input) {
+  input.select(); input.setSelectionRange(0, 99999);
+  try { document.execCommand('copy'); showToast('📋 تم نسخ الرابط', 'success'); } catch(e) {}
+}
+
 function updateInvitations() {
   const list = document.getElementById('invitations-list');
   if (!state.invites?.length) {
     list.innerHTML = '<div class="empty-state"><div class="empty-text">لا توجد دعوات</div></div>'; return;
   }
-  list.innerHTML = state.invites.map(inv =>
-    '<div class="invitation-item"><div class="invitation-info"><div class="invitation-email">' + (inv.email || '') +
-    '</div><small class="invited-by">بواسطة ' + (inv.invited_by_name || '') + '</small></div>' +
-    '<span class="invitation-status ' + (inv.status || 'pending') + '">' +
-    (inv.status === 'accepted' ? '✅ مقبولة' : '⏳ معلقة') + '</span></div>'
-  ).join('');
+  list.innerHTML = state.invites.map(inv => {
+    const link = inv.token ? location.origin + '/invite?token=' + inv.token : '';
+    const statusLabel = inv.status === 'accepted' ? '✅ مقبولة' : '⏳ معلقة';
+    return '<div class="invitation-item">' +
+      '<div class="invitation-info"><div class="invitation-email">' + (inv.email || '') +
+      '</div><small class="invited-by">بواسطة ' + (inv.invited_by_name || '') + '</small></div>' +
+      '<span class="invitation-status ' + (inv.status || 'pending') + '">' + statusLabel + '</span>' +
+      (inv.status !== 'accepted' && link ?
+        '<button class="btn btn-sm btn-accent" style="margin-top:6px" onclick="copyInviteLink(this)">📋 نسخ رابط الدعوة</button>' : '') +
+    '</div>';
+  }).join('');
 }
 
 function updateChallenges() {
