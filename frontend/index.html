@@ -182,6 +182,7 @@
               <li>✅ رمز مخصص من اختيارك</li>
               <li>👑 رمز فريد لعائلتك</li>
             </ul>
+            <button class="btn btn-accent btn-full" onclick="customPackageClick()">💳 شراء</button>
           </div>
           <div class="pricing-card">
             <div class="pricing-type">👥 زيادة الأعضاء</div>
@@ -1439,6 +1440,15 @@ async function loadLandingAuctions() {
       }, 1000);
     });
   } catch(e) { console.error('Landing auctions:', e); }
+}
+
+function customPackageClick() {
+  if (state.isLoggedIn) {
+    navigateTo('codes');
+  } else {
+    showToast('📝 سجل دخول أولاً لشراء رمز مخصص', 'success');
+    setTimeout(() => showAuth('login'), 600);
+  }
 }
 
 function landingCapacityClick() {
