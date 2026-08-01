@@ -607,12 +607,25 @@
                 <option value="4">4</option><option value="5">5</option><option value="6" selected>6</option>
               </select>
             </div>
-            <div class="call-buttons" style="display:flex;gap:8px;justify-content:center;margin-top:10px">
-              <button class="call-control-btn" id="mic-toggle-btn" onclick="toggleMic()">🎤</button>
-              <button class="call-control-btn" id="cam-toggle-btn" onclick="toggleCamera()">🎥</button>
-              <button class="call-control-btn" id="gift-box-btn" onclick="openGiftBox()">🎁</button>
-              <button class="call-control-btn" id="cam-invite-btn" onclick="openCameraInvite()" style="display:none" title="دعوة للمشاركة بالكاميرا">📹</button>
-              <button class="call-control-btn" id="fullscreen-toggle-btn" onclick="toggleCallFullscreen()">⛶</button>
+            <div class="call-buttons" style="display:flex;gap:10px;justify-content:center;margin-top:12px">
+              <button class="call-control-btn" id="mic-toggle-btn" onclick="toggleMic()" title="كتم المايك">
+                <svg class="ic-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+                <svg class="ic-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-.19 1.4"/><line x1="1" y1="1" x2="23" y2="23"/><path d="M12 19a7 7 0 0 1-7-7v-2"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+              </button>
+              <button class="call-control-btn" id="cam-toggle-btn" onclick="toggleCamera()" title="إغلاق الكاميرا">
+                <svg class="ic-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+                <svg class="ic-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2m5.66 0H14a2 2 0 0 1 2 2v3.34l1 1L23 7v10"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+              </button>
+              <button class="call-control-btn" id="gift-box-btn" onclick="openGiftBox()" title="صندوق الهدايا">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>
+              </button>
+              <button class="call-control-btn" id="cam-invite-btn" onclick="openCameraInvite()" style="display:none" title="دعوة للمشاركة بالكاميرا">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/><circle cx="9.5" cy="12" r="2.2" fill="currentColor" stroke="none"/></svg>
+              </button>
+              <button class="call-control-btn" id="fullscreen-toggle-btn" onclick="toggleCallFullscreen()" title="تكبير الشاشة">
+                <svg class="ic-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+                <svg class="ic-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/><path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M16 21v-3a2 2 0 0 1 2-2h3"/></svg>
+              </button>
             </div>
           </div>
           <button class="btn btn-accent btn-full" id="join-audio-btn" onclick="joinLiveAudio()">🎥 انضم لمكالمة الفيديو</button>

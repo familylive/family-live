@@ -524,7 +524,7 @@ function connectSocket() {
           const myVideo = document.getElementById('my-video');
           if (myVideo) myVideo.style.display = 'none';
           const camBtn = document.getElementById('cam-toggle-btn');
-          if (camBtn) { camBtn.textContent = '🚫'; camBtn.classList.add('off'); }
+          if (camBtn) { camBtn.classList.add('off'); }
         }
       } else {
         showToast('✅ تم رفع التقييد - تقدر تشارك من جديد', 'success');
@@ -540,7 +540,7 @@ function connectSocket() {
         const myVideo = document.getElementById('my-video');
         if (myVideo) myVideo.style.display = 'none';
         const camBtn = document.getElementById('cam-toggle-btn');
-        if (camBtn) { camBtn.textContent = '🚫'; camBtn.classList.add('off'); }
+        if (camBtn) { camBtn.classList.add('off'); }
       }
       showToast('🙊 تم إيقاف الكاميرا - وضع الاستماع فقط', 'error');
     }
@@ -591,7 +591,7 @@ function connectSocket() {
       const myVideo = document.getElementById('my-video');
       if (myVideo) myVideo.style.display = 'none';
       const camBtn = document.getElementById('cam-toggle-btn');
-      if (camBtn) { camBtn.textContent = '🚫'; camBtn.classList.add('off'); }
+      if (camBtn) { camBtn.classList.add('off'); }
     }
     showToast(data.message || '🎥 الكاميرات ممتلئة - ستنضم بالصوت', 'error');
   });
@@ -1277,7 +1277,6 @@ function toggleMic() {
   localStream.getAudioTracks().forEach(t => t.enabled = !micMuted);
   const btn = document.getElementById('mic-toggle-btn');
   if (btn) {
-    btn.textContent = micMuted ? '🔇' : '🎤';
     btn.classList.toggle('muted', micMuted);
     btn.classList.toggle('off', micMuted);
   }
@@ -1297,7 +1296,6 @@ function toggleCamera() {
   const btn = document.getElementById('cam-toggle-btn');
   const myVideo = document.getElementById('my-video');
   if (btn) {
-    btn.textContent = camOff ? '🚫' : '🎥';
     btn.classList.toggle('off', camOff);
   }
   if (myVideo) myVideo.style.display = camOff ? 'none' : 'block';
@@ -1479,8 +1477,8 @@ async function joinLiveAudio() {
       // Force UI state
       const micBtn = document.getElementById('mic-toggle-btn');
       const camBtn = document.getElementById('cam-toggle-btn');
-      if (micBtn) { micBtn.textContent = '🔇'; micBtn.classList.add('off'); }
-      if (camBtn) { camBtn.textContent = '🚫'; camBtn.classList.add('off'); }
+      if (micBtn) { micBtn.classList.add('muted'); micBtn.classList.add('off'); }
+      if (camBtn) { camBtn.classList.add('off'); }
       const stateEl = document.getElementById('my-tile-state');
       if (stateEl) stateEl.textContent = '🕵️ مراقب - يسمع فقط';
     } else {
@@ -1508,8 +1506,8 @@ function leaveLiveAudio() {
   const micBtn = document.getElementById('mic-toggle-btn');
   const camBtn = document.getElementById('cam-toggle-btn');
   const tileState = document.getElementById('my-tile-state');
-  if (micBtn) { micBtn.textContent = '🎤'; micBtn.classList.remove('off','muted'); }
-  if (camBtn) { camBtn.textContent = '🎥'; camBtn.classList.remove('off'); }
+  if (micBtn) { micBtn.classList.remove('off','muted'); }
+  if (camBtn) { camBtn.classList.remove('off'); }
   if (tileState) { tileState.textContent = ''; tileState.classList.remove('muted-state'); }
   
   inLiveCall = false;
@@ -1651,25 +1649,25 @@ function toggleCallFullscreen() {
   // Fullscreen API
   if (document.fullscreenElement) {
     document.exitFullscreen().catch(() => {});
-    if (btn) btn.textContent = '⛶';
+    if (btn) btn.classList.remove('zoom');
     grid.classList.remove('video-zoom');
     return;
   }
   if (grid.requestFullscreen) {
     grid.requestFullscreen().catch(() => {
       grid.classList.toggle('video-zoom');
-      if (btn) btn.textContent = grid.classList.contains('video-zoom') ? '🗕' : '⛶';
+      if (btn) btn.classList.toggle('zoom', grid.classList.contains('video-zoom'));
     });
     document.addEventListener('fullscreenchange', function fs() {
       if (!document.fullscreenElement) {
         grid.classList.remove('video-zoom');
-        if (btn) btn.textContent = '⛶';
+        if (btn) btn.classList.remove('zoom');
         document.removeEventListener('fullscreenchange', fs);
       }
     });
   } else {
     grid.classList.toggle('video-zoom');
-    if (btn) btn.textContent = grid.classList.contains('video-zoom') ? '🗕' : '⛶';
+    if (btn) btn.classList.toggle('zoom', grid.classList.contains('video-zoom'));
   }
 }
 // Tap on any video tile to zoom
@@ -1877,7 +1875,7 @@ async function enableMyCamera() {
     const myVideo = document.getElementById('my-video');
     if (myVideo) { myVideo.srcObject = localStream; myVideo.style.display = 'block'; }
     const camBtn = document.getElementById('cam-toggle-btn');
-    if (camBtn) { camBtn.textContent = '🎥'; camBtn.classList.remove('off'); }
+    if (camBtn) { camBtn.classList.remove('off'); }
     const myTile = document.getElementById('my-video-tile');
     const ov = myTile?.querySelector('.cam-off-overlay');
     if (ov) ov.style.display = 'none';
