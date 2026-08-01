@@ -3197,6 +3197,11 @@ async function loadWallet() {
     const data = await api('GET', '/api/wallet');
     walletData = data.wallet;
     document.getElementById('wallet-coins').textContent = data.wallet.coins || 0;
+    // My public ID
+    const idEl = document.getElementById('my-public-id');
+    if (idEl) idEl.textContent = state.user?.public_id || '------';
+    loadTransfers();
+    loadCharges();
     document.getElementById('wallet-money').textContent = data.wallet.wallet || 0;
     document.getElementById('wallet-rate').textContent = '1 كوينز = ' + data.rate + ' ريال';
     // Render packages
@@ -3212,6 +3217,59 @@ async function loadWallet() {
     }
   } catch(e) {}
   loadWalletHistory();
+}
+
+// ==================== TRANSFERS & CHARGES ====================
+async function loadTransfers() {
+  try {
+    const { transfers } = await api('GET', '/api/wallet/transfers');
+    const out = document.getElementById('transfer-out-list');
+    const inn = document.getElementById('transfer-in-list');
+    const outs = (transfers || []).filter(t => t.type === 'transfer_out');
+    const ins = (transfers || []).filter(t => t.type === 'transfer_in');
+    if (out) out.innerHTML = outs.length ? outs.map(t => fmtTx(t, 'out')).join('') : '<div class="empty-state"><div class="empty-text">لا توجد تحويلات</div></div>';
+    if (inn) inn.innerHTML = ins.length ? ins.map(t => fmtTx(t, 'in')).join('') : '<div class="empty-state"><div class="empty-text">لا توجد تحويلات</div></div>';
+  } catch(e) {}
+}
+async function loadCharges() {
+  try {
+    const { charges } = await api('GET', '/api/wallet/charges');
+    const list = document.getElementById('charge-list');
+    if (charges?.length && list) {
+      list.innerHTML = charges.map(c => {
+        const d = new Date(c.created_at).toLocaleString('ar-SA', { dateStyle:'short', timeStyle:'short' });
+        return '<div class="admin-family-item"><div class="admin-family-name">🪙 شحن: <b style="color:var(--gold)">' + c.coins + ' كوينز</b></div>' +
+          '<div class="admin-family-meta">' + (c.detail || '') + ' · ' + d + '</div></div>';
+      }).join('');
+    } else if (list) {
+      list.innerHTML = '<div class="empty-state"><div class="empty-text">لا توجد عمليات شحن</div></div>';
+    }
+  } catch(e) {}
+}
+function fmtTx(t, dir) {
+  const d = new Date(t.created_at).toLocaleString('ar-SA', { dateStyle:'short', timeStyle:'short' });
+  const sign = dir === 'out' ? '➡️ إلى' : '⬅️ من';
+  return '<div class="admin-family-item"><div class="admin-family-name">' + sign + ' <b style="color:' + (dir==='out' ? 'var(--danger)' : 'var(--success)') + '">' + t.coins + ' كوينز</b></div>' +
+    '<div class="admin-family-meta">' + (t.detail || '') + ' · ' + d + '</div></div>';
+}
+async function transferCoinsTo() {
+  const toPublicId = (document.getElementById('transfer-to-id')?.value || '').trim();
+  const coins = document.getElementById('transfer-amount')?.value;
+  if (!toPublicId) return showToast('أدخل ايدي العضو', 'error');
+  if (!coins || parseInt(coins) <= 0) return showToast('أدخل عدد الكوينزات', 'error');
+  if (!confirm('🔄 تحويل ' + coins + ' كوينز إلى العضو (' + toPublicId + ')؟')) return;
+  try {
+    const result = await api('POST', '/api/wallet/transfer', { toPublicId, coins });
+    showToast(result.message, 'success');
+    refreshWalletHeader();
+    loadWallet();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+function copyMyId() {
+  const id = document.getElementById('my-public-id')?.textContent;
+  if (!id || id === '------') return showToast('ما عندك ايدي بعد', 'error');
+  if (navigator.clipboard) { navigator.clipboard.writeText(id).then(() => showToast('📋 تم نسخ الايدي: ' + id, 'success')).catch(()=>{}); }
+  else { const ta = document.createElement('textarea'); ta.value = id; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); showToast('📋 تم نسخ الايدي: ' + id, 'success'); }
 }
 
 async function loadWalletHistory() {
