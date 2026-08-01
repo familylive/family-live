@@ -230,6 +230,7 @@ async function loadApp(user, family) {
   updateAllUI();
   connectSocket();
   loadOnlineStatus();
+  startDiwaniyaStatusPoll();
   // Admin goes directly to admin panel
   navigateTo(user.role === 'admin' ? 'admin' : 'dashboard');
 }
@@ -643,6 +644,61 @@ function sendChat() {
   } else {
     api('POST', '/api/diwaniya/message', { sessionId: state.activeSession.id, message: text }).catch(() => {});
   }
+}
+
+// Live diwaniya status sync (every 15s) - members see it open in real-time
+function startDiwaniyaStatusPoll() {
+  if (state._statusPoll) clearInterval(state._statusPoll);
+  state._statusPoll = setInterval(async () => {
+    try {
+      const { session } = await api('GET', '/api/diwaniya/active');
+      const isOpen = session?.status === 'open';
+      // Detected: diwaniya opened (by founder/moderator)
+      if (isOpen && !state.diwaniyaOpen) {
+        const prevSession = state.activeSession;
+        state.diwaniyaOpen = true;
+        state.activeSession = session;
+        const mode = session.mode || 'text';
+        state.diwaniyaMode = mode;
+        // Update UI
+        const btn = document.getElementById('diwaniya-toggle-btn');
+        if (btn) btn.textContent = '🔒 إغلاق الديوانية';
+        const stat = document.getElementById('stat-diwaniya');
+        if (stat) stat.textContent = '🟢 مفتوحة';
+        const modeLabel = { text: '✍️ كتابي', audio: '🎤 صوتي', video: '🎥 فيديو', both: '📝🎤 كتابي+صوتي', all: '📝🎥🎤 كل شي' };
+        const tl = document.querySelector('#timer-display .timer-label');
+        if (tl) tl.textContent = 'الديوانية مفتوحة - ' + (modeLabel[mode] || mode);
+        if (session.duration_minutes) startDiwaniyaTimer(session.duration_minutes);
+        setupChatMode(mode);
+        enableChat(true);
+        startMessagePolling();
+        if (socket?.connected) socket.emit('join_session', session.id);
+        showToast('🕌 الديوانية مفتوحة الآن! انضم', 'success');
+        playNotificationSound();
+        // If mode has audio/video, allow joining the call
+        if (['audio','video','both','all'].includes(mode)) {
+          const audioSection = document.getElementById('live-audio-section');
+          if (audioSection) audioSection.style.display = 'block';
+        }
+      }
+      // Detected: diwaniya closed
+      if (!isOpen && state.diwaniyaOpen) {
+        state.diwaniyaOpen = false;
+        state.activeSession = null;
+        stopDiwaniyaTimer();
+        enableChat(false);
+        stopMessagePolling();
+        const btn = document.getElementById('diwaniya-toggle-btn');
+        if (btn) btn.textContent = '🔓 فتح الديوانية';
+        const stat = document.getElementById('stat-diwaniya');
+        if (stat) stat.textContent = '🔴 متوقفة';
+        const audioSection = document.getElementById('live-audio-section');
+        if (audioSection) audioSection.style.display = 'none';
+        if (inLiveCall) leaveLiveAudio();
+        showToast('🔒 أغلقت الديوانية', 'error');
+      }
+    } catch(e) {}
+  }, 15000);
 }
 
 // Poll diwaniya messages every 4s while open (ensures moderator messages appear)
