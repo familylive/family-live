@@ -1801,3 +1801,23 @@ body {
   display: inline-block;
   padding: 2px 6px;
 }
+
+/* Call fullscreen */
+#video-grid.call-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: #000;
+  padding: 8px;
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 6px;
+  overflow: auto;
+}
+#video-grid.call-fullscreen .video-tile {
+  aspect-ratio: auto;
+  min-height: 160px;
+}
+#video-grid.call-fullscreen .video-name {
+  font-size: 13px;
+}
