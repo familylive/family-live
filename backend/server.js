@@ -1270,14 +1270,14 @@ app.get('/api/admin/gift-items', authMiddleware, adminMiddleware, async (req, re
   res.json({ gifts: await db.getAllGiftItems() });
 });
 app.post('/api/admin/gift-items/add', authMiddleware, adminMiddleware, async (req, res) => {
-  const { name, emoji, coins, gift_image } = req.body;
+  const { name, emoji, coins, gift_image, price } = req.body;
   if (!name) return res.status(400).json({ error: 'اسم الهدية مطلوب' });
-  const gift = await db.addGiftItem(name, emoji, coins, gift_image);
+  const gift = await db.addGiftItem(name, emoji, coins, gift_image, price);
   res.json({ message: '✅ تمت إضافة الهدية', gift });
 });
 app.post('/api/admin/gift-items/update', authMiddleware, adminMiddleware, async (req, res) => {
-  const { id, name, emoji, coins, status } = req.body;
-  const gift = await db.updateGiftItem(id, { name, emoji, coins, status });
+  const { id, name, emoji, coins, price, status, gift_image } = req.body;
+  const gift = await db.updateGiftItem(id, { name, emoji, coins, price, status, gift_image });
   res.json({ message: '✅ تم التحديث', gift });
 });
 app.post('/api/admin/gift-items/delete', authMiddleware, adminMiddleware, async (req, res) => {

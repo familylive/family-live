@@ -1036,13 +1036,15 @@
           <button class="btn btn-accent" onclick="addCoinPackageAdmin()">➕</button>
         </div>
         <div id="admin-coin-packages" style="margin-top:8px"></div>
-        <div class="card-title" style="font-size:14px;margin-top:14px">🎁 الهدايا</div>
+        <div class="card-title" style="font-size:14px;margin-top:14px">🎁 إدارة الهدايا</div>
+        <div class="form-group"><label>اسم الهدية</label><input class="form-input" id="gift-name" type="text" placeholder="مثال: أسد"></div>
+        <div class="form-group"><label>رمز الهدية (إيموجي)</label><input class="form-input" id="gift-emoji" type="text" placeholder="🦁"></div>
+        <div class="form-group"><label>صورة الهدية (GIF/صورة متحركة - من جهازك)</label><input class="form-input" id="gift-image-file" type="file" accept="image/*,.gif" onchange="previewGiftImage(this)"><img id="gift-image-preview" style="display:none;width:100px;height:100px;object-fit:contain;margin-top:6px"></div>
         <div style="display:flex;gap:8px">
-          <input class="form-input" id="gift-name" type="text" placeholder="اسم الهدية" style="flex:1">
-          <input class="form-input" id="gift-emoji" type="text" placeholder="رمز" style="width:60px">
-          <input class="form-input" id="gift-coins" type="number" placeholder="كوينز" style="width:70px">
-          <button class="btn btn-accent" onclick="addGiftItemAdmin()">➕</button>
+          <div class="form-group" style="flex:1"><label>🪙 بالكوينزات</label><input class="form-input" id="gift-coins" type="number" placeholder="10" value="10"></div>
+          <div class="form-group" style="flex:1"><label>💰 بالريال</label><input class="form-input" id="gift-price" type="number" placeholder="0" value="0"></div>
         </div>
+        <button class="btn btn-accent btn-full" onclick="addGiftItemAdmin()">➕ إضافة الهدية</button>
         <div id="admin-gift-items" style="margin-top:8px"></div>
         <div class="card-title" style="font-size:14px;margin-top:14px">📤 طلبات السحب</div>
         <div id="admin-withdrawals-list"><div class="empty-state"><div class="empty-text">لا توجد طلبات</div></div></div>
@@ -2891,16 +2893,47 @@ function showGiftOnCamera(data) {
   setTimeout(() => giftOverlay.remove(), 6000);
 }
 
-// Admin gifts
+let giftImageBase64 = '';
+
+function previewGiftImage(input) {
+  const file = input.files?.[0];
+  const preview = document.getElementById('gift-image-preview');
+  if (!file) return;
+  if (file.size > 3 * 1024 * 1024) {
+    showToast('الصورة كبيرة - الحد الأقصى 3MB', 'error');
+    input.value = '';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    giftImageBase64 = e.target.result;
+    if (preview) { preview.src = giftImageBase64; preview.style.display = 'block'; }
+  };
+  reader.readAsDataURL(file);
+}
+
 async function loadAdminGiftItems() {
   try {
     const { gifts } = await api('GET', '/api/admin/gift-items');
     const list = document.getElementById('admin-gift-items');
     if (gifts?.length) {
       list.innerHTML = gifts.map(g =>
-        '<div class="admin-family-item" style="display:flex;justify-content:space-between;align-items:center">' +
-          '<div>' + g.emoji + ' ' + g.name + ' · 🪙 ' + g.coins + '</div>' +
-          '<button class="btn btn-sm btn-danger" onclick="deleteGiftItemAdmin(\'' + g.id + '\')">🗑️</button>' +
+        '<div class="admin-family-item">' +
+          '<div class="admin-family-name">' + (g.gift_image ? '<img src="' + g.gift_image + '" style="width:32px;height:32px;vertical-align:middle;border-radius:6px">' : g.emoji) + ' ' + g.name +
+          ' <span style="font-size:11px;color:' + (g.status === 'active' ? 'var(--success)' : 'var(--danger)') + '">' + (g.status === 'active' ? 'نشطة' : 'موقوفة') + '</span></div>' +
+          '<div class="admin-family-meta">🪙 ' + g.coins + ' · 💰 ' + (g.price || 0) + ' ريال</div>' +
+          '<div class="admin-family-actions">' +
+            '<button class="btn btn-sm" onclick="editGiftItemAdmin(\'' + g.id + '\')">✏️ تعديل</button>' +
+            '<button class="btn btn-sm ' + (g.status === 'active' ? 'btn-danger' : 'btn-success') + '" onclick="toggleGiftItemAdmin(\'' + g.id + '\', \'' + (g.status === 'active' ? 'inactive' : 'active') + '\')">' + (g.status === 'active' ? '⛔ إيقاف' : '🟢 تفعيل') + '</button>' +
+            '<button class="btn btn-sm btn-danger" onclick="deleteGiftItemAdmin(\'' + g.id + '\')">🗑️ حذف</button>' +
+          '</div>' +
+          '<div id="gift-edit-' + g.id + '" style="display:none;margin-top:8px">' +
+            '<div class="form-group"><label>الاسم</label><input class="form-input" id="ge-name-' + g.id + '" value="' + (g.name||'') + '"></div>' +
+            '<div class="form-group"><label>الإيموجي</label><input class="form-input" id="ge-emoji-' + g.id + '" value="' + (g.emoji||'') + '"></div>' +
+            '<div style="display:flex;gap:8px"><div class="form-group" style="flex:1"><label>كوينز</label><input class="form-input" id="ge-coins-' + g.id + '" type="number" value="' + (g.coins||0) + '"></div>' +
+            '<div class="form-group" style="flex:1"><label>ريال</label><input class="form-input" id="ge-price-' + g.id + '" type="number" value="' + (g.price||0) + '"></div></div>' +
+            '<button class="btn btn-primary btn-full" onclick="saveGiftItemAdmin(\'' + g.id + '\')">💾 حفظ</button>' +
+          '</div>' +
         '</div>'
       ).join('');
     } else {
@@ -2912,14 +2945,43 @@ async function addGiftItemAdmin() {
   const name = document.getElementById('gift-name').value.trim();
   const emoji = document.getElementById('gift-emoji').value.trim();
   const coins = document.getElementById('gift-coins').value;
-  if (!name || !coins) return showToast('الاسم والكوينزات مطلوبة', 'error');
+  const price = document.getElementById('gift-price').value;
+  if (!name) return showToast('اسم الهدية مطلوب', 'error');
   try {
-    await api('POST', '/api/admin/gift-items/add', { name, emoji, coins });
+    await api('POST', '/api/admin/gift-items/add', { name, emoji, coins, price, gift_image: giftImageBase64 });
     showToast('✅ تمت إضافة الهدية', 'success');
+    giftImageBase64 = '';
+    document.getElementById('gift-name').value = '';
+    document.getElementById('gift-emoji').value = '';
+    document.getElementById('gift-image-file').value = '';
+    const prev = document.getElementById('gift-image-preview');
+    if (prev) { prev.style.display = 'none'; prev.src = ''; }
     loadAdminGiftItems();
   } catch(e) { showToast(e.message, 'error'); }
 }
+function editGiftItemAdmin(id) {
+  const el = document.getElementById('gift-edit-' + id);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+async function saveGiftItemAdmin(id) {
+  const name = document.getElementById('ge-name-' + id).value.trim();
+  const emoji = document.getElementById('ge-emoji-' + id).value.trim();
+  const coins = document.getElementById('ge-coins-' + id).value;
+  const price = document.getElementById('ge-price-' + id).value;
+  try {
+    await api('POST', '/api/admin/gift-items/update', { id, name, emoji, coins, price });
+    showToast('✅ تم الحفظ', 'success');
+    loadAdminGiftItems();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+async function toggleGiftItemAdmin(id, status) {
+  try {
+    await api('POST', '/api/admin/gift-items/update', { id, status });
+    loadAdminGiftItems();
+  } catch(e) {}
+}
 async function deleteGiftItemAdmin(id) {
+  if (!confirm('🗑️ حذف الهدية؟')) return;
   try { await api('POST', '/api/admin/gift-items/delete', { id }); loadAdminGiftItems(); } catch(e) {}
 }
 
