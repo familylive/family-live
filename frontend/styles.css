@@ -2458,3 +2458,11 @@ body {
 .gift-fs-family { color: #fff; font-size: 11px; }
 .gift-fs-to { color: #8ecfff; font-size: 11px; margin-top: 2px; }
 .gift-fullscreen.out { opacity: 0; transition: opacity .5s; }
+
+/* Gift item selected state */
+.gift-item.selected {
+  border-color: var(--gold);
+  box-shadow: 0 0 14px rgba(232,184,48,.5);
+  transform: scale(1.05);
+  background: rgba(232,184,48,.12);
+}

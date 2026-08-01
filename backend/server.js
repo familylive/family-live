@@ -2090,6 +2090,21 @@ io.on('connection', (socket) => {
     console.log(`🎤 User left audio call ${sessionId}`);
   });
   
+  // Camera invite: founder invites a present member to join on camera
+  socket.on('camera_invite', (data) => {
+    const { to, sessionId, founderId, founderName } = data;
+    io.to(`user_${to}`).emit('camera_invite', { sessionId, founderId, founderName });
+    socket.emit('camera_invite_sent', { to });
+    console.log(`📹 ${founderName} invited ${to} to camera in session ${sessionId}`);
+  });
+
+  // Camera invite response: member accepts/declines
+  socket.on('camera_invite_response', (data) => {
+    const { to, accept, inviteeName } = data;
+    io.to(`user_${to}`).emit('camera_invite_response', { accept, inviteeName });
+    console.log(`📹 ${inviteeName} ${accept ? 'accepted' : 'declined'} camera invite from ${to}`);
+  });
+
   socket.on('audio_offer', async (data) => {
     const { to, offer, sessionId, userName, fromUserId } = data;
     const senderId = fromUserId || socket.userId || null;
