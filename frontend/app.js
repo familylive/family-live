@@ -214,8 +214,7 @@ async function loadApp(user, family) {
       state.challenges = challData.challenges || [];
       state.pendingChallenges = challData.pending || [];
       state.leaderboard = lbData.leaderboard || [];
-      state.activeSession = diwData.session;
-      state.diwaniyaOpen = diwData.session?.status === 'open';
+      applyDiwaniyaSession(diwData.session);
     } else {
       // Admin or new user: load minimal data
       state.members = [];
@@ -710,7 +709,8 @@ async function refreshDiwaniyaNow() {
 // Apply a fetched session to the UI (shared by poll + page open)
 function applyDiwaniyaSession(session) {
   const isOpen = session?.status === 'open';
-  if (isOpen && !state.diwaniyaOpen) {
+  const wasOpen = state.diwaniyaOpen;
+  if (isOpen) {
     state.diwaniyaOpen = true;
     state.activeSession = session;
     const mode = session.mode || 'text';
@@ -729,10 +729,19 @@ function applyDiwaniyaSession(session) {
     if (socket?.connected) socket.emit('join_session', session.id);
     const audioSection = document.getElementById('live-audio-section');
     if (audioSection && ['audio','video','both','all'].includes(mode)) audioSection.style.display = 'block';
-    showToast('🕌 الديوانية مفتوحة الآن! انضم', 'success');
-    playNotificationSound();
+    // Show join button state based on mode
+    const joinBtn = document.getElementById('join-audio-btn');
+    if (joinBtn && ['audio','video','both','all'].includes(mode)) {
+      joinBtn.style.display = 'block';
+      joinBtn.textContent = '🎥 انضم لمكالمة الفيديو';
+      joinBtn.className = 'btn btn-accent btn-full';
+    }
+    if (!wasOpen) {
+      showToast('🕌 الديوانية مفتوحة الآن! انضم', 'success');
+      playNotificationSound();
+    }
   }
-  if (!isOpen && state.diwaniyaOpen) {
+  if (!isOpen && wasOpen) {
     state.diwaniyaOpen = false;
     state.activeSession = null;
     stopDiwaniyaTimer();
