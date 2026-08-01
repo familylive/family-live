@@ -1854,6 +1854,10 @@ app.post('/api/diwaniya/message', authMiddleware, async (req, res) => {
 app.post('/api/battles/start', authMiddleware, asyncHandler(async (req, res) => {
   const { opponentId, sessionId, durationMinutes } = req.body;
   if (!opponentId || !sessionId) return res.status(400).json({ error: 'بيانات ناقصة' });
+  // Only the founder opens the round
+  if (req.user.role !== 'founder' && req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'فقط مؤسس العائلة يفتح جولة التحدي' });
+  }
   if (opponentId === req.user.id) return res.status(400).json({ error: 'لا يمكنك تحدي نفسك' });
   const existing = await db.getActiveBattle(sessionId);
   if (existing) return res.status(400).json({ error: 'هناك تحدي قائم بالفعل في هذه الديوانية' });

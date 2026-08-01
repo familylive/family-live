@@ -2624,3 +2624,44 @@ body {
 .battle-fill-b { background: linear-gradient(90deg, #8ecfff, #5aa7ff); transition: width .5s ease; }
 .battle-timer { text-align: center; font-size: 12px; font-weight: 800; color: #fff; margin: 6px 0; }
 .battle-support-row { display: flex; gap: 6px; justify-content: center; }
+
+/* Tug-of-war battle line */
+.battle-line-track {
+  position: relative;
+  height: 30px;
+  margin-top: 10px;
+  background: linear-gradient(to right, rgba(232,184,48,.08), rgba(255,255,255,.05) 50%, rgba(142,207,255,.08));
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.battle-line-track::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 0; bottom: 0;
+  border-left: 1px dashed rgba(255,255,255,.25);
+}
+.battle-line {
+  position: absolute;
+  top: 2px; bottom: 2px;
+  width: 4px;
+  margin-left: -2px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #ffd75e, #e8b830);
+  box-shadow: 0 0 12px rgba(232,184,48,.9);
+  transition: left .7s cubic-bezier(.3,.9,.3,1);
+}
+.battle-line.sway { animation: lineSway 1s ease-in-out infinite; }
+@keyframes lineSway {
+  0%,100% { transform: translateX(-3px); }
+  50% { transform: translateX(3px); }
+}
+.battle-line-label {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+  font-weight: 900;
+  color: var(--text-muted);
+}

@@ -1589,6 +1589,8 @@ async function joinLiveAudio() {
     if (presenceEl) presenceEl.style.display = 'block';
     const invBtn = document.getElementById('cam-invite-btn');
     if (invBtn) invBtn.style.display = (state.isFounder || state.user?.role === 'admin') ? 'block' : 'none';
+    const bsb = document.getElementById('battle-start-box');
+    if (bsb) bsb.style.display = (state.isFounder || state.user?.role === 'admin') ? 'block' : 'none';
     updateAudioCallUI(true);
     startCallWatermark();
     if (isModeratorVisit) {
@@ -1854,11 +1856,16 @@ function renderBattle(b) {
   document.getElementById('battle-coins-a').textContent = '🪙 ' + (b.coins_a || 0);
   document.getElementById('battle-coins-b').textContent = '🪙 ' + (b.coins_b || 0);
   const total = (b.coins_a || 0) + (b.coins_b || 0);
-  const pctA = total ? Math.round(b.coins_a / total * 100) : 50;
-  const fa = bar.querySelector('.battle-fill-a');
-  const fb = bar.querySelector('.battle-fill-b');
-  if (fa) fa.style.width = pctA + '%';
-  if (fb) fb.style.width = (100 - pctA) + '%';
+  // Tug-of-war line: 50% = center, moves toward the leader
+  const linePos = total ? 50 + ((b.coins_a || 0) - (b.coins_b || 0)) / total * 50 : 50;
+  const line = document.getElementById('battle-line');
+  if (line) {
+    line.style.left = Math.max(3, Math.min(97, linePos)) + '%';
+    line.classList.remove('sway');
+    void line.offsetWidth;
+    // sway when close to center (tie fight)
+    if (Math.abs(linePos - 50) < 8) line.classList.add('sway');
+  }
   // Timer
   if (b.status === 'active' && b.start_time) {
     const dur = (b.duration_minutes || 3) * 60;
