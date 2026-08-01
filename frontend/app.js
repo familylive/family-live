@@ -1115,10 +1115,10 @@ function toggleMic() {
     btn.classList.toggle('off', micMuted);
   }
   // Show state on my tile
-  const state = document.getElementById('my-tile-state');
-  if (state) {
-    state.textContent = micMuted ? '🔇 كتم المايك' : '';
-    state.classList.toggle('muted-state', micMuted);
+  const tileState = document.getElementById('my-tile-state');
+  if (tileState) {
+    tileState.textContent = micMuted ? '🔇 كتم المايك' : '';
+    tileState.classList.toggle('muted-state', micMuted);
   }
   showToast(micMuted ? '🔇 كتمت المايك - ما يسمعونك' : '🎤 فتحت المايك', micMuted ? 'error' : 'success');
 }
@@ -1141,15 +1141,15 @@ function toggleCamera() {
       overlay = document.createElement('div');
       overlay.className = 'cam-off-overlay';
       overlay.style.display = 'none';
-      overlay.innerHTML = '<div class="cam-off-circle">' + avatarHtml(state.user?.avatar) + '</div><div class="cam-off-icon">🚫</div><div class="cam-off-label">كاميرا مغلقة</div>';
+      overlay.innerHTML = '<div class="cam-off-circle">' + avatarHtml(globalThis.state?.user?.avatar) + '</div><div class="cam-off-icon">🚫</div><div class="cam-off-label">كاميرا مغلقة</div>';
       myTile.appendChild(overlay);
     }
     overlay.style.display = camOff ? 'flex' : 'none';
   }
-  const state = document.getElementById('my-tile-state');
-  if (state) {
-    state.textContent = camOff ? '' : '';
-    if (!micMuted) state.classList.remove('muted-state');
+  const tileState = document.getElementById('my-tile-state');
+  if (tileState) {
+    tileState.textContent = '';
+    if (!micMuted) tileState.classList.remove('muted-state');
   }
   showToast(camOff ? '🚫 أغلقت الكاميرا - يسمعونك فقط' : '🎥 فتحت الكاميرا', camOff ? 'error' : 'success');
 }
@@ -1334,14 +1334,33 @@ function leaveLiveAudio() {
   micMuted = false; camOff = false;
   const micBtn = document.getElementById('mic-toggle-btn');
   const camBtn = document.getElementById('cam-toggle-btn');
-  const state = document.getElementById('my-tile-state');
+  const tileState = document.getElementById('my-tile-state');
   if (micBtn) { micBtn.textContent = '🎤'; micBtn.classList.remove('off','muted'); }
   if (camBtn) { camBtn.textContent = '🎥'; camBtn.classList.remove('off'); }
-  if (state) { state.textContent = ''; state.classList.remove('muted-state'); }
+  if (tileState) { tileState.textContent = ''; tileState.classList.remove('muted-state'); }
   
   inLiveCall = false;
-  socket.emit('leave_audio_call', { sessionId: state.activeSession.id, userId: state.user.id });
+  // Remove local video tile content + close overlays (gifts/zoom)
+  const myTile = document.getElementById('my-video-tile');
+  if (myTile) {
+    const ov = myTile.querySelector('.cam-off-overlay');
+    if (ov) ov.style.display = 'none';
+  }
+  if (socket?.connected) {
+    socket.emit('leave_audio_call', {
+      sessionId: state?.activeSession?.id || null,
+      userId: state?.user?.id || null
+    });
+  }
   updateAudioCallUI(false);
+  // Force-hide call UI even if updateAudioCallUI failed
+  const ctrl = document.getElementById('call-controls');
+  const grid = document.getElementById('video-grid');
+  if (ctrl) ctrl.style.display = 'none';
+  if (grid) { grid.style.display = 'none'; grid.innerHTML = ''; }
+  // Reset my video
+  const myVideo = document.getElementById('my-video');
+  if (myVideo) { myVideo.srcObject = null; myVideo.style.display = 'none'; }
   showToast('غادرت المكالمة');
 }
 
