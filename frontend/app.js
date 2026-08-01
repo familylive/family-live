@@ -442,6 +442,15 @@ function connectSocket() {
     if (el) el.textContent = data.videoLimit || 6;
   });
   socket.on('video_slots_full', (data) => {
+    // Turn off camera - become audio-only listener (still hears + sees others)
+    if (localStream) {
+      localStream.getVideoTracks().forEach(t => t.enabled = false);
+      camOff = true;
+      const myVideo = document.getElementById('my-video');
+      if (myVideo) myVideo.style.display = 'none';
+      const camBtn = document.getElementById('cam-toggle-btn');
+      if (camBtn) { camBtn.textContent = '🚫'; camBtn.classList.add('off'); }
+    }
     showToast(data.message || '🎥 الكاميرات ممتلئة - ستنضم بالصوت', 'error');
   });
   socket.on('call_participants', (data) => {
@@ -1145,8 +1154,9 @@ async function joinLiveAudio() {
   const isModeratorVisit = (state.user?.role === 'moderator') || (state.user?.role === 'admin' && document.getElementById('moderator-send-box')?.style.display === 'block');
   
   try {
-    // Observer (moderator): audio only to receive, video NEVER requested (camera forced off)
-    localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    // Normal users: request camera (server limits to 6). Moderator: audio only.
+    const wantVideo = !isModeratorVisit;
+    localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: wantVideo });
     
     if (isModeratorVisit) {
       // Forced observer: mute mic immediately, no camera at all
