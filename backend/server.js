@@ -2166,22 +2166,20 @@ async function bootstrap() {
     }
   } catch(e) { console.log('Coin trial error:', e.message); }
   
-  // Seed default gifts
+  // Seed default gifts (self-healing: insert any missing by name)
   try {
-    const gp = await db.execQuery('SELECT COUNT(*) c FROM gift_items');
-    if (!gp.length || gp[0].c === 0) {
-      // 10 default gifts
-      await db.addGiftItem('ورد', '🌹', 10, null, 1);
-      await db.addGiftItem('قلب', '❤️', 20, null, 2);
-      await db.addGiftItem('دبدوب', '🧸', 30, null, 3);
-      await db.addGiftItem('شوكولاتة', '🍫', 50, null, 5);
-      await db.addGiftItem('تاج', '👑', 100, null, 10);
-      await db.addGiftItem('ميدالية', '🏅', 150, null, 15);
-      await db.addGiftItem('ماسة', '💎', 200, null, 20);
-      await db.addGiftItem('سيارة', '🚗', 350, null, 35);
-      await db.addGiftItem('شلال', '🎆', 500, null, 50);
-      await db.addGiftItem('قلعة', '🏰', 1000, null, 100);
-      console.log('✅ Seeded 10 default gifts');
+    const defaults = [
+      ['ورد','🌹',10,1], ['قلب','❤️',20,2], ['دبدوب','🧸',30,3],
+      ['شوكولاتة','🍫',50,5], ['تاج','👑',100,10], ['ميدالية','🏅',150,15],
+      ['ماسة','💎',200,20], ['سيارة','🚗',350,35], ['شلال','🎆',500,50],
+      ['قلعة','🏰',1000,100]
+    ];
+    for (const [gname, gemoji, gcoins, gprice] of defaults) {
+      const ex = await db.execQuery('SELECT id FROM gift_items WHERE name = $1', [gname]);
+      if (!ex.length) {
+        await db.addGiftItem(gname, gemoji, gcoins, null, gprice);
+        console.log('🎁 Added gift: ' + gname);
+      }
     }
   } catch(e) { console.log('Gift seed error:', e.message); }
   
