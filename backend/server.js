@@ -3,6 +3,7 @@ const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const path = require('path');
+const fs = require('fs');
 const http = require('http');
 const { Server } = require('socket.io');
 const { v4: uuidv4 } = require('uuid');
@@ -31,16 +32,22 @@ app.use(async (req, res, next) => {
   next();
 });
 
+// Dynamic frontend version fingerprint (changes every deploy -> kills stale cache)
+const FRONTEND_VER = String(Date.now());
+function serveIndex(req, res) {
+  try {
+    const html = fs.readFileSync(path.join(__dirname, '..', 'frontend', 'index.html'), 'utf8');
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-store');
+    res.send(html.replace(/v=\d+/g, 'v=' + FRONTEND_VER));
+  } catch(e) { res.status(500).send('خطأ في تحميل الواجهة'); }
+}
+
 // Serve static frontend files
 app.use(express.static(path.join(__dirname, '..', 'frontend')));
 
-// Invite page: serve the SPA so registration opens with the invite token
-app.get('/invite', (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'frontend', 'index.html'));
-});
-app.get('/invite/', (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'frontend', 'index.html'));
-});
+// Index + invite pages: serve SPA with fresh version fingerprint
+app.get(['/', '/index.html', '/invite', '/invite/'], serveIndex);
 
 // Auth middleware
 function authMiddleware(req, res, next) {
