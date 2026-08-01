@@ -1594,6 +1594,19 @@ io.on('connection', (socket) => {
 // =============== SEED DATA ===============
 
 
+// =============== PROCESS ERROR HANDLERS (prevent crash) ===============
+process.on('unhandledRejection', (reason) => {
+  console.log('⚠️ Unhandled rejection:', reason && reason.message || reason);
+});
+process.on('uncaughtException', (err) => {
+  console.log('⚠️ Uncaught exception:', err.message);
+});
+
+// Async route wrapper (Express 4 doesn't catch async errors)
+const asyncHandler = (fn) => (req, res, next) => {
+  Promise.resolve(fn(req, res, next)).catch(next);
+};
+
 // =============== GLOBAL ERROR HANDLER ===============
 app.use((err, req, res, next) => {
   console.log('❌ Route error:', err.message, err.code || '');
