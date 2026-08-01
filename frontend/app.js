@@ -242,7 +242,12 @@ function updateAllUI() {
   try {
   document.getElementById('menu-user-name').textContent = state.user?.name || '';
   document.getElementById('menu-user-role').textContent = state.isFounder ? 'المؤسس 👑' : 'عضو';
-  document.getElementById('menu-avatar').textContent = state.user?.avatar || '👤';
+  const menuAv = document.getElementById('menu-avatar');
+  if (state.user?.avatar && state.user.avatar.startsWith('data:')) {
+    menuAv.innerHTML = '<img src="' + state.user.avatar + '" style="width:100%;height:100%;border-radius:50%;object-fit:cover">';
+  } else {
+    menuAv.textContent = state.user?.avatar || '👤';
+  }
   document.getElementById('points-display').textContent = state.points || 0;
   const headerCoins = document.getElementById('header-coins');
   if (headerCoins) headerCoins.textContent = state.coins || 0;
@@ -552,7 +557,7 @@ async function loadDiwaniyaMessages(sessionId, isPoll = false) {
     const { messages } = await api('GET', `/api/diwaniya/messages/${sessionId}`);
     const room = document.getElementById('chat-room'); if (!room) return;
     room.innerHTML = '';
-    messages.forEach(msg => addChatMessage(msg.user_name, msg.message, msg.user_id === state.user?.id));
+    messages.forEach(msg => addChatMessage(msg.user_name, msg.message, msg.user_id === state.user?.id, msg.avatar));
     
     // Popup notification for NEW moderator/system messages (from others)
     if (isPoll && messages.length > lastMsgCount) {
@@ -811,13 +816,14 @@ function enableChat(enabled) {
   if (btn) btn.disabled = !enabled;
 }
 
-function addChatMessage(name, text, isSent) {
+function addChatMessage(name, text, isSent, avatar) {
   const room = document.getElementById('chat-room');
   if (!room) return;
   const empty = room.querySelector('.empty-state');
   if (empty) room.innerHTML = '';
   const msg = document.createElement('div');
   msg.className = 'chat-msg' + (isSent ? ' sent' : '');
+  msg.avatar = avatar;
   const initial = name?.charAt(0) || '👤';
   const time = new Date().toLocaleTimeString('ar-SA', { hour:'2-digit', minute:'2-digit' });
   msg.innerHTML = '<div class="chat-avatar">' + initial + '</div><div>' +

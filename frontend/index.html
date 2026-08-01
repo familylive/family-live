@@ -725,6 +725,11 @@
       <div class="card">
         <div class="card-title">✏️ تعديل الملف الشخصي</div>
         <div class="form-group">
+          <label>صورة العرض (من جهازك)</label>
+          <input class="form-input" id="profile-avatar-file" type="file" accept="image/*" onchange="previewProfileAvatar(this)">
+          <div style="text-align:center;margin-top:8px"><img id="profile-avatar-preview" src="" style="width:90px;height:90px;border-radius:50%;object-fit:cover;display:none;border:3px solid var(--gold)"></div>
+        </div>
+        <div class="form-group">
           <label>الاسم</label>
           <input class="form-input" id="profile-edit-name" type="text">
         </div>
@@ -1953,6 +1958,12 @@ async function loadProfilePage() {
   document.getElementById('profile-email').textContent = user?.email || '-';
   
   document.getElementById('profile-edit-name').value = user?.name || '';
+  // Show avatar preview
+  const avPreview = document.getElementById('profile-avatar-preview');
+  if (avPreview && user?.avatar && user.avatar.startsWith('data:')) {
+    avPreview.src = user.avatar;
+    avPreview.style.display = 'block';
+  }
   document.getElementById('profile-edit-country').value = user?.country || '';
   document.getElementById('profile-edit-city').value = user?.city || '';
   document.getElementById('profile-edit-phone').value = user?.phone || '';
@@ -1996,6 +2007,25 @@ async function switchFamily(familyId) {
   } catch(e) { showToast(e.message, 'error'); }
 }
 
+let profileAvatarBase64 = '';
+
+function previewProfileAvatar(input) {
+  const file = input.files?.[0];
+  const preview = document.getElementById('profile-avatar-preview');
+  if (!file) return;
+  if (file.size > 2 * 1024 * 1024) {
+    showToast('الصورة كبيرة - الحد الأقصى 2MB', 'error');
+    input.value = '';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    profileAvatarBase64 = e.target.result;
+    if (preview) { preview.src = profileAvatarBase64; preview.style.display = 'block'; }
+  };
+  reader.readAsDataURL(file);
+}
+
 async function saveProfile() {
   const name = document.getElementById('profile-edit-name').value.trim();
   const country = document.getElementById('profile-edit-country').value.trim();
@@ -2005,12 +2035,13 @@ async function saveProfile() {
   const currency = document.getElementById('profile-edit-currency').value;
   if (!name) return showToast('الاسم مطلوب', 'error');
   try {
-    const { user } = await api('POST', '/api/profile/update', { name, country, city, phone, whatsapp, currency });
+    const { user } = await api('POST', '/api/profile/update', { name, country, city, phone, whatsapp, currency, avatar: profileAvatarBase64 || undefined });
     state.user.currency = currency;
     userCurrency = currency; // flip prices immediately
     state.user = { ...state.user, ...user };
     updateAllUI();
     loadProfilePage();
+    profileAvatarBase64 = '';
     // Refresh prices with new currency
     loadLandingPackages();
     loadLandingAuctions();
