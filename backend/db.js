@@ -94,6 +94,8 @@ async function initDb() {
   try { await run("ALTER TABLE families ADD COLUMN IF NOT EXISTS secret_room_purchased_at TEXT"); } catch(e) {}
   try { await run("ALTER TABLE families ADD COLUMN IF NOT EXISTS name_changed_at TEXT"); } catch(e) {}
   try { await run("ALTER TABLE families ADD COLUMN IF NOT EXISTS name_changes_count INTEGER DEFAULT 0"); } catch(e) {}
+  try { await run("ALTER TABLE families ADD COLUMN IF NOT EXISTS image TEXT"); } catch(e) {}
+  try { await run("ALTER TABLE families ADD COLUMN IF NOT EXISTS description TEXT"); } catch(e) {}
   try { await run("ALTER TABLE diwaniya_sessions ADD COLUMN IF NOT EXISTS secret_code TEXT"); } catch(e) {}
   try { await run("ALTER TABLE diwaniya_sessions ADD COLUMN IF NOT EXISTS capacity INTEGER DEFAULT 15"); } catch(e) {}
   try { await run("ALTER TABLE diwaniya_sessions ADD COLUMN IF NOT EXISTS video_limit INTEGER DEFAULT 6"); } catch(e) {}

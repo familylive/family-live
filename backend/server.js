@@ -1916,20 +1916,32 @@ io.on('connection', (socket) => {
   console.log('Socket connected:', socket.id);
 
   socket.on('join_family', async (familyId) => {
+    // Zombie guard: family must exist (stale sessions get killed)
+    try {
+      const fam = await db.getFamily(familyId);
+      if (!fam) {
+        socket.emit('session_invalid', { message: 'جلسة قديمة - سجل الخروج والدخول مرة أخرى' });
+        socket.disconnect(true);
+        return;
+      }
+    } catch(e) { socket.disconnect(true); return; }
     socket.join(`family_${familyId}`);
     console.log(`Socket ${socket.id} joined family ${familyId}`);
   });
 
   socket.on('join_user', async (userId) => {
-    socket.userId = userId;
-    socket.join(`user_${userId}`);
-    onlineUsers.add(userId);
-    console.log(`🟢 ${userId} online`);
-    // Notify family members that this user is online
-    const user = await db.getUserById(userId);
-    if (user && user.family_id) {
-      io.to(`family_${user.family_id}`).emit('user_online', { userId, name: user.name });
-    }
+    // Zombie guard: user must exist
+    try {
+      const user = await db.getUserById(userId);
+      if (!user) { socket.disconnect(true); return; }
+      socket.userId = userId;
+      socket.join(`user_${userId}`);
+      onlineUsers.add(userId);
+      console.log(`🟢 ${userId} online`);
+      if (user.family_id) {
+        io.to(`family_${user.family_id}`).emit('user_online', { userId, name: user.name });
+      }
+    } catch(e) { socket.disconnect(true); }
   });
 
   socket.on('join_session', async (sessionId) => {

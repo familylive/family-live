@@ -562,6 +562,12 @@ function connectSocket() {
     if (chip) chip.remove();
     showToast('👢 تم طرد عضو بواسطة ' + (data.byName || 'المؤسس'), 'error');
   });
+  socket.on('session_invalid', () => {
+    localStorage.clear();
+    sessionStorage.clear();
+    if (socket) socket.disconnect();
+    location.reload();
+  });
   socket.on('coins_charged', (data) => {
     showToast('🎉 تم شحن حسابك بـ ' + data.amount + ' كوينز!', 'success');
     playNotificationSound();
