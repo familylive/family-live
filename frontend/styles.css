@@ -2466,3 +2466,10 @@ body {
   transform: scale(1.05);
   background: rgba(232,184,48,.12);
 }
+
+/* Bigger entry banner */
+.entry-banner { padding: 10px 24px 10px 10px; }
+.entry-avatar { width: 46px; height: 46px; min-width: 46px; font-size: 24px; }
+.entry-name { font-size: 16px; }
+.entry-sub { font-size: 12px; }
+.entry-confetti { font-size: 24px; }

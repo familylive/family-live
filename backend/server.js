@@ -1263,7 +1263,7 @@ app.get('/api/gifts/items', async (req, res) => {
 });
 
 // Send gift to member on camera (via socket)
-app.post('/api/gifts/send', authMiddleware, async (req, res) => {
+app.post('/api/gifts/send', authMiddleware, asyncHandler(async (req, res) => {
   const { giftId, toId, sessionId } = req.body;
   const gift = await db.execQuery("SELECT * FROM gift_items WHERE id = $1 AND status = 'active'", [giftId]);
   if (!gift.length) return res.status(400).json({ error: 'الهدية غير متاحة' });
@@ -1281,14 +1281,14 @@ app.post('/api/gifts/send', authMiddleware, async (req, res) => {
     giftImage: gift[0].gift_image || null,
     fromName: fromUser.name,
     toName: toUser?.name || 'عضو',
-    familyName: fam?.name || state?.family?.name || '',
+    familyName: fam?.name || '',
     toId: toId,
     fromId: req.user.id
   });
   // Notify recipient
   io.to(`user_${toId}`).emit('gift_received', { fromName: fromUser.name, coins: gift[0].coins, message: gift[0].emoji + ' ' + gift[0].name });
   res.json({ message: '🎁 أرسلت ' + gift[0].emoji + ' ' + gift[0].name + ' إلى العضو', wallet: result.wallet });
-});
+}));
 
 // Admin: gift items management
 app.get('/api/admin/gift-items', authMiddleware, adminMiddleware, async (req, res) => {
@@ -2050,6 +2050,19 @@ io.on('connection', (socket) => {
       return;
     }
     
+    // VIDEO LIMIT ENFORCEMENT (founder sets 1-6): 7th+ camera joins audio-only
+    let wantsVideo = !!data.wantsVideo;
+    try {
+      const sessRow = await db.getDiwaniyaSessionById(sessionId);
+      const videoLimit = sessRow?.video_limit || 6;
+      const videoOnCount = participants.filter(p => p.wantsVideo && !p.isObserver).length;
+      if (wantsVideo && !isObserver && videoOnCount >= videoLimit) {
+        wantsVideo = false;
+        socket.emit('video_slots_full', { videoLimit, message: '🎥 الكاميرات ممتلئة (' + videoLimit + ') - ستنضم بالصوت فقط' });
+        console.log(`🎥 ${userName} joined audio-only (video limit ${videoLimit} reached)`);
+      }
+    } catch(e) {}
+    
     // Fetch avatar for the joining user
     let avatar = null;
     try {
@@ -2062,7 +2075,7 @@ io.on('connection', (socket) => {
       io.to(p.socketId).emit('user_joined_call', { userId, userName, avatar, isObserver: !!isObserver || forcedAudioOnly });
     });
     
-    participants.push({ socketId: socket.id, userId, userName, avatar, isObserver: !!isObserver || forcedAudioOnly });
+    participants.push({ socketId: socket.id, userId, userName, avatar, isObserver: !!isObserver || forcedAudioOnly, wantsVideo });
     
     // Send current participants to the new user
     socket.emit('call_participants', { 

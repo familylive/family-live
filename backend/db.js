@@ -236,6 +236,7 @@ async function closeDiwaniya(sessionId) {
   return queryOne('SELECT * FROM diwaniya_sessions WHERE id = $1', [sessionId]);
 }
 async function getActiveDiwaniya(familyId) { return queryOne("SELECT * FROM diwaniya_sessions WHERE family_id = $1 AND status = 'open' ORDER BY opened_at DESC LIMIT 1", [familyId]); }
+async function getDiwaniyaSessionById(sessionId) { return queryOne('SELECT * FROM diwaniya_sessions WHERE id = $1', [sessionId]); }
 async function getDiwaniyaHistory(familyId) { return query('SELECT ds.*, u.name as opened_by_name FROM diwaniya_sessions ds JOIN users u ON ds.opened_by = u.id WHERE ds.family_id = $1 ORDER BY ds.opened_at DESC LIMIT 20', [familyId]); }
 async function addDiwaniyaMessage(sessionId, userId, message) {
   const id = uuidv4();
@@ -885,7 +886,7 @@ module.exports = {
   createFamily, getFamily, validateSubscriptionCode, updateFamilyFounder, leaveFamily,
   generateSubscriptionCodes, generatePremiumCode, getAvailablePremiumCodes, purchaseCode, getUserCodes, getFirstAvailablePremiumCode, updatePrice,
   createInvitation, createInvitationByPhone, getInvitationsByFamily, getInvitationByToken, acceptInvitation,
-  openDiwaniya, closeDiwaniya, getActiveDiwaniya, verifyDiwaniyaCode, getDiwaniyaHistory, addDiwaniyaMessage, getDiwaniyaMessages,
+  openDiwaniya, closeDiwaniya, getActiveDiwaniya, getDiwaniyaSessionById, verifyDiwaniyaCode, getDiwaniyaHistory, addDiwaniyaMessage, getDiwaniyaMessages,
   createChallenge, respondToChallenge, completeChallenge, getFamilyChallenges, getPendingChallenges, getFamilyLeaderboard,
   createAuction, getActiveAuctions, getAllAuctions, getAuctionById, joinAuction, placeBid, endAuction, confirmAuctionPayment, cancelAuction, getAuctionBids, isAuctionParticipant, getAvailableAuctionCodes,
   getAllFamilies, updateFamilyData, setFamilyStatus, deleteFamily, getAllUsersDetailed, updateUserByAdmin, deleteUserByAdmin, createAdminUser, createUserByRole, getAdminStats,

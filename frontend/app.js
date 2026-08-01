@@ -1324,7 +1324,7 @@ function showEntryBanner(name, avatar, subText) {
   entryBannerTimer = setTimeout(() => {
     banner.classList.remove('show');
     setTimeout(() => { banner.style.display = 'none'; }, 600);
-  }, 5000);
+  }, 6500);
 }
 
 // Presence: members currently in the call
