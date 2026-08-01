@@ -355,8 +355,30 @@ async function addUserToFamily(userId, familyId, isCurrent = 0) {
 async function setCurrentFamily(userId, familyId) { await run('UPDATE user_families SET is_current = 0 WHERE user_id = $1', [userId]); await run('UPDATE user_families SET is_current = 1 WHERE user_id = $1 AND family_id = $2', [userId, familyId]); }
 
 // =============== SETTINGS ===============
-async function getCurrencyRate() { return parseFloat(await getSetting('currency_rate', '3.75')); }
-async function setCurrencyRate(rate) { await setSetting('currency_rate', rate); }
+let cachedRate = null;
+let cachedAt = 0;
+
+async function getCurrencyRate() {
+  // Use cached live rate (valid 1 hour)
+  if (cachedRate && (Date.now() - cachedAt < 3600000)) return cachedRate;
+  // Try live rate
+  try {
+    const res = await fetch('https://open.er-api.com/v6/latest/USD');
+    const data = await res.json();
+    if (data && data.rates && data.rates.SAR) {
+      cachedRate = parseFloat(data.rates.SAR);
+      cachedAt = Date.now();
+      await setSetting('currency_rate', cachedRate.toString());
+      return cachedRate;
+    }
+  } catch(e) {}
+  // Fallback to setting or fixed
+  const fallback = parseFloat(await getSetting('currency_rate', '3.75'));
+  cachedRate = fallback;
+  cachedAt = Date.now();
+  return fallback;
+}
+async function setCurrencyRate(rate) { await setSetting('currency_rate', rate); cachedRate = parseFloat(rate); cachedAt = Date.now(); }
 
 async function getSetting(key, def) { const r = await queryOne('SELECT value FROM settings WHERE key = $1', [key]); return r ? r.value : def; }
 async function setSetting(key, value) { await run('INSERT INTO settings (key, value) VALUES ($1,$2) ON CONFLICT (key) DO UPDATE SET value = $2', [key, String(value)]); }
