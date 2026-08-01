@@ -529,6 +529,23 @@ function connectSocket() {
     if (chip) chip.remove();
     showToast('👢 تم طرد عضو بواسطة ' + (data.byName || 'المؤسس'), 'error');
   });
+  socket.on('diwaniya_action_announce', (data) => {
+    // Public: everyone sees who was kicked/restricted and why
+    const icon = data.action === 'kick' ? '👢' : '🙊';
+    const actionName = data.action === 'kick' ? 'طرد' : 'تقييد';
+    const msg = icon + ' تم ' + actionName + ' العضو «' + (data.victimName || 'عضو') + '» بسبب: ' + data.reason + ' — بواسطة مؤسس العائلة ' + (data.byName || '');
+    showToast(msg, 'error');
+    // Add as system message in diwaniya chat
+    const room = document.getElementById('chat-room');
+    if (room) {
+      const sys = document.createElement('div');
+      sys.className = 'system-msg';
+      sys.style.cssText = 'text-align:center;font-size:12px;color:var(--gold);margin:8px 0;font-weight:700;background:rgba(232,184,48,.12);padding:8px;border-radius:8px';
+      sys.textContent = msg;
+      room.appendChild(sys);
+      room.scrollTop = room.scrollHeight;
+    }
+  });
   socket.on('video_limit_updated', (data) => {
     const el = document.getElementById('video-limit-display');
     if (el) el.textContent = data.videoLimit || 6;
@@ -1494,28 +1511,90 @@ function addRemoteAudio(peerId, peerName, stream) {
   }
 }
 
-// Founder: kick member from diwaniya (any mode)
-async function kickFromDiwaniya(userId) {
+let founderActionTarget = null; // { userId, action }
+
+// Founder: kick member from diwaniya (any mode) - with reason
+function kickFromDiwaniya(userId) {
+  founderActionTarget = { userId, action: 'kick' };
+  openFounderActionModal();
+}
+
+// Founder: restrict member (listen only) - with reason
+function restrictMember(userId) {
+  founderActionTarget = { userId, action: 'restrict' };
+  openFounderActionModal();
+}
+
+async function openFounderActionModal() {
+  const isKick = founderActionTarget.action === 'kick';
+  document.getElementById('founder-action-title').textContent = isKick ? '👢 سبب طرد العضو' : '🙊 سبب تقييد العضو';
+  const name = document.getElementById('participant-' + founderActionTarget.userId)?.textContent?.replace(/[⛔🙊]/g, '')?.trim() || 'العضو';
+  document.getElementById('founder-action-victim').textContent = 'العضو: ' + name;
+  // Load templates
+  try {
+    const { templates } = await api('GET', '/api/violations/templates');
+    const sel = document.getElementById('founder-action-reason');
+    sel.innerHTML = '<option value="">اختر السبب...</option>' +
+      (templates || []).map(t => '<option value="' + t.name + '">' + (t.icon || '🚫') + ' ' + t.name + '</option>').join('') +
+      '<option value="__custom__">✍️ سبب آخر...</option>';
+  } catch(e) {}
+  document.getElementById('founder-action-modal').style.display = 'flex';
+}
+
+function founderActionCustom() {
+  const v = document.getElementById('founder-action-reason').value;
+  document.getElementById('founder-action-custom-wrap').style.display = v === '__custom__' ? 'block' : 'none';
+}
+
+async function confirmFounderAction() {
+  if (!founderActionTarget) return;
+  let reason = document.getElementById('founder-action-reason').value;
+  if (reason === '__custom__') reason = document.getElementById('founder-action-custom').value.trim();
+  if (!reason) return showToast('اختر أو اكتب سبب ' + (founderActionTarget.action === 'kick' ? 'الطرد' : 'التقييد'), 'error');
+  const { userId, action } = founderActionTarget;
   const sessionId = state.activeSession?.id;
   if (!sessionId) return;
-  const name = document.getElementById('participant-' + userId)?.textContent?.replace(/[⛔🙊]/g, '')?.trim() || 'العضو';
-  if (!confirm('👢 طرد ' + name + ' من الديوانية نهائياً؟')) return;
   try {
-    const result = await api('POST', '/api/diwaniya/kick', { userId, sessionId });
+    const endpoint = action === 'kick' ? '/api/diwaniya/kick' : '/api/diwaniya/restrict';
+    const result = await api('POST', endpoint, { userId, sessionId, reason, restricted: action === 'restrict' });
     showToast(result.message, 'success');
+    document.getElementById('founder-action-modal').style.display = 'none';
+    founderActionTarget = null;
   } catch(e) { showToast(e.message, 'error'); }
 }
 
-// Founder: restrict member (listen only)
-async function restrictMember(userId) {
-  const sessionId = state.activeSession?.id;
-  if (!sessionId) return;
-  const name = document.getElementById('participant-' + userId)?.textContent?.replace(/[⛔🙊]/g, '')?.trim() || 'العضو';
-  if (!confirm('🙊 تقييد ' + name + ' (يستمع فقط - بدون كتابة أو كاميرا)؟')) return;
+// Admin: violation templates
+async function loadAdminViolationTemplates() {
   try {
-    const result = await api('POST', '/api/diwaniya/restrict', { userId, sessionId, restricted: true });
-    showToast(result.message, 'success');
+    const { templates } = await api('GET', '/api/admin/violation-templates');
+    const list = document.getElementById('admin-vt-list');
+    if (templates?.length) {
+      list.innerHTML = templates.map(t =>
+        '<div class="admin-family-item" style="display:flex;justify-content:space-between;align-items:center">' +
+          '<div>' + (t.icon || '🚫') + ' ' + t.name + '</div>' +
+          '<button class="btn btn-sm btn-danger" onclick="deleteViolationTemplateAdmin(\'' + t.id + '\')">🗑️</button>' +
+        '</div>'
+      ).join('');
+    } else {
+      list.innerHTML = '<div class="empty-state"><div class="empty-text">لا توجد أنواع</div></div>';
+    }
+  } catch(e) {}
+}
+async function addViolationTemplateAdmin() {
+  const name = document.getElementById('vt-name').value.trim();
+  const icon = document.getElementById('vt-icon').value.trim();
+  if (!name) return showToast('اسم النوع مطلوب', 'error');
+  try {
+    await api('POST', '/api/admin/violation-templates/add', { name, icon });
+    showToast('✅ تمت الإضافة', 'success');
+    document.getElementById('vt-name').value = '';
+    document.getElementById('vt-icon').value = '';
+    loadAdminViolationTemplates();
   } catch(e) { showToast(e.message, 'error'); }
+}
+async function deleteViolationTemplateAdmin(id) {
+  if (!confirm('🗑️ حذف نوع المخالفة؟')) return;
+  try { await api('POST', '/api/admin/violation-templates/delete', { id }); loadAdminViolationTemplates(); } catch(e) {}
 }
 
 function removeRemoteAudio(peerId) {

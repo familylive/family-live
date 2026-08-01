@@ -1131,7 +1131,14 @@
       </div>
 
       <div class="card" id="admin-ai-card">
-        <div class="card-title">🤖 موظف الذكاء الاصطناعي - نظام المخالفات</div>
+        <div class="card-title" style="font-size:14px;margin-top:14px">📋 أنواع المخالفات (عدم الالتزام بأنظمة البث)</div>
+        <div style="display:flex;gap:8px">
+          <input class="form-input" id="vt-name" type="text" placeholder="نوع جديد" style="flex:1">
+          <input class="form-input" id="vt-icon" type="text" placeholder="رمز" style="width:60px">
+          <button class="btn btn-accent" onclick="addViolationTemplateAdmin()">➕</button>
+        </div>
+        <div id="admin-vt-list" style="margin-top:8px"></div>
+        <div class="card-title" style="font-size:14px;margin-top:14px">🤖 موظف الذكاء الاصطناعي - نظام المخالفات</div>
         <div id="ai-violation-stats" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"></div>
         <div class="form-group">
           <label>العضو المخالف</label>
@@ -1281,6 +1288,28 @@
         <input class="form-input" id="diwaniya-code-input" type="text" dir="ltr" placeholder="الرقم السري" style="text-align:center;letter-spacing:3px;margin-bottom:10px">
         <button class="btn btn-accent btn-full" onclick="submitDiwaniyaCode()">🗝️ دخول</button>
         <button class="btn btn-secondary btn-full" style="margin-top:6px" onclick="document.getElementById('diwaniya-code-modal').style.display='none'">إلغاء</button>
+      </div>
+    </div>
+
+    <!-- Founder Action Reason Modal -->
+    <div id="founder-action-modal" class="modal-overlay" style="display:none">
+      <div class="modal-box" style="max-width:340px">
+        <h3 style="color:var(--gold);margin-bottom:12px" id="founder-action-title">⚖️ سبب الطرد</h3>
+        <div id="founder-action-victim" style="font-size:13px;margin-bottom:8px;color:var(--text-muted)"></div>
+        <div class="form-group">
+          <label>نوع المخالفة</label>
+          <select class="form-input" id="founder-action-reason" onchange="founderActionCustom()">
+            <option value="">اختر السبب...</option>
+          </select>
+        </div>
+        <div class="form-group" id="founder-action-custom-wrap" style="display:none">
+          <label>سبب مخصص</label>
+          <input class="form-input" id="founder-action-custom" type="text" placeholder="اكتب السبب...">
+        </div>
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <button class="btn btn-accent" style="flex:1" onclick="confirmFounderAction()">✅ تأكيد</button>
+          <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('founder-action-modal').style.display='none'">إلغاء</button>
+        </div>
       </div>
     </div>
 
@@ -2449,12 +2478,13 @@ async function loadViolations() {
     }
     log.innerHTML = '<div class="card-title" style="font-size:14px;margin-bottom:8px">📋 سجل المخالفات</div>' +
       violations.map(v => {
-        const typeIcon = { text:'✍️', audio:'🎤', video:'🎥', image:'📷', screen_recording:'🚫' }[v.violation_type] || '📋';
+        const typeIcon = { text:'✍️', audio:'🎤', video:'🎥', image:'📷', screen_recording:'🚫', broadcast_rules:'📵' }[v.violation_type] || '📋';
         const applied = v.duration_hours && v.duration_hours > 0 ? '<span style="color:var(--danger)">⛔ جزاء: ' + (v.duration_hours >= 720 ? 'شهر' : v.duration_hours + ' ساعة') + '</span>' : '<span style="color:var(--text-muted)">تنبيه</span>';
         const until = v.banned_until ? new Date(v.banned_until).toLocaleString('ar-SA') : '-';
+        const actionLabel = v.action === 'kick' ? '<span style="color:var(--danger)">👢 طرد من البث</span>' : (v.action === 'restrict' ? '<span style="color:#ff9f43">🙊 تقييد</span>' : (v.duration_hours && v.duration_hours > 0 ? '<span style="color:var(--danger)">⛔ موقوف</span>' : '<span style="color:var(--text-muted)">تنبيه</span>'));
         return '<div class="admin-family-item">' +
-          '<div class="admin-family-name">' + typeIcon + ' ' + (v.user_name || '') + ' <span style="font-size:11px;color:var(--danger)">موقوف</span></div>' +
-          '<div class="admin-family-meta">' + (v.reason || '') + ' · ' + (v.created_at || '') + ' · ' + applied + '</div>' +
+          '<div class="admin-family-name">' + typeIcon + ' ' + (v.user_name || '') + ' · ' + actionLabel + '</div>' +
+          '<div class="admin-family-meta">' + (v.reason || '') + ' · ' + (v.created_at || '') + (v.by_user_name ? ' · بواسطة: ' + v.by_user_name : '') + '</div>' +
         '</div>';
       }).join('');
   } catch(e) { console.error('Violations:', e); }

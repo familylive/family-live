@@ -1610,29 +1610,56 @@ app.post('/api/diwaniya/video-limit', authMiddleware, async (req, res) => {
 });
 
 // Verify diwaniya secret code
+// Violation templates API
+app.get('/api/violations/templates', async (req, res) => {
+  res.json({ templates: await db.getViolationTemplates() });
+});
+app.get('/api/admin/violation-templates', authMiddleware, adminMiddleware, async (req, res) => {
+  res.json({ templates: await db.getAllViolationTemplates() });
+});
+app.post('/api/admin/violation-templates/add', authMiddleware, adminMiddleware, async (req, res) => {
+  const { name, icon } = req.body;
+  if (!name) return res.status(400).json({ error: 'اسم المخالفة مطلوب' });
+  const t = await db.addViolationTemplate(name, icon);
+  res.json({ message: '✅ تمت إضافة نوع المخالفة', template: t });
+});
+app.post('/api/admin/violation-templates/delete', authMiddleware, adminMiddleware, async (req, res) => {
+  const { id } = req.body;
+  await db.deleteViolationTemplate(id);
+  res.json({ message: '🗑️ تم الحذف' });
+});
+
 // Founder: kick member from diwaniya (any mode)
 app.post('/api/diwaniya/kick', authMiddleware, async (req, res) => {
-  const { userId, sessionId } = req.body;
+  const { userId, sessionId, reason } = req.body;
   if (!userId || !sessionId) return res.status(400).json({ error: 'بيانات ناقصة' });
+  if (!reason) return res.status(400).json({ error: 'اكتب سبب الطرد' });
   if (req.user.role !== 'founder') return res.status(403).json({ error: 'فقط المؤسس يمكنه الطرد' });
   const session = await db.getActiveDiwaniya(sessionId);
   if (!session) return res.status(404).json({ error: 'الديوانية غير موجودة' });
   if (session.family_id !== req.user.familyId) return res.status(403).json({ error: 'ليست ديوانية عائلتك' });
   if (userId === req.user.id) return res.status(400).json({ error: 'لا يمكنك طرد نفسك' });
   
+  const victim = await db.getUserById(userId);
   await db.restrictFromDiwaniya(sessionId, userId, 'kick');
-  // Notify user + session
-  io.to(`user_${userId}`).emit('diwaniya_kicked', { sessionId, byName: req.user.name });
-  io.to(`session_${sessionId}`).emit('diwaniya_member_kicked', { userId, byName: req.user.name });
+  // Record violation: member + founder + admin (violations log)
+  await db.addFounderViolation(userId, reason, 'kick', req.user.id, req.user.name);
+  // Notify user + announce to everyone
+  io.to(`user_${userId}`).emit('diwaniya_kicked', { sessionId, byName: req.user.name, reason });
+  io.to(`session_${sessionId}`).emit('diwaniya_member_kicked', { userId, byName: req.user.name, reason, victimName: victim?.name });
+  io.to(`session_${sessionId}`).emit('diwaniya_action_announce', {
+    action: 'kick', reason, byName: req.user.name,
+    victimName: victim?.name || 'عضو', time: Date.now()
+  });
   // Remove from audio room
   io.to(`audio_${sessionId}`).emit('audio_kick', { userId });
-  console.log('👢 Founder kicked user ' + userId + ' from diwaniya ' + sessionId);
-  res.json({ message: '👢 تم طرد العضو من الديوانية' });
+  console.log('👢 Founder kicked user ' + userId + ' from diwaniya ' + sessionId + ' (reason: ' + reason + ')');
+  res.json({ message: '👢 تم طرد العضو بسبب: ' + reason });
 });
 
 // Founder: restrict member (listen only - no typing, no camera)
 app.post('/api/diwaniya/restrict', authMiddleware, async (req, res) => {
-  const { userId, sessionId, restricted } = req.body;
+  const { userId, sessionId, restricted, reason } = req.body;
   if (!userId || !sessionId) return res.status(400).json({ error: 'بيانات ناقصة' });
   if (req.user.role !== 'founder') return res.status(403).json({ error: 'فقط المؤسس يمكنه التقييد' });
   const session = await db.getActiveDiwaniya(sessionId);
@@ -1640,13 +1667,21 @@ app.post('/api/diwaniya/restrict', authMiddleware, async (req, res) => {
   if (session.family_id !== req.user.familyId) return res.status(403).json({ error: 'ليست ديوانية عائلتك' });
   if (userId === req.user.id) return res.status(400).json({ error: 'لا يمكنك تقييد نفسك' });
   
+  const victim = await db.getUserById(userId);
   if (restricted) {
+    if (!reason) return res.status(400).json({ error: 'اكتب سبب التقييد' });
     await db.restrictFromDiwaniya(sessionId, userId, 'restrict');
-    io.to(`user_${userId}`).emit('diwaniya_restricted', { sessionId, restricted: true, byName: req.user.name });
-    io.to(`session_${sessionId}`).emit('diwaniya_member_restricted', { userId, restricted: true, byName: req.user.name });
+    // Record violation
+    await db.addFounderViolation(userId, reason, 'restrict', req.user.id, req.user.name);
+    io.to(`user_${userId}`).emit('diwaniya_restricted', { sessionId, restricted: true, byName: req.user.name, reason });
+    io.to(`session_${sessionId}`).emit('diwaniya_member_restricted', { userId, restricted: true, byName: req.user.name, reason, victimName: victim?.name });
+    io.to(`session_${sessionId}`).emit('diwaniya_action_announce', {
+      action: 'restrict', reason, byName: req.user.name,
+      victimName: victim?.name || 'عضو', time: Date.now()
+    });
     // Force audio-only: turn off camera + mute mic
     io.to(`audio_${sessionId}`).emit('audio_restrict', { userId });
-    res.json({ message: '🙊 تم التقييد - العضو يستمع فقط' });
+    res.json({ message: '🙊 تم التقييد بسبب: ' + reason });
   } else {
     await db.unrestrictFromDiwaniya(sessionId, userId);
     io.to(`user_${userId}`).emit('diwaniya_restricted', { sessionId, restricted: false, byName: req.user.name });
@@ -2011,6 +2046,9 @@ async function bootstrap() {
       console.log('📋 رموز الاشتراك المتاحة: ' + newCodes.join(', '));
     }
   } catch(e) {}
+  
+  // Seed violation templates
+  try { await db.seedViolationTemplates(); } catch(e) { console.log('Template seed error:', e.message); }
   
   // Trial: give family account 1M coins
   try {

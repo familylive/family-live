@@ -51,6 +51,9 @@ async function initDb() {
   await run(`CREATE TABLE IF NOT EXISTS support_messages (id TEXT PRIMARY KEY, title TEXT NOT NULL, content TEXT NOT NULL, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS support_tickets (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, user_name TEXT, subject TEXT, message TEXT NOT NULL, status TEXT DEFAULT 'open', admin_reply TEXT, replied_at TEXT, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS payments (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, user_name TEXT, gateway TEXT NOT NULL, amount INTEGER NOT NULL, purpose TEXT, reference TEXT, status TEXT DEFAULT 'pending', created_at TEXT DEFAULT now(), confirmed_at TEXT)`);
+  await run(`CREATE TABLE IF NOT EXISTS violation_templates (id TEXT PRIMARY KEY, name TEXT NOT NULL, icon TEXT DEFAULT '🚫', status TEXT DEFAULT 'active', created_at TEXT DEFAULT now())`);
+  try { await run("ALTER TABLE violations ADD COLUMN IF NOT EXISTS action TEXT"); } catch(e) {}
+  try { await run("ALTER TABLE violations ADD COLUMN IF NOT EXISTS by_user_name TEXT"); } catch(e) {}
   await run(`CREATE TABLE IF NOT EXISTS diwaniya_restrictions (id TEXT PRIMARY KEY, session_id TEXT NOT NULL, user_id TEXT NOT NULL, type TEXT DEFAULT 'restrict', created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS gift_items (id TEXT PRIMARY KEY, name TEXT NOT NULL, emoji TEXT DEFAULT '🎁', coins INTEGER DEFAULT 10, price INTEGER DEFAULT 0, status TEXT DEFAULT 'active', gift_image TEXT, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS coin_packages (id TEXT PRIMARY KEY, coins INTEGER NOT NULL, price INTEGER NOT NULL, status TEXT DEFAULT 'active', created_at TEXT DEFAULT now())`);
@@ -575,6 +578,36 @@ async function updatePackage(id, data) {
 async function deletePackage(id) { await run('DELETE FROM packages WHERE id = $1', [id]); return true; }
 
 // =============== COINS & WALLET ===============
+async function seedViolationTemplates() {
+  const c = await queryOne('SELECT COUNT(*) as c FROM violation_templates');
+  if (c && c.c > 0) return;
+  const defaults = [
+    { name: 'سياسية', icon: '🏛️' },
+    { name: 'عنصرية', icon: '🚫' },
+    { name: 'إباحية', icon: '🔞' },
+    { name: 'عدم احترام الموجودين', icon: '😠' },
+    { name: 'كلام غير لائق', icon: '🗣️' }
+  ];
+  for (const d of defaults) {
+    await run('INSERT INTO violation_templates (id, name, icon) VALUES ($1,$2,$3)', [uuidv4(), d.name, d.icon]);
+  }
+}
+async function getViolationTemplates() { return query("SELECT * FROM violation_templates WHERE status = 'active' ORDER BY created_at"); }
+async function getAllViolationTemplates() { return query('SELECT * FROM violation_templates ORDER BY created_at'); }
+async function addViolationTemplate(name, icon) {
+  const id = uuidv4();
+  await run('INSERT INTO violation_templates (id, name, icon) VALUES ($1,$2,$3)', [id, name, icon || '🚫']);
+  return queryOne('SELECT * FROM violation_templates WHERE id = $1', [id]);
+}
+async function deleteViolationTemplate(id) { await run('DELETE FROM violation_templates WHERE id = $1', [id]); return true; }
+async function addFounderViolation(userId, reason, action, byUserId, byUserName) {
+  const id = uuidv4();
+  const bannedUntil = action === 'kick' ? null : null;
+  await run("INSERT INTO violations (id, user_id, reason, duration_hours, violation_type, evidence, created_by, banned_until, action, by_user_name) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
+    [id, userId, reason, 0, 'broadcast_rules', '', byUserName + ' (مؤسس العائلة)', bannedUntil, action, byUserName]);
+  return queryOne('SELECT * FROM violations WHERE id = $1', [id]);
+}
+
 async function isDiwaniyaRestricted(sessionId, userId) {
   const r = await queryOne('SELECT * FROM diwaniya_restrictions WHERE session_id = $1 AND user_id = $2', [sessionId, userId]);
   return r || null;
@@ -824,6 +857,7 @@ module.exports = {
   getActivePackages, getAllPackages, addPackage, updatePackage, deletePackage, getPaymentSettings, savePaymentSettings, createPayment, getAllPayments, getMyPayments, confirmPayment, rejectPayment, getFamilyEditInfo, recordFamilyNameChange, getFamilyCapacity, purchaseCapacity, setDiwaniyaCapacity, getCapacityPackages,
   createAnnouncement, getFamilyAnnouncements, getAnnouncementsForUser, deleteAnnouncement,
   isDiwaniyaRestricted, restrictFromDiwaniya, unrestrictFromDiwaniya, getDiwaniyaRestrictions,
+  seedViolationTemplates, getViolationTemplates, getAllViolationTemplates, addViolationTemplate, deleteViolationTemplate, addFounderViolation,
   getGiftItems, getAllGiftItems, addGiftItem, updateGiftItem, deleteGiftItem,
   getWallet, addCoins, sendGift, convertCoinsToWallet, getCoinPackages, getAllCoinPackages, addCoinPackage, updateCoinPackage, deleteCoinPackage,
   requestWithdrawal, getMyWithdrawals, getAllWithdrawals, updateWithdrawal,
