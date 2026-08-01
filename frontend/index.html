@@ -1021,6 +1021,22 @@
         <div id="admin-packages-list" style="margin-top:12px"></div>
       </div>
 
+      <div class="card" id="admin-coins-card">
+        <div class="card-title">💰 إدارة الكوينزات</div>
+        <div class="form-group"><label>سعر التحويل (1 كوينز = ? ريال)</label>
+          <div style="display:flex;gap:8px"><input class="form-input" id="coin-rate-input" type="number" step="0.01" value="1" style="flex:1"><button class="btn btn-sm" onclick="saveCoinRate()">💾</button></div>
+        </div>
+        <div class="card-title" style="font-size:14px;margin-top:10px">🛍️ باقات الكوينزات</div>
+        <div style="display:flex;gap:8px">
+          <input class="form-input" id="coin-pkg-coins" type="number" placeholder="كوينزات" style="flex:1">
+          <input class="form-input" id="coin-pkg-price" type="number" placeholder="السعر" style="flex:1">
+          <button class="btn btn-accent" onclick="addCoinPackageAdmin()">➕</button>
+        </div>
+        <div id="admin-coin-packages" style="margin-top:8px"></div>
+        <div class="card-title" style="font-size:14px;margin-top:14px">📤 طلبات السحب</div>
+        <div id="admin-withdrawals-list"><div class="empty-state"><div class="empty-text">لا توجد طلبات</div></div></div>
+      </div>
+
       <div class="card" id="admin-payments-card">
         <div class="card-title">💳 بوابات الدفع</div>
         <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
@@ -2722,6 +2738,63 @@ async function deletePackageAdmin(id) {
     loadAdminPackages();
     loadLandingPackages();
   } catch(e) { showToast(e.message, 'error'); }
+}
+
+// ==================== ADMIN COINS ====================
+async function loadAdminCoins() {
+  try {
+    const { packages } = await api('GET', '/api/admin/coin-packages');
+    const list = document.getElementById('admin-coin-packages');
+    if (packages?.length) {
+      list.innerHTML = packages.map(p =>
+        '<div class="admin-family-item" style="display:flex;justify-content:space-between;align-items:center">' +
+          '<div>' + p.coins + ' كوينز · ' + p.price + ' ريال</div>' +
+          '<div><button class="btn btn-sm btn-danger" onclick="deleteCoinPackageAdmin(\'' + p.id + '\')">🗑️</button></div>' +
+        '</div>'
+      ).join('');
+    } else {
+      list.innerHTML = '<div class="empty-state"><div class="empty-text">لا توجد باقات</div></div>';
+    }
+  } catch(e) {}
+  try {
+    const { withdrawals } = await api('GET', '/api/admin/withdrawals');
+    const list = document.getElementById('admin-withdrawals-list');
+    if (withdrawals?.length) {
+      list.innerHTML = withdrawals.map(w => {
+        const st = { pending:'⏳', processing:'🔄', paid:'✅', rejected:'❌' }[w.status] || w.status;
+        return '<div class="admin-family-item"><div class="admin-family-name">📤 ' + (w.user_name||'') + ' · ' + w.amount + ' ريال <span>' + st + '</span></div>' +
+          '<div class="admin-family-meta">' + (w.phone||'') + ' · ' + (w.created_at||'') + '</div>' +
+          '<div class="admin-family-actions">' +
+            '<button class="btn btn-sm btn-success" onclick="updateWithdrawalAdmin(\'' + w.id + '\', \'paid\')">✅ تحويل</button>' +
+            '<button class="btn btn-sm btn-secondary" onclick="updateWithdrawalAdmin(\'' + w.id + '\', \'processing\')">🔄 جاري</button>' +
+            '<button class="btn btn-sm btn-danger" onclick="updateWithdrawalAdmin(\'' + w.id + '\', \'rejected\')">❌ رفض</button>' +
+          '</div></div>';
+      }).join('');
+    } else {
+      list.innerHTML = '<div class="empty-state"><div class="empty-text">لا توجد طلبات</div></div>';
+    }
+  } catch(e) {}
+}
+
+async function addCoinPackageAdmin() {
+  const coins = document.getElementById('coin-pkg-coins').value;
+  const price = document.getElementById('coin-pkg-price').value;
+  if (!coins || !price) return showToast('البيانات مطلوبة', 'error');
+  try {
+    await api('POST', '/api/admin/coin-packages/add', { coins, price });
+    showToast('✅ تمت إضافة الباقة', 'success');
+    loadAdminCoins();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+async function deleteCoinPackageAdmin(id) {
+  try { await api('POST', '/api/admin/coin-packages/delete', { id }); loadAdminCoins(); } catch(e) {}
+}
+async function saveCoinRate() {
+  const rate = document.getElementById('coin-rate-input').value;
+  try { await api('POST', '/api/admin/wallet/rate', { rate }); showToast('✅ تم التحديث', 'success'); } catch(e) {}
+}
+async function updateWithdrawalAdmin(id, status) {
+  try { await api('POST', '/api/admin/withdrawals/update', { id, status }); showToast('✅ تم التحديث', 'success'); loadAdminCoins(); } catch(e) {}
 }
 
 // ==================== WALLET (COINS & GIFTS) ====================

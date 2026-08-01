@@ -1871,6 +1871,17 @@ async function bootstrap() {
     }
   } catch(e) {}
   
+  // Seed default coin packages
+  try {
+    const cp = await db.execQuery('SELECT COUNT(*) c FROM coin_packages');
+    if (!cp.length || cp[0].c === 0) {
+      await db.addCoinPackage(100, 100);
+      await db.addCoinPackage(500, 450);
+      await db.addCoinPackage(1000, 800);
+      console.log('✅ Seeded coin packages');
+    }
+  } catch(e) { console.log('Coin seed error:', e.message); }
+  
   // Seed default packages
   try {
     const pkgs = await db.execQuery('SELECT COUNT(*) c FROM packages');
