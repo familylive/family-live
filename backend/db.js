@@ -53,6 +53,23 @@ async function initDb() {
   await run(`CREATE TABLE IF NOT EXISTS payments (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, user_name TEXT, gateway TEXT NOT NULL, amount INTEGER NOT NULL, purpose TEXT, reference TEXT, status TEXT DEFAULT 'pending', created_at TEXT DEFAULT now(), confirmed_at TEXT)`);
   await run(`CREATE TABLE IF NOT EXISTS packages (id TEXT PRIMARY KEY, title TEXT NOT NULL, code_example TEXT, price INTEGER DEFAULT 0, features TEXT DEFAULT '[]', status TEXT DEFAULT 'active', sort_order INTEGER DEFAULT 0, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS capacity_purchases (id TEXT PRIMARY KEY, family_id TEXT NOT NULL, capacity INTEGER NOT NULL, price INTEGER NOT NULL, purchased_at TEXT DEFAULT now())`);
+  
+  // Migrations for existing databases
+  try { await run("ALTER TABLE users ADD COLUMN IF NOT EXISTS currency TEXT DEFAULT 'sar'"); } catch(e) {}
+  try { await run("ALTER TABLE users ADD COLUMN IF NOT EXISTS stars INTEGER DEFAULT 0"); } catch(e) {}
+  try { await run("ALTER TABLE users ADD COLUMN IF NOT EXISTS moderator_tier TEXT DEFAULT 'none'"); } catch(e) {}
+  try { await run("ALTER TABLE users ADD COLUMN IF NOT EXISTS whatsapp TEXT"); } catch(e) {}
+  try { await run("ALTER TABLE families ADD COLUMN IF NOT EXISTS diwaniya_capacity INTEGER DEFAULT 15"); } catch(e) {}
+  try { await run("ALTER TABLE families ADD COLUMN IF NOT EXISTS secret_room_enabled INTEGER DEFAULT 0"); } catch(e) {}
+  try { await run("ALTER TABLE families ADD COLUMN IF NOT EXISTS secret_room_purchased_at TEXT"); } catch(e) {}
+  try { await run("ALTER TABLE families ADD COLUMN IF NOT EXISTS name_changed_at TEXT"); } catch(e) {}
+  try { await run("ALTER TABLE families ADD COLUMN IF NOT EXISTS name_changes_count INTEGER DEFAULT 0"); } catch(e) {}
+  try { await run("ALTER TABLE diwaniya_sessions ADD COLUMN IF NOT EXISTS secret_code TEXT"); } catch(e) {}
+  try { await run("ALTER TABLE diwaniya_sessions ADD COLUMN IF NOT EXISTS capacity INTEGER DEFAULT 15"); } catch(e) {}
+  try { await run("ALTER TABLE ads ADD COLUMN IF NOT EXISTS start_time TEXT"); } catch(e) {}
+  try { await run("ALTER TABLE ads ADD COLUMN IF NOT EXISTS end_time TEXT"); } catch(e) {}
+  try { await run("ALTER TABLE ads ADD COLUMN IF NOT EXISTS views INTEGER DEFAULT 0"); } catch(e) {}
+  try { await run("ALTER TABLE ads ADD COLUMN IF NOT EXISTS clicks INTEGER DEFAULT 0"); } catch(e) {}
 }
 
 // =============== USERS & FAMILY ===============
