@@ -1012,6 +1012,7 @@ function toggleCamera() {
 }
 
 let diwaniyaCodeVerified = false;
+let pendingCallJoin = false;
 
 async function checkDiwaniyaSecretCode() {
   const session = state.activeSession;
@@ -1023,7 +1024,8 @@ async function checkDiwaniyaSecretCode() {
     const { session: fresh } = await api('GET', '/api/diwaniya/active');
     if (fresh?.secret_code) {
       if (!diwaniyaCodeVerified) {
-        // Show code modal
+        // Show code modal (pending call join)
+        pendingCallJoin = true;
         document.getElementById('diwaniya-code-modal').style.display = 'flex';
         document.getElementById('diwaniya-code-input').value = '';
         return false;
@@ -1043,6 +1045,11 @@ async function submitDiwaniyaCode() {
     document.getElementById('diwaniya-code-modal').style.display = 'none';
     showToast('🗝️ تم التحقق - أهلاً بك', 'success');
     enableChat(true);
+    // If user was trying to join the call, proceed
+    if (pendingCallJoin) {
+      pendingCallJoin = false;
+      joinLiveAudioNow();
+    }
   } catch(e) { showToast(e.message, 'error'); }
 }
 
@@ -1051,6 +1058,7 @@ async function joinLiveAudio() {
   // Verify secret code before joining
   const canJoin = await checkDiwaniyaSecretCode();
   if (!canJoin) return;
+  joinLiveAudioNow();
   
   const isModeratorVisit = (state.user?.role === 'moderator') || (state.user?.role === 'admin' && document.getElementById('moderator-send-box')?.style.display === 'block');
   

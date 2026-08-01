@@ -515,7 +515,7 @@
           <select class="form-input" id="diwaniya-capacity-select">
             <option value="15">👥 الحد الأقصى: 15 عضو</option>
           </select>
-          <input class="form-input" id="diwaniya-secret-code" type="text" placeholder="🗝️ رقم سري (اختياري)" dir="ltr" style="max-width:130px" disabled>
+          <input class="form-input" id="diwaniya-secret-code" type="text" placeholder="🗝️ رقم سري (اختياري)" dir="ltr" style="max-width:130px">
           <button class="btn btn-sm" id="secret-room-btn" onclick="toggleSecretRoomPurchase()" style="white-space:nowrap">🔒 الغرفة المغلقة</button>
           <input class="form-input" id="diwaniya-topic" type="text" placeholder="موضوع الجلسة (اختياري)" style="flex:1">
           <select class="form-input" id="diwaniya-mode">
@@ -1151,13 +1151,11 @@
     <div id="diwaniya-code-modal" class="modal-overlay" style="display:none">
       <div class="modal-box" style="max-width:340px;text-align:center">
         <div style="font-size:44px;margin-bottom:8px">🗝️</div>
-        <h3 style="color:var(--gold);margin-bottom:10px">الديوانية محمية برقم سري</h3>
-        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">أدخل الرقم السري للدخول</p>
+        <h3 style="color:var(--gold);margin-bottom:10px">هذه الديوانية محمية</h3>
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">أدخل الرقم السري للانضمام للمكالمة</p>
         <input class="form-input" id="diwaniya-code-input" type="text" dir="ltr" placeholder="الرقم السري" style="text-align:center;letter-spacing:3px;margin-bottom:10px">
-        <div style="display:flex;gap:8px">
-          <button class="btn btn-accent" style="flex:1" onclick="submitDiwaniyaCode()">🗝️ دخول</button>
-          <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('diwaniya-code-modal').style.display='none'">إلغاء</button>
-        </div>
+        <button class="btn btn-accent btn-full" onclick="submitDiwaniyaCode()">🗝️ دخول</button>
+        <button class="btn btn-secondary btn-full" style="margin-top:6px" onclick="document.getElementById('diwaniya-code-modal').style.display='none'">إلغاء</button>
       </div>
     </div>
 
