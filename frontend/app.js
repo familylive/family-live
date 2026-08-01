@@ -1393,6 +1393,10 @@ function toggleCamera() {
   if (!localStream) return;
   camOff = !camOff;
   localStream.getVideoTracks().forEach(t => t.enabled = !camOff);
+  // Notify server (keeps the live camera count accurate)
+  if (socket?.connected && state.activeSession?.id) {
+    socket.emit('camera_state', { sessionId: state.activeSession.id, on: !camOff });
+  }
   const btn = document.getElementById('cam-toggle-btn');
   const myVideo = document.getElementById('my-video');
   if (btn) {
@@ -2181,6 +2185,9 @@ async function enableMyCamera() {
     const myTile = document.getElementById('my-video-tile');
     const ov = myTile?.querySelector('.cam-off-overlay');
     if (ov) ov.style.display = 'none';
+    if (socket?.connected && state.activeSession?.id) {
+      socket.emit('camera_state', { sessionId: state.activeSession.id, on: true });
+    }
     return true;
   } catch(e) { console.error('Camera enable error:', e); return false; }
 }

@@ -2187,6 +2187,28 @@ io.on('connection', (socket) => {
     console.log(`🎤 User left audio call ${sessionId}`);
   });
   
+  // Live camera state: update participant wantsVideo + enforce limit on toggle
+  socket.on('camera_state', async (data) => {
+    const { sessionId, on } = data;
+    const room = audioRooms[sessionId];
+    if (!room) return;
+    const me = room.find(p => p.socketId === socket.id);
+    if (!me) return;
+    // If turning ON, enforce the video limit
+    if (on) {
+      try {
+        const sessRow = await db.getDiwaniyaSessionById(sessionId);
+        const videoLimit = sessRow?.video_limit || 6;
+        const videoOnCount = room.filter(p => p.wantsVideo && !p.isObserver).length;
+        if (videoOnCount >= videoLimit) {
+          socket.emit('video_slots_full', { videoLimit, message: '🎥 الكاميرات ممتلئة (' + videoLimit + ') - يرجى إيقاف كاميرا أخرى أولاً' });
+          return; // don't allow
+        }
+      } catch(e) {}
+    }
+    me.wantsVideo = on;
+  });
+
   // Camera invite: founder invites a present member to join on camera
   socket.on('camera_invite', (data) => {
     const { to, sessionId, founderId, founderName } = data;
