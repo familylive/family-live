@@ -1593,6 +1593,7 @@ async function joinLiveAudio() {
     if (bsb) bsb.style.display = (state.isFounder || state.user?.role === 'admin') ? 'block' : 'none';
     updateAudioCallUI(true);
     startCallWatermark();
+    setTikTokMode(true); // TikTok layout by default with chat below
     if (isModeratorVisit) {
       showToast('🕵️ أنت مراقب - تسمع فقط، كاميرا ومايك مقفلان', 'success');
       // Force UI state
@@ -1635,6 +1636,7 @@ function leaveLiveAudio() {
   state.callMembers = {};
   const presenceEl2 = document.getElementById('call-presence');
   if (presenceEl2) presenceEl2.style.display = 'none';
+  setTikTokMode(false);
   // Remove local video tile content + close overlays (gifts/zoom)
   const myTile = document.getElementById('my-video-tile');
   if (myTile) {
@@ -1950,19 +1952,24 @@ function syncTikTokChat() {
 }
 
 // TikTok mode: self big + participants as small corner tiles
+function setTikTokMode(on) {
+  const grid = document.getElementById('video-grid');
+  if (!grid) return;
+  grid.classList.toggle('tiktok-mode', on);
+  const tk = document.getElementById('tiktok-chat');
+  if (tk) tk.style.display = on ? 'flex' : 'none';
+  const btn = document.getElementById('tiktok-mode-btn');
+  if (btn) btn.classList.toggle('zoom', on);
+  if (on) setTimeout(syncTikTokChat, 300);
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+}
+
 function toggleTikTokMode() {
   const grid = document.getElementById('video-grid');
   if (!grid) return;
-  grid.classList.toggle('tiktok-mode');
-  const btn = document.getElementById('tiktok-mode-btn');
-  if (btn) btn.classList.toggle('zoom');
-  // Show/hide the on-screen chat
-  const tk = document.getElementById('tiktok-chat');
-  if (tk) tk.style.display = grid.classList.contains('tiktok-mode') ? 'flex' : 'none';
-  if (grid.classList.contains('tiktok-mode')) setTimeout(syncTikTokChat, 300);
-  // Exit fullscreen if switching layouts
-  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-  showToast(grid.classList.contains('tiktok-mode') ? '🎬 وضع تيك توك - أنت كبير والدردشة تحت' : '🖼 وضع الشبكة - بجوار بعض', 'success');
+  const on = !grid.classList.contains('tiktok-mode');
+  setTikTokMode(on);
+  showToast(on ? '🎬 وضع تيك توك - أنت كبير والدردشة تحت' : '🖼 وضع الشبكة - بجوار بعض', 'success');
 }
 
 // Tap on any video tile to zoom
