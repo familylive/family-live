@@ -1053,6 +1053,67 @@ async function submitDiwaniyaCode() {
   } catch(e) { showToast(e.message, 'error'); }
 }
 
+// ==================== SECRET ROOM (PAID) ====================
+async function loadSecretRoomStatus() {
+  if (!state.family?.id || !state.isFounder) return;
+  try {
+    const status = await api('GET', '/api/diwaniya/secret-room');
+    const input = document.getElementById('diwaniya-secret-code');
+    const btn = document.getElementById('secret-room-btn');
+    const banner = document.getElementById('secret-room-banner');
+    if (status.enabled) {
+      if (input) input.placeholder = '🗝️ رقم سري (اختياري)';
+      if (btn) { btn.textContent = '🟢 الغرفة المغلقة مفعلة'; btn.classList.add('btn-success'); }
+      if (banner) banner.style.display = 'none';
+    } else {
+      if (input) input.placeholder = '🗝️ رقم سري (اختياري)';
+      if (btn) { btn.textContent = '🔒 الغرفة المغلقة'; btn.classList.remove('btn-success'); }
+      if (banner) banner.style.display = 'none';
+    }
+  } catch(e) {}
+}
+
+function toggleSecretRoomPurchase() {
+  const banner = document.getElementById('secret-room-banner');
+  if (banner) banner.style.display = banner.style.display === 'none' ? 'block' : 'none';
+}
+
+async function purchaseSecretRoom() {
+  try {
+    const result = await api('POST', '/api/diwaniya/secret-room/purchase');
+    document.getElementById('secret-room-price').textContent = result.price;
+    showToast(result.message, 'success');
+    showPaymentModal(result.price, 'تفعيل الغرفة المغلقة');
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function loadDiwaniyaCapacity() {
+  if (!state.family?.id) return;
+  try {
+    const { capacity, packages } = await api('GET', '/api/diwaniya/capacity');
+    const info = document.getElementById('capacity-info');
+    const sel = document.getElementById('diwaniya-capacity-select');
+    const pkgs = document.getElementById('capacity-packages');
+    if (info) info.textContent = '👥 الحد الأقصى للعائلة: ' + capacity + ' عضو' + (capacity === 15 ? ' (اشترِ باقة توسعة)' : '');
+    if (sel) {
+      const options = [15];
+      if (capacity >= 20) options.push(20);
+      if (capacity >= 40) options.push(40);
+      sel.innerHTML = options.map(c => '<option value="' + c + '">👥 الحد الأقصى: ' + c + ' عضو</option>').join('');
+    }
+    if (pkgs) pkgs.style.display = (state.isFounder && capacity < 40) ? 'block' : 'none';
+  } catch(e) {}
+}
+
+async function purchaseCapacity(cap) {
+  if (!confirm('💳 شراء باقة توسعة الديوانية إلى ' + cap + ' عضو؟')) return;
+  try {
+    const result = await api('POST', '/api/diwaniya/capacity/purchase', { capacity: cap });
+    showToast(result.message, 'success');
+    loadDiwaniyaCapacity();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
 async function joinLiveAudio() {
   if (inLiveCall) return leaveLiveAudio();
   // Verify secret code before joining
