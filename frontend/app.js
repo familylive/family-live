@@ -1448,3 +1448,60 @@ function updateSpeakingIndicator(peerId, peerName, isSpeaking) {
     if (!anyoneSpeaking) banner.classList.remove('show');
   }
 }
+
+// ==================== PRESS-ZOOM AVATAR ====================
+// Press and hold avatar to enlarge; release to return
+function initAvatarZoom() {
+  let zoomOverlay = null;
+  let pressTimer = null;
+  
+  function createZoomOverlay(src) {
+    zoomOverlay = document.createElement('div');
+    zoomOverlay.id = 'avatar-zoom-overlay';
+    zoomOverlay.innerHTML = '<img src="' + src + '">';
+    document.body.appendChild(zoomOverlay);
+    requestAnimationFrame(() => zoomOverlay.classList.add('show'));
+  }
+  function closeZoomOverlay() {
+    if (zoomOverlay) {
+      zoomOverlay.classList.remove('show');
+      setTimeout(() => zoomOverlay.remove(), 200);
+      zoomOverlay = null;
+    }
+  }
+  
+  // Watch for avatars (image or emoji) - attach to any .menu-avatar, .chat-avatar, .member-avatar, .profile-avatar, .lb-avatar
+  document.addEventListener('mousedown', (e) => {
+    const av = e.target.closest('.menu-avatar img, .chat-avatar img, .member-avatar img, .profile-avatar img, .lb-avatar img, #profile-avatar-preview');
+    if (av) {
+      const src = av.src || av.getAttribute('src');
+      if (src && src.startsWith('data:')) {
+        e.preventDefault();
+        pressTimer = setTimeout(() => createZoomOverlay(src), 200);
+      }
+    }
+  });
+  document.addEventListener('mouseup', () => {
+    clearTimeout(pressTimer);
+    setTimeout(closeZoomOverlay, 100);
+  });
+  document.addEventListener('touchstart', (e) => {
+    const av = e.target.closest('.menu-avatar img, .chat-avatar img, .member-avatar img, .profile-avatar img, .lb-avatar img, #profile-avatar-preview');
+    if (av) {
+      const src = av.src || av.getAttribute('src');
+      if (src && src.startsWith('data:')) {
+        pressTimer = setTimeout(() => createZoomOverlay(src), 200);
+      }
+    }
+  }, { passive: true });
+  document.addEventListener('touchend', () => {
+    clearTimeout(pressTimer);
+    setTimeout(closeZoomOverlay, 100);
+  });
+  document.addEventListener('touchcancel', () => {
+    clearTimeout(pressTimer);
+    closeZoomOverlay();
+  });
+}
+document.addEventListener('DOMContentLoaded', initAvatarZoom);
+setTimeout(initAvatarZoom, 1500);
