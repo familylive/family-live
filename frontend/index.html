@@ -2868,18 +2868,26 @@ async function sendGiftItem(giftId) {
   } catch(e) { showToast(e.message, 'error'); }
 }
 
-// Show gift on camera (socket event)
+// Show gift on camera (socket event) - TikTok style animated
 function showGiftOnCamera(data) {
   const tile = document.getElementById('video-' + data.toId) || document.getElementById('my-video-tile');
   if (!tile) return;
-  // Gift animation overlay on recipient's camera
   let giftOverlay = document.createElement('div');
   giftOverlay.className = 'gift-camera-overlay';
-  giftOverlay.innerHTML = '<div class="gift-emoji-anim">' + data.giftEmoji + '</div>' +
+  
+  // If animated image provided, use it; else animated emoji with effects
+  const media = data.giftImage
+    ? '<img class="gift-anim-img" src="' + data.giftImage + '" alt="' + data.giftName + '">'
+    : '<div class="gift-emoji-anim">' + data.giftEmoji + '</div>';
+  
+  giftOverlay.innerHTML =
+    '<div class="gift-ring"></div>' +
+    '<div class="gift-sparkles"><span></span><span></span><span></span><span></span><span></span><span></span></div>' +
+    '<div class="gift-media-wrap">' + media + '</div>' +
+    '<div class="gift-beams"></div>' +
     '<div class="gift-from-name">' + data.fromName + '</div>' +
     '<div class="gift-coins-bottom">🪙 ' + data.giftCoins + '</div>';
   tile.appendChild(giftOverlay);
-  // Coins count below recipient camera
   setTimeout(() => giftOverlay.remove(), 6000);
 }
 

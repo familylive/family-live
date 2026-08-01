@@ -1255,6 +1255,7 @@ app.post('/api/gifts/send', authMiddleware, async (req, res) => {
     giftName: gift[0].name,
     giftEmoji: gift[0].emoji,
     giftCoins: gift[0].coins,
+    giftImage: gift[0].gift_image || null,
     fromName: fromUser.name,
     toId: toId,
     fromId: req.user.id
@@ -1269,9 +1270,9 @@ app.get('/api/admin/gift-items', authMiddleware, adminMiddleware, async (req, re
   res.json({ gifts: await db.getAllGiftItems() });
 });
 app.post('/api/admin/gift-items/add', authMiddleware, adminMiddleware, async (req, res) => {
-  const { name, emoji, coins } = req.body;
+  const { name, emoji, coins, gift_image } = req.body;
   if (!name) return res.status(400).json({ error: 'اسم الهدية مطلوب' });
-  const gift = await db.addGiftItem(name, emoji, coins);
+  const gift = await db.addGiftItem(name, emoji, coins, gift_image);
   res.json({ message: '✅ تمت إضافة الهدية', gift });
 });
 app.post('/api/admin/gift-items/update', authMiddleware, adminMiddleware, async (req, res) => {

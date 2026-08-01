@@ -51,7 +51,7 @@ async function initDb() {
   await run(`CREATE TABLE IF NOT EXISTS support_messages (id TEXT PRIMARY KEY, title TEXT NOT NULL, content TEXT NOT NULL, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS support_tickets (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, user_name TEXT, subject TEXT, message TEXT NOT NULL, status TEXT DEFAULT 'open', admin_reply TEXT, replied_at TEXT, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS payments (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, user_name TEXT, gateway TEXT NOT NULL, amount INTEGER NOT NULL, purpose TEXT, reference TEXT, status TEXT DEFAULT 'pending', created_at TEXT DEFAULT now(), confirmed_at TEXT)`);
-  await run(`CREATE TABLE IF NOT EXISTS gift_items (id TEXT PRIMARY KEY, name TEXT NOT NULL, emoji TEXT DEFAULT '🎁', coins INTEGER DEFAULT 10, status TEXT DEFAULT 'active', created_at TEXT DEFAULT now())`);
+  await run(`CREATE TABLE IF NOT EXISTS gift_items (id TEXT PRIMARY KEY, name TEXT NOT NULL, emoji TEXT DEFAULT '🎁', coins INTEGER DEFAULT 10, status TEXT DEFAULT 'active', gift_image TEXT, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS coin_packages (id TEXT PRIMARY KEY, coins INTEGER NOT NULL, price INTEGER NOT NULL, status TEXT DEFAULT 'active', created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS gifts (id TEXT PRIMARY KEY, from_user TEXT NOT NULL, to_user TEXT NOT NULL, coins INTEGER NOT NULL, message TEXT, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS coin_transactions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, type TEXT NOT NULL, coins INTEGER DEFAULT 0, amount INTEGER DEFAULT 0, detail TEXT, created_at TEXT DEFAULT now())`);
@@ -75,6 +75,7 @@ async function initDb() {
   try { await run("ALTER TABLE diwaniya_sessions ADD COLUMN IF NOT EXISTS secret_code TEXT"); } catch(e) {}
   try { await run("ALTER TABLE diwaniya_sessions ADD COLUMN IF NOT EXISTS capacity INTEGER DEFAULT 15"); } catch(e) {}
   try { await run("ALTER TABLE diwaniya_sessions ADD COLUMN IF NOT EXISTS video_limit INTEGER DEFAULT 6"); } catch(e) {}
+  try { await run("ALTER TABLE gift_items ADD COLUMN IF NOT EXISTS gift_image TEXT"); } catch(e) {}
   try { await run("ALTER TABLE ads ADD COLUMN IF NOT EXISTS start_time TEXT"); } catch(e) {}
   try { await run("ALTER TABLE ads ADD COLUMN IF NOT EXISTS end_time TEXT"); } catch(e) {}
   try { await run("ALTER TABLE ads ADD COLUMN IF NOT EXISTS views INTEGER DEFAULT 0"); } catch(e) {}
@@ -574,17 +575,18 @@ async function deletePackage(id) { await run('DELETE FROM packages WHERE id = $1
 // =============== COINS & WALLET ===============
 async function getGiftItems() { return query("SELECT * FROM gift_items WHERE status = 'active' ORDER BY coins"); }
 async function getAllGiftItems() { return query('SELECT * FROM gift_items ORDER BY coins'); }
-async function addGiftItem(name, emoji, coins) {
+async function addGiftItem(name, emoji, coins, giftImage) {
   const id = uuidv4();
-  await run('INSERT INTO gift_items (id, name, emoji, coins) VALUES ($1,$2,$3,$4)', [id, name, emoji || '🎁', parseInt(coins) || 10]);
+  await run('INSERT INTO gift_items (id, name, emoji, coins, gift_image) VALUES ($1,$2,$3,$4,$5)', [id, name, emoji || '🎁', parseInt(coins) || 10, giftImage || null]);
   return queryOne('SELECT * FROM gift_items WHERE id = $1', [id]);
 }
 async function updateGiftItem(id, data) {
-  const { name, emoji, coins, status } = data;
+  const { name, emoji, coins, status, gift_image } = data;
   if (name !== undefined) await run('UPDATE gift_items SET name = $1 WHERE id = $2', [name, id]);
   if (emoji !== undefined) await run('UPDATE gift_items SET emoji = $1 WHERE id = $2', [emoji, id]);
   if (coins !== undefined) await run('UPDATE gift_items SET coins = $1 WHERE id = $2', [coins, id]);
   if (status !== undefined) await run('UPDATE gift_items SET status = $1 WHERE id = $2', [status, id]);
+  if (gift_image !== undefined) await run('UPDATE gift_items SET gift_image = $1 WHERE id = $2', [gift_image, id]);
   return queryOne('SELECT * FROM gift_items WHERE id = $1', [id]);
 }
 async function deleteGiftItem(id) { await run('DELETE FROM gift_items WHERE id = $1', [id]); return true; }
