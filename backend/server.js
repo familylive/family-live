@@ -181,7 +181,8 @@ app.post('/api/auth/login', async (req, res) => {
       family_id: user.family_id,
       role: user.role,
       avatar: user.avatar,
-      points: user.points
+      points: user.points,
+      public_id: user.public_id
     },
     family: user.family_id ? await db.getFamily(user.family_id) : null
   });
