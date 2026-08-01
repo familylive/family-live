@@ -1584,6 +1584,11 @@ app.get('/api/family/invitations', authMiddleware, async (req, res) => {
 
 // Open diwaniya
 app.post('/api/diwaniya/open', authMiddleware, async (req, res) => {
+  // Guard: stale sessions (family deleted/reset) must not create ghost diwaniyas
+  const famExists = req.user.familyId ? await db.getFamily(req.user.familyId) : null;
+  if (!famExists) {
+    return res.status(403).json({ error: 'عائلتك غير موجودة - سجل الخروج والدخول مرة أخرى' });
+  }
   const userFull = await db.getUserById(req.user.id);
   const isFounder = req.user.role === 'founder';
   const isManager = userFull && userFull.can_open_diwaniya == 1;
