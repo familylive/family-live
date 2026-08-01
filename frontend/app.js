@@ -33,7 +33,21 @@ async function api(method, path, body = null) {
   const hash = window.location.hash;
   let token = params.get('token') || (hash.startsWith('#token=') ? hash.replace('#token=', '') : null);
   
-  if (token) {
+  // Invitation link (/invite?token=XXX) - prefill the invite code, don't clear URL
+  const isInvitePage = window.location.pathname === '/invite' || window.location.pathname.startsWith('/invite');
+  if (token && isInvitePage) {
+    window.__inviteToken = token;
+    // After splash: show the join-family form with the invite code prefilled
+    setTimeout(() => {
+      try {
+        if (typeof switchRegTab === 'function') switchRegTab('join');
+        if (typeof navigateTo === 'function') navigateTo('register');
+      } catch(e) {}
+      const invInput = document.getElementById('reg-invite-token');
+      if (invInput) invInput.value = token;
+      showToast('🔗 تم تجهيز الدعوة - أكمل التسجيل للانضمام للعائلة', 'success');
+    }, 2600);
+  } else if (token && !isInvitePage) {
     localStorage.setItem('token', token);
     // Clean URL after saving token
     if (window.history.replaceState) {

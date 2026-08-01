@@ -34,6 +34,14 @@ app.use(async (req, res, next) => {
 // Serve static frontend files
 app.use(express.static(path.join(__dirname, '..', 'frontend')));
 
+// Invite page: serve the SPA so registration opens with the invite token
+app.get('/invite', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'frontend', 'index.html'));
+});
+app.get('/invite/', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'frontend', 'index.html'));
+});
+
 // Auth middleware
 function authMiddleware(req, res, next) {
   const token = req.headers.authorization?.split(' ')[1];
