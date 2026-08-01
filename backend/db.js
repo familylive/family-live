@@ -611,7 +611,19 @@ async function recordRecordingAttempt(userId) {
     await banUser(userId, reason, durationHours, 'system');
     banned = true;
   }
+  
+  // Save as violation record (shows in admin + member logs)
+  try {
+    await run("INSERT INTO violations (id, user_id, reason, duration_hours, violation_type, evidence, created_by, banned_until) VALUES ($1,$2,$3,$4,'screen_recording','','system',$5)",
+      [uuidv4(), userId, reason, durationHours || 0, durationHours ? new Date(Date.now() + durationHours * 3600000).toISOString() : null]);
+  } catch(e) {}
+  
   return { attempts, banned, durationHours, reason };
+}
+
+// Get violations for a specific user (member's own record)
+async function getViolationsByUser(userId) {
+  return query('SELECT * FROM violations WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50', [userId]);
 }
 
 async function getSecretRoomStatus(familyId) {
@@ -686,7 +698,7 @@ module.exports = {
   getUserFamilies, getUserFamilyCount, addUserToFamily, setCurrentFamily, getSetting, setSetting,
   lockDiwaniya, getDiwaniyaLock,
   getBannedWords, addBannedWord, deleteBannedWord, checkBannedWord, banUser, getActiveBan, getAllBans, unbanUser, setDiwaniyaManager, countDiwaniyaManagers,
-  addViolation, getAllViolations, getViolationStats, getModerationSettings, setModerationSetting,
+  addViolation, getAllViolations, getViolationStats, getViolationsByUser, getModerationSettings, setModerationSetting,
   getAgreement, acceptAgreement, rejectAgreement, canOpenDiwaniya, getFamilyAgreements, getAllAgreements,
   addSupportMessage, getSupportMessages, deleteSupportMessage, countSupportMessages, createSupportTicket, getSupportTickets, getMyTickets, replyTicket, closeTicket,
   requestModeratorVisit, approveModeratorVisit, enterModeratorVisit, exitModeratorVisit, getModeratorVisits, getModeratorVisitsByUser, getPendingVisitByModerator, getFamiliesWithActiveDiwaniya,

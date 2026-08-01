@@ -103,6 +103,9 @@
       <div class="menu-nav-item" data-page="support" onclick="navigateTo('support');toggleMenu()">
         <span class="nav-icon">🎧</span> الدعم الفني
       </div>
+      <div class="menu-nav-item" data-page="myviolations" onclick="navigateTo('myviolations');toggleMenu()">
+        <span class="nav-icon">⚠️</span> نظام المخالفات
+      </div>
       <div class="menu-nav-item" id="menu-login-item" onclick="showAuth('login');toggleMenu()" style="display:none">
         <span class="nav-icon">🔐</span> تسجيل الدخول
       </div>
@@ -752,6 +755,17 @@
       </div>
     </div>
 
+    <!-- My Violations Page -->
+    <div id="page-myviolations" class="page-content">
+      <div class="page-title">⚠️ نظام المخالفات</div>
+      <div class="page-subtitle">سجل مخالفاتك والجزاءات المطبقة</div>
+      <div class="card">
+        <div id="my-violations-list">
+          <div class="empty-state"><div class="empty-text">لا توجد مخالفات — ممتاز 👍</div></div>
+        </div>
+      </div>
+    </div>
+
     <!-- Support Page -->
     <div id="page-support" class="page-content">
       <div class="page-title">🎧 الدعم الفني والمساعدة</div>
@@ -1260,7 +1274,7 @@ function navigateTo(pageName) {
   const navItem = document.querySelector('.menu-nav-item[data-page="' + pageName + '"]');
   if (page) page.classList.add('active');
   if (navItem) navItem.classList.add('active');
-  const titles = { dashboard:'الرئيسية', family:'العائلة', diwaniya:'الديوانية', games:'الألعاب', challenges:'التحديات', leaderboard:'قادة النقاط', codes:'رموزي', profile:'ملفي الشخصي', moderator:'زيارات المودريتر', login:'تسجيل الدخول', register:'إنشاء حساب' };
+  const titles = { dashboard:'الرئيسية', family:'العائلة', diwaniya:'الديوانية', games:'الألعاب', challenges:'التحديات', leaderboard:'قادة النقاط', codes:'رموزي', profile:'ملفي الشخصي', moderator:'زيارات المودريتر', myviolations:'نظام المخالفات', login:'تسجيل الدخول', register:'إنشاء حساب' };
   const titleEl = document.getElementById('header-title-text');
   if (titleEl && titles[pageName]) titleEl.textContent = titles[pageName];
   toggleHeaderVisibility(pageName);
@@ -1270,6 +1284,7 @@ function navigateTo(pageName) {
   if (pageName === 'dashboard' && state.isLoggedIn) { loadDashboardAuctions(); loadDashboardAds(); }
   if (pageName === 'profile' && state.isLoggedIn) { loadProfilePage(); loadMyFamilies(); }
   if (pageName === 'support' && state.isLoggedIn) loadMyTickets();
+  if (pageName === 'myviolations' && state.isLoggedIn) loadMyViolations();
   if (pageName === 'admin' && state.user?.role === 'admin') loadAdminSupport();
   if (pageName === 'family' && state.isLoggedIn) { loadAnnouncements(); populateAnnTarget(); populateManagerSelect(); loadFamilyPageData(); }
   if (pageName === 'admin' && state.user?.role === 'admin') { loadBannedWords(); loadAdminBans(); loadAIUsers(); loadViolations(); loadAdminAgreements(); loadAdminUsers(); loadModeratorVisitsAdmin(); }
@@ -2263,6 +2278,29 @@ async function loadAIUsers() {
   } catch(e) {}
 }
 
+// ==================== MY VIOLATIONS (MEMBER) ====================
+async function loadMyViolations() {
+  try {
+    const { violations } = await api('GET', '/api/violations/my');
+    const list = document.getElementById('my-violations-list');
+    if (!violations?.length) {
+      list.innerHTML = '<div class="empty-state"><div class="empty-text">لا توجد مخالفات — ممتاز 👍</div></div>';
+      return;
+    }
+    const typeIcons = { text:'✍️', audio:'🎤', video:'🎥', image:'📷', screen_recording:'🚫' };
+    list.innerHTML = violations.map(v => {
+      const icon = typeIcons[v.violation_type] || '📋';
+      const penalty = (v.duration_hours && v.duration_hours > 0)
+        ? '<span style="color:var(--danger)">⛔ الجزاء: ' + (v.duration_hours >= 720 ? 'شهر كامل' : v.duration_hours + ' ساعة') + '</span>'
+        : '<span style="color:var(--info)">⚠️ تنبيه فقط</span>';
+      return '<div class="admin-family-item">' +
+        '<div class="admin-family-name">' + icon + ' ' + (v.reason || 'مخالفة') + '</div>' +
+        '<div class="admin-family-meta">📅 ' + (v.created_at || '') + ' · ' + penalty + '</div>' +
+      '</div>';
+    }).join('');
+  } catch(e) { console.error('My violations:', e); }
+}
+
 async function loadViolations() {
   try {
     const { violations, stats } = await api('GET', '/api/admin/violations');
@@ -2281,11 +2319,12 @@ async function loadViolations() {
     }
     log.innerHTML = '<div class="card-title" style="font-size:14px;margin-bottom:8px">📋 سجل المخالفات</div>' +
       violations.map(v => {
-        const typeIcon = { text:'✍️', audio:'🎤', video:'🎥', image:'📷' }[v.violation_type] || '📋';
+        const typeIcon = { text:'✍️', audio:'🎤', video:'🎥', image:'📷', screen_recording:'🚫' }[v.violation_type] || '📋';
+        const applied = v.duration_hours && v.duration_hours > 0 ? '<span style="color:var(--danger)">⛔ جزاء: ' + (v.duration_hours >= 720 ? 'شهر' : v.duration_hours + ' ساعة') + '</span>' : '<span style="color:var(--text-muted)">تنبيه</span>';
         const until = v.banned_until ? new Date(v.banned_until).toLocaleString('ar-SA') : '-';
         return '<div class="admin-family-item">' +
           '<div class="admin-family-name">' + typeIcon + ' ' + (v.user_name || '') + ' <span style="font-size:11px;color:var(--danger)">موقوف</span></div>' +
-          '<div class="admin-family-meta">' + (v.reason || '') + ' · ' + (v.duration_hours||0) + ' ساعة · حتى ' + until + '</div>' +
+          '<div class="admin-family-meta">' + (v.reason || '') + ' · ' + (v.created_at || '') + ' · ' + applied + '</div>' +
         '</div>';
       }).join('');
   } catch(e) { console.error('Violations:', e); }

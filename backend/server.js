@@ -679,6 +679,11 @@ app.post('/api/admin/violations/add', authMiddleware, adminMiddleware, async (re
   res.json({ message: '⛔ تم تسجيل المخالفة وإيقاف العضوية', violation });
 });
 
+// Get my violations (member)
+app.get('/api/violations/my', authMiddleware, async (req, res) => {
+  res.json({ violations: await db.getViolationsByUser(req.user.id) });
+});
+
 // Get all violations (admin)
 app.get('/api/admin/violations', authMiddleware, adminMiddleware, async (req, res) => {
   const violations = await db.getAllViolations();
