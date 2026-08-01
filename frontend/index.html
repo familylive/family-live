@@ -1892,11 +1892,15 @@ async function saveProfile() {
   try {
     const { user } = await api('POST', '/api/profile/update', { name, country, city, phone, whatsapp, currency });
     state.user.currency = currency;
-    updateAllUI();
+    userCurrency = currency; // flip prices immediately
     state.user = { ...state.user, ...user };
     updateAllUI();
     loadProfilePage();
-    showToast('✅ تم حفظ التعديلات', 'success');
+    // Refresh prices with new currency
+    loadLandingPackages();
+    loadLandingAuctions();
+    if (state.isLoggedIn) loadDashboardAuctions();
+    showToast('✅ تم حفظ التعديلات - الأسعار تحدثت بال' + (currency === 'usd' ? 'دولار' : 'ريال'), 'success');
   } catch(e) { showToast(e.message, 'error'); }
 }
 
