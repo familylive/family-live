@@ -1453,6 +1453,128 @@ async function handleIceCandidate(fromId, candidate) {
   }
 }
 
+// ==================== CALL WATERMARK (anti-recording) ====================
+function startCallWatermark() {
+  const wm = document.getElementById('call-watermark');
+  if (!wm) return;
+  const fam = state?.family?.name || 'العائلة';
+  const me = state?.user?.name || '';
+  wm.textContent = '🔒 ' + fam + ' · ' + me + ' · ' + new Date().toLocaleTimeString('ar-SA', {hour:'2-digit',minute:'2-digit'});
+  wm.style.display = 'block';
+}
+function stopCallWatermark() {
+  const wm = document.getElementById('call-watermark');
+  if (wm) { wm.style.display = 'none'; wm.textContent = ''; }
+}
+
+// ==================== CALL FULLSCREEN (tap camera to zoom) ====================
+function toggleCallFullscreen() {
+  const grid = document.getElementById('video-grid');
+  if (!grid) return;
+  const btn = document.getElementById('fullscreen-toggle-btn');
+  // Fullscreen API
+  if (document.fullscreenElement) {
+    document.exitFullscreen().catch(() => {});
+    if (btn) btn.textContent = '⛶';
+    grid.classList.remove('video-zoom');
+    return;
+  }
+  if (grid.requestFullscreen) {
+    grid.requestFullscreen().catch(() => {
+      grid.classList.toggle('video-zoom');
+      if (btn) btn.textContent = grid.classList.contains('video-zoom') ? '🗕' : '⛶';
+    });
+    document.addEventListener('fullscreenchange', function fs() {
+      if (!document.fullscreenElement) {
+        grid.classList.remove('video-zoom');
+        if (btn) btn.textContent = '⛶';
+        document.removeEventListener('fullscreenchange', fs);
+      }
+    });
+  } else {
+    grid.classList.toggle('video-zoom');
+    if (btn) btn.textContent = grid.classList.contains('video-zoom') ? '🗕' : '⛶';
+  }
+}
+// Tap on any video tile to zoom
+function bindVideoTileZoom() {
+  document.getElementById('video-grid')?.addEventListener('click', (e) => {
+    if (e.target.closest('.video-tile')) toggleCallFullscreen();
+  }, true);
+}
+if (document.readyState !== 'loading') bindVideoTileZoom();
+else document.addEventListener('DOMContentLoaded', bindVideoTileZoom);
+setTimeout(bindVideoTileZoom, 2000);
+
+// ==================== WALLET HEADER REFRESH ====================
+async function refreshWalletHeader() {
+  try {
+    const { wallet } = await api('GET', '/api/wallet');
+    state.coins = wallet.coins || 0;
+    const el = document.getElementById('header-coins');
+    if (el) el.textContent = state.coins;
+  } catch(e) {}
+}
+
+// ==================== FAMILY IMAGE (founder) ====================
+let familyImageBase64 = '';
+
+function previewFamilyImage(input) {
+  const file = input.files?.[0];
+  const preview = document.getElementById('family-image-preview');
+  if (!file) return;
+  if (file.size > 2 * 1024 * 1024) {
+    showToast('الصورة كبيرة - الحد الأقصى 2MB', 'error');
+    input.value = '';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    familyImageBase64 = e.target.result;
+    if (preview) { preview.src = familyImageBase64; preview.style.display = 'block'; }
+  };
+  reader.readAsDataURL(file);
+}
+
+function showFamilyImageInUI() {
+  const card = document.getElementById('family-image-card');
+  if (card) card.style.display = state?.isFounder ? 'block' : 'none';
+  const img = document.getElementById('family-image-current');
+  if (img && state?.family?.image && state.family.image.startsWith('data:')) {
+    img.src = state.family.image;
+    img.style.display = 'block';
+  } else if (img) { img.style.display = 'none'; }
+}
+
+async function saveFamilyImage() {
+  if (!familyImageBase64) return showToast('اختر صورة أولاً', 'error');
+  try {
+    const { family } = await api('POST', '/api/family/edit', { image: familyImageBase64 });
+    state.family = family;
+    familyImageBase64 = '';
+    const fileEl = document.getElementById('family-image-file');
+    if (fileEl) fileEl.value = '';
+    const prev = document.getElementById('family-image-preview');
+    if (prev) { prev.style.display = 'none'; prev.src = ''; }
+    showFamilyImageInUI();
+    updateAllUI();
+    showToast('✅ تم حفظ صورة العائلة', 'success');
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+// ==================== FAMILY PAGE LOAD ====================
+async function loadFamilyPageData() {
+  showFamilyImageInUI();
+  try {
+    const { members } = await api('GET', '/api/family/members');
+    state.members = members || [];
+    updateMembersList();
+  } catch(e) {}
+  loadAnnouncements();
+  populateAnnTarget();
+  populateManagerSelect();
+}
+
 function avatarHtml(avatar) {
   if (avatar && avatar.startsWith('data:')) return '<img src="' + avatar + '" alt="">';
   return '<div class="avatar-emoji">' + (avatar || '👤') + '</div>';

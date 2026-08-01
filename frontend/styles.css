@@ -2147,3 +2147,25 @@ body {
   font-size: 13px;
   z-index: 15;
 }
+
+/* Fullscreen video grid (zoom camera) */
+#video-grid:fullscreen {
+  background: #000;
+  align-content: center;
+  padding: 10px;
+}
+#video-grid:fullscreen .video-tile video {
+  max-height: 80vh;
+}
+#video-grid.video-zoom {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 1250 !important;
+  background: #000 !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+  padding: 10px;
+}
+#video-grid.video-zoom .video-tile video {
+  max-height: 80vh;
+}
