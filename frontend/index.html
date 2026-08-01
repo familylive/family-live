@@ -996,6 +996,31 @@
         </div>
       </div>
 
+      <div class="card" id="admin-payments-card">
+        <div class="card-title">💳 بوابات الدفع</div>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+          <label style="font-size:14px;font-weight:600">STC Pay:</label>
+          <button class="btn btn-sm" id="stcpay-toggle-btn" onclick="toggleGateway('stcpay')">🟢 مفعلة</button>
+        </div>
+        <div class="form-group">
+          <label>📱 رقم الجوال لاستقبال STC Pay</label>
+          <input class="form-input" id="stcpay-number" type="text" dir="ltr" placeholder="05xxxxxxxx">
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;margin-top:10px">
+          <label style="font-size:14px;font-weight:600">🏦 التحويل البنكي:</label>
+          <button class="btn btn-sm" id="bank-toggle-btn" onclick="toggleGateway('bank')">🟢 مفعلة</button>
+        </div>
+        <div class="form-group">
+          <label>🏦 بيانات الحساب البنكي (IBAN)</label>
+          <input class="form-input" id="bank-details" type="text" dir="ltr" placeholder="SA0000000000000000000000">
+        </div>
+        <button class="btn btn-accent btn-full" onclick="savePaymentSettings()">💾 حفظ إعدادات الدفع</button>
+        <div class="card-title" style="font-size:14px;margin-top:16px">📨 إثباتات الدفع الواردة</div>
+        <div id="admin-payments-list">
+          <div class="empty-state"><div class="empty-text">لا توجد مدفوعات</div></div>
+        </div>
+      </div>
+
       <div class="card" id="admin-users-card">
         <div class="card-title">👥 المستخدمون</div>
         <div class="agreement-tabs" style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
@@ -1171,6 +1196,21 @@
         <div class="banned-countdown" style="font-size:32px;font-weight:900;color:var(--danger);direction:ltr;margin:12px 0" id="banned-countdown">--:--:--</div>
         <p style="font-size:12px;color:var(--text-muted)">متبقي على انتهاء الإيقاف</p>
         <button class="btn btn-secondary btn-full" style="margin-top:12px" onclick="logout()">تسجيل الخروج</button>
+      </div>
+    </div>
+
+    <!-- Payment Modal -->
+    <div id="payment-modal" class="modal-overlay" style="display:none">
+      <div class="modal-box" style="max-width:380px">
+        <h3 style="color:var(--gold);margin-bottom:12px">💳 الدفع</h3>
+        <div id="payment-amount-box" style="text-align:center;font-size:22px;font-weight:900;color:var(--gold);margin-bottom:12px"></div>
+        <div id="payment-methods"></div>
+        <div class="form-group" style="margin-top:10px">
+          <label>رقم العملية/المرجع (اختياري)</label>
+          <input class="form-input" id="payment-reference" type="text" placeholder="رقم العملية" dir="ltr">
+        </div>
+        <button class="btn btn-accent btn-full" onclick="submitPayment()">📨 أرسل إثبات الدفع</button>
+        <button class="btn btn-secondary btn-full" style="margin-top:6px" onclick="document.getElementById('payment-modal').style.display='none'">إلغاء</button>
       </div>
     </div>
 
@@ -2431,6 +2471,110 @@ async function sendModeratorMessage() {
     await api('POST', '/api/moderator/send-message', { sessionId: activeVisitSession, messageId });
     showToast('💬 تم إرسال رسالة المشرف', 'success');
   } catch(e) { showToast(e.message, 'error'); }
+}
+
+// ==================== PAYMENT GATEWAYS ====================
+let paymentSettings = { stcpay_enabled: '1', stcpay_number: '', bank_enabled: '1', bank_details: '' };
+let pendingPayment = null;
+
+async function loadPaymentSettings() {
+  try {
+    const { settings } = await api('GET', '/api/payment/settings');
+    paymentSettings = settings;
+    document.getElementById('stcpay-number').value = settings.stcpay_number || '';
+    document.getElementById('bank-details').value = settings.bank_details || '';
+    updateGatewayButtons();
+  } catch(e) {}
+}
+
+function updateGatewayButtons() {
+  const stcBtn = document.getElementById('stcpay-toggle-btn');
+  const bankBtn = document.getElementById('bank-toggle-btn');
+  if (stcBtn) {
+    stcBtn.textContent = paymentSettings.stcpay_enabled === '1' ? '🟢 مفعلة' : '🔴 مغلقة';
+    stcBtn.className = 'btn btn-sm ' + (paymentSettings.stcpay_enabled === '1' ? 'btn-success' : 'btn-danger');
+  }
+  if (bankBtn) {
+    bankBtn.textContent = paymentSettings.bank_enabled === '1' ? '🟢 مفعلة' : '🔴 مغلقة';
+    bankBtn.className = 'btn btn-sm ' + (paymentSettings.bank_enabled === '1' ? 'btn-success' : 'btn-danger');
+  }
+}
+
+async function toggleGateway(gw) {
+  if (gw === 'stcpay') paymentSettings.stcpay_enabled = paymentSettings.stcpay_enabled === '1' ? '0' : '1';
+  if (gw === 'bank') paymentSettings.bank_enabled = paymentSettings.bank_enabled === '1' ? '0' : '1';
+  updateGatewayButtons();
+}
+
+async function savePaymentSettings() {
+  const stcpay_number = document.getElementById('stcpay-number').value.trim();
+  const bank_details = document.getElementById('bank-details').value.trim();
+  try {
+    await api('POST', '/api/admin/payment/settings', { stcpay_enabled: paymentSettings.stcpay_enabled, stcpay_number, bank_enabled: paymentSettings.bank_enabled, bank_details });
+    showToast('✅ تم حفظ إعدادات الدفع', 'success');
+    loadPaymentSettings();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+// Show payment modal for a specific amount/purpose
+async function showPaymentModal(amount, purpose) {
+  const settings = await api('GET', '/api/payment/settings').then(d => d.settings).catch(() => paymentSettings);
+  paymentSettings = settings;
+  pendingPayment = { amount, purpose };
+  document.getElementById('payment-amount-box').textContent = amount + ' ريال — ' + (purpose || '');
+  
+  const methods = document.getElementById('payment-methods');
+  let html = '';
+  if (settings.stcpay_enabled === '1') {
+    html += '<div class="payment-method"><div style="font-size:16px">📱 STC Pay</div>' +
+      '<div style="font-size:13px;color:var(--text-secondary)">حوّل على الرقم: <b style="color:var(--gold)" dir="ltr">' + (settings.stcpay_number || 'غير محدد') + '</b></div></div>';
+  }
+  if (settings.bank_enabled === '1') {
+    html += '<div class="payment-method" style="margin-top:8px"><div style="font-size:16px">🏦 تحويل بنكي</div>' +
+      '<div style="font-size:13px;color:var(--text-secondary)">IBAN: <b style="color:var(--gold)" dir="ltr">' + (settings.bank_details || 'غير محدد') + '</b></div></div>';
+  }
+  if (!html) html = '<div class="empty-text">لا توجد بوابات دفع مفعلة حالياً</div>';
+  methods.innerHTML = html;
+  document.getElementById('payment-modal').style.display = 'flex';
+}
+
+async function submitPayment() {
+  if (!pendingPayment) return;
+  const gateway = paymentSettings.stcpay_enabled === '1' ? 'stcpay' : 'bank';
+  const reference = document.getElementById('payment-reference').value.trim();
+  try {
+    await api('POST', '/api/payments/confirm', { gateway, amount: pendingPayment.amount, purpose: pendingPayment.purpose, reference });
+    showToast('📨 تم إرسال إثبات الدفع — بانتظار تأكيد الإدارة', 'success');
+    document.getElementById('payment-modal').style.display = 'none';
+    document.getElementById('payment-reference').value = '';
+    pendingPayment = null;
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+// Admin: payments list
+async function loadAdminPayments() {
+  try {
+    const { payments } = await api('GET', '/api/admin/payments');
+    const list = document.getElementById('admin-payments-list');
+    if (!payments?.length) {
+      list.innerHTML = '<div class="empty-state"><div class="empty-text">لا توجد مدفوعات</div></div>';
+      return;
+    }
+    list.innerHTML = payments.map(p => {
+      const statusLabel = { pending:'⏳ بانتظار', confirmed:'✅ مؤكد', rejected:'❌ مرفوض' }[p.status] || p.status;
+      return '<div class="admin-family-item"><div class="admin-family-name">' + (p.user_name||'') + ' · ' + p.amount + ' ريال <span style="font-size:11px">' + statusLabel + '</span></div>' +
+        '<div class="admin-family-meta">' + (p.gateway === 'stcpay' ? '📱 STC Pay' : '🏦 بنكي') + ' · ' + (p.purpose||'') + ' · مرجع: ' + (p.reference||'-') + '</div>' +
+        (p.status === 'pending' ? '<div class="admin-family-actions"><button class="btn btn-sm btn-success" onclick="confirmPaymentAdmin(\'' + p.id + '\')">✅ تأكيد</button><button class="btn btn-sm btn-danger" onclick="rejectPaymentAdmin(\'' + p.id + '\')">❌ رفض</button></div>' : '') +
+      '</div>';
+    }).join('');
+  } catch(e) {}
+}
+
+async function confirmPaymentAdmin(id) {
+  try { await api('POST', '/api/admin/payments/confirm', { paymentId: id }); showToast('✅ تم تأكيد الدفع', 'success'); loadAdminPayments(); } catch(e) { showToast(e.message, 'error'); }
+}
+async function rejectPaymentAdmin(id) {
+  try { await api('POST', '/api/admin/payments/reject', { paymentId: id }); showToast('❌ تم الرفض', 'success'); loadAdminPayments(); } catch(e) { showToast(e.message, 'error'); }
 }
 
 // ==================== USERS MANAGEMENT ====================

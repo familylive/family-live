@@ -1767,3 +1767,10 @@ body {
   max-height: 80px;
   font-size: 11px;
 }
+
+/* Payment methods */
+.payment-method {
+  background: var(--bg-hover);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+}

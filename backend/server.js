@@ -1155,6 +1155,53 @@ app.post('/api/admin/auctions/cancel', authMiddleware, adminMiddleware, async (r
   res.json({ message: '❌ تم إلغاء المزاد', auction });
 });
 
+// =============== PAYMENT GATEWAYS ===============
+
+// Get payment settings (public - shows what's enabled)
+app.get('/api/payment/settings', async (req, res) => {
+  const settings = await db.getPaymentSettings();
+  res.json({ settings });
+});
+
+// Admin: save payment settings (toggle + numbers + details)
+app.post('/api/admin/payment/settings', authMiddleware, adminMiddleware, async (req, res) => {
+  const settings = await db.savePaymentSettings(req.body);
+  res.json({ message: '✅ تم حفظ إعدادات الدفع', settings });
+});
+
+// User: submit payment confirmation
+app.post('/api/payments/confirm', authMiddleware, async (req, res) => {
+  const { gateway, amount, purpose, reference } = req.body;
+  if (!gateway || !amount) return res.status(400).json({ error: 'البيانات ناقصة' });
+  const user = await db.getUserById(req.user.id);
+  const payment = await db.createPayment(req.user.id, user.name, gateway, parseInt(amount), purpose || '', reference || '');
+  res.json({ message: '📨 تم إرسال إثبات الدفع — بانتظار تأكيد الإدارة', payment });
+});
+
+// User: my payments
+app.get('/api/payments/my', authMiddleware, async (req, res) => {
+  res.json({ payments: await db.getMyPayments(req.user.id) });
+});
+
+// Admin: all payments
+app.get('/api/admin/payments', authMiddleware, adminMiddleware, async (req, res) => {
+  res.json({ payments: await db.getAllPayments() });
+});
+
+// Admin: confirm payment
+app.post('/api/admin/payments/confirm', authMiddleware, adminMiddleware, async (req, res) => {
+  const { paymentId } = req.body;
+  const payment = await db.confirmPayment(paymentId);
+  res.json({ message: '✅ تم تأكيد الدفع', payment });
+});
+
+// Admin: reject payment
+app.post('/api/admin/payments/reject', authMiddleware, adminMiddleware, async (req, res) => {
+  const { paymentId } = req.body;
+  const payment = await db.rejectPayment(paymentId);
+  res.json({ message: '❌ تم رفض الدفع', payment });
+});
+
 // =============== FAMILY ROUTES ===============
 
 // Get family info

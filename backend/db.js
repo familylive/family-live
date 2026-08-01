@@ -491,6 +491,31 @@ async function getTierSettings() {
 }
 
 // =============== FAMILY EDIT & CAPACITY ===============
+async function getPaymentSettings() {
+  return {
+    stcpay_enabled: await getSetting('stcpay_enabled', '1'),
+    stcpay_number: await getSetting('stcpay_number', ''),
+    bank_enabled: await getSetting('bank_enabled', '1'),
+    bank_details: await getSetting('bank_details', ''),
+  };
+}
+async function savePaymentSettings(settings) {
+  if (settings.stcpay_enabled !== undefined) await setSetting('stcpay_enabled', settings.stcpay_enabled);
+  if (settings.stcpay_number !== undefined) await setSetting('stcpay_number', settings.stcpay_number);
+  if (settings.bank_enabled !== undefined) await setSetting('bank_enabled', settings.bank_enabled);
+  if (settings.bank_details !== undefined) await setSetting('bank_details', settings.bank_details);
+  return getPaymentSettings();
+}
+async function createPayment(userId, userName, gateway, amount, purpose, reference) {
+  const id = uuidv4();
+  await run("INSERT INTO payments (id, user_id, user_name, gateway, amount, purpose, reference) VALUES ($1,$2,$3,$4,$5,$6,$7)", [id, userId, userName, gateway, amount, purpose, reference || '']);
+  return queryOne('SELECT * FROM payments WHERE id = $1', [id]);
+}
+async function getAllPayments() { return query('SELECT * FROM payments ORDER BY created_at DESC LIMIT 100'); }
+async function getMyPayments(userId) { return query('SELECT * FROM payments WHERE user_id = $1 ORDER BY created_at DESC', [userId]); }
+async function confirmPayment(paymentId) { await run("UPDATE payments SET status = 'confirmed', confirmed_at = now() WHERE id = $1", [paymentId]); return queryOne('SELECT * FROM payments WHERE id = $1', [paymentId]); }
+async function rejectPayment(paymentId) { await run("UPDATE payments SET status = 'rejected' WHERE id = $1", [paymentId]); return queryOne('SELECT * FROM payments WHERE id = $1', [paymentId]); }
+
 async function getFamilyEditInfo(familyId) {
   const family = await queryOne('SELECT name_changed_at, name_changes_count FROM families WHERE id = $1', [familyId]);
   const price = parseInt(await getSetting('family_edit_price', '100'));
@@ -554,6 +579,6 @@ module.exports = {
   addSupportMessage, getSupportMessages, deleteSupportMessage, countSupportMessages, createSupportTicket, getSupportTickets, getMyTickets, replyTicket, closeTicket,
   requestModeratorVisit, approveModeratorVisit, enterModeratorVisit, exitModeratorVisit, getModeratorVisits, getModeratorVisitsByUser, getPendingVisitByModerator, getFamiliesWithActiveDiwaniya,
   addModeratorStars, getModeratorProfile, rateModerator, getModeratorTier, updateModeratorTier, getTierSettings,
-  getFamilyEditInfo, recordFamilyNameChange, getFamilyCapacity, purchaseCapacity, setDiwaniyaCapacity, getCapacityPackages,
+  getPaymentSettings, savePaymentSettings, createPayment, getAllPayments, getMyPayments, confirmPayment, rejectPayment, getFamilyEditInfo, recordFamilyNameChange, getFamilyCapacity, purchaseCapacity, setDiwaniyaCapacity, getCapacityPackages,
   createAnnouncement, getFamilyAnnouncements, getAnnouncementsForUser, deleteAnnouncement,
 };
