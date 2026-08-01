@@ -1864,3 +1864,18 @@ body {
 .rw-icon { font-size: 36px; }
 .rw-title { font-size: 16px; font-weight: 800; }
 .rw-msg { font-size: 13px; color: #ffd9d4; margin-top: 2px; }
+
+/* Hidden overlay (anti-recording) */
+.call-hidden-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  background: rgba(10,10,20,.95);
+  color: #fff;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+  padding: 20px;
+}
