@@ -1759,6 +1759,18 @@ function toggleCallFullscreen() {
     if (btn) btn.classList.toggle('zoom', grid.classList.contains('video-zoom'));
   }
 }
+// TikTok mode: self big + participants as small corner tiles
+function toggleTikTokMode() {
+  const grid = document.getElementById('video-grid');
+  if (!grid) return;
+  grid.classList.toggle('tiktok-mode');
+  const btn = document.getElementById('tiktok-mode-btn');
+  if (btn) btn.classList.toggle('zoom');
+  // Exit fullscreen if switching layouts
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  showToast(grid.classList.contains('tiktok-mode') ? '🎬 وضع تيك توك - أنت كبير والأعضاء بالزاوية' : '🖼 وضع الشبكة - بجوار بعض', 'success');
+}
+
 // Tap on any video tile to zoom
 function bindVideoTileZoom() {
   document.getElementById('video-grid')?.addEventListener('click', (e) => {
