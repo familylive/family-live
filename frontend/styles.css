@@ -2169,3 +2169,16 @@ body {
 #video-grid.video-zoom .video-tile video {
   max-height: 80vh;
 }
+
+/* Presence counter below cameras */
+.call-presence {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--gold);
+  background: rgba(232,184,48,.1);
+  border: 1px solid rgba(232,184,48,.25);
+  border-radius: 10px;
+  padding: 6px;
+  margin: 8px 0 0;
+}

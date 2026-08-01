@@ -591,6 +591,9 @@
               <div class="tile-state" id="my-tile-state"></div>
             </div>
           </div>
+          <div class="call-presence" id="call-presence" style="display:none">
+            👥 المتواجدون في الديوانية: <span id="call-count">1</span>
+          </div>
           <div class="call-controls" id="call-controls" style="display:none">
             <div class="call-participants" id="call-participants">
               <div class="call-participant"><span class="call-dot"></span> أنت</div>
@@ -608,6 +611,7 @@
               <button class="call-control-btn" id="mic-toggle-btn" onclick="toggleMic()">🎤</button>
               <button class="call-control-btn" id="cam-toggle-btn" onclick="toggleCamera()">🎥</button>
               <button class="call-control-btn" id="gift-box-btn" onclick="openGiftBox()">🎁</button>
+              <button class="call-control-btn" id="cam-invite-btn" onclick="openCameraInvite()" style="display:none" title="دعوة للمشاركة بالكاميرا">📹</button>
               <button class="call-control-btn" id="fullscreen-toggle-btn" onclick="toggleCallFullscreen()">⛶</button>
             </div>
           </div>
@@ -1321,6 +1325,33 @@
       </div>
     </div>
 
+    <!-- Camera Invite Modal (founder picks member) -->
+    <div id="cam-invite-modal" class="modal-overlay" style="display:none">
+      <div class="modal-box" style="max-width:340px">
+        <h3 style="color:var(--gold);margin-bottom:12px">📹 دعوة للصعود للكاميرا</h3>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:10px">اختر من المتواجدين في الديوانية ليشارك بالكاميرا</p>
+        <div class="form-group">
+          <select class="form-input" id="cam-invite-target"><option value="">اختر العضو...</option></select>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button class="btn btn-accent" style="flex:1" onclick="sendCameraInvite()">📤 إرسال الدعوة</button>
+          <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('cam-invite-modal').style.display='none'">إلغاء</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Camera Invite Accept Modal (member) -->
+    <div id="camera-invite-modal" class="modal-overlay" style="display:none">
+      <div class="modal-box" style="max-width:320px;text-align:center">
+        <h3 style="color:var(--gold);margin-bottom:12px">📹 دعوة كاميرا</h3>
+        <p id="camera-invite-text" style="font-size:14px;margin-bottom:16px"></p>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-success" style="flex:1" onclick="respondCameraInvite(true)">✅ موافق</button>
+          <button class="btn btn-danger" style="flex:1" onclick="respondCameraInvite(false)">❌ غير موافق</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Gift Box Modal -->
     <div id="gift-box-modal" class="modal-overlay" style="display:none">
       <div class="modal-box" style="max-width:360px">
@@ -1419,7 +1450,7 @@ function navigateTo(pageName) {
   toggleHeaderVisibility(pageName);
   
   // Load page-specific data
-  if (pageName === 'diwaniya' && state.isLoggedIn) checkDiwaniyaLock();
+  if (pageName === 'diwaniya' && state.isLoggedIn) { checkDiwaniyaLock(); refreshDiwaniyaNow(); }
   if (pageName === 'dashboard' && state.isLoggedIn) { loadDashboardAuctions(); loadDashboardAds(); }
   if (pageName === 'profile' && state.isLoggedIn) { loadProfilePage(); loadMyFamilies(); }
   if (pageName === 'support' && state.isLoggedIn) loadMyTickets();

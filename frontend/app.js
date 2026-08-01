@@ -456,11 +456,18 @@ function connectSocket() {
   socket.on('user_joined_call', (data) => {
     if (data.avatar) peerAvatars[data.userId] = data.avatar;
     if (inLiveCall && data.userId !== state.user?.id) {
+      if (!state.callMembers) state.callMembers = {};
+      state.callMembers[data.userId] = data.userName;
+      updateCallPresence();
       // New user joined, send them an offer
       setTimeout(() => createOffer(data.userId, data.userName), 500);
     }
   });
-  socket.on('user_left_call', (data) => removeRemoteAudio(data.userId));
+  socket.on('user_left_call', (data) => {
+    removeRemoteAudio(data.userId);
+    if (state.callMembers) delete state.callMembers[data.userId];
+    updateCallPresence();
+  });
   socket.on('call_full', (data) => {
     showToast(data.message || 'المكالمة ممتلئة', 'error');
     leaveLiveAudio();
@@ -544,6 +551,17 @@ function connectSocket() {
     if (chip) chip.remove();
     showToast('👢 تم طرد عضو بواسطة ' + (data.byName || 'المؤسس'), 'error');
   });
+  socket.on('camera_invite', (data) => {
+    // I was invited to go on camera
+    pendingCameraInvite = data;
+    document.getElementById('camera-invite-text').textContent = 'تمت دعوتك للمشاركة بكاميرا الديوانية من قبل ' + (data.founderName || 'المؤسس');
+    document.getElementById('camera-invite-modal').style.display = 'flex';
+    playNotificationSound();
+  });
+  socket.on('camera_invite_response', (data) => {
+    if (data.accept) showToast('🎥 ' + (data.inviteeName || 'العضو') + ' وافق على المشاركة بالكاميرا!', 'success');
+    else showToast('❌ ' + (data.inviteeName || 'العضو') + ' رفض المشاركة بالكاميرا', 'error');
+  });
   socket.on('diwaniya_action_announce', (data) => {
     // Public: everyone sees who was kicked/restricted and why
     const icon = data.action === 'kick' ? '👢' : '🙊';
@@ -579,12 +597,15 @@ function connectSocket() {
   });
   socket.on('call_participants', (data) => {
     // Join existing participants
+    if (!state.callMembers) state.callMembers = {};
     data.participants.forEach(p => {
       if (p.avatar) peerAvatars[p.userId] = p.avatar;
       if (p.userId !== state.user?.id) {
+        state.callMembers[p.userId] = p.userName;
         setTimeout(() => createOffer(p.userId, p.userName), 500);
       }
     });
+    updateCallPresence();
   });
 }
 
@@ -646,57 +667,64 @@ function sendChat() {
   }
 }
 
+// Instant check: fetch diwaniya status right now (used when opening the page)
+async function refreshDiwaniyaNow() {
+  try {
+    const { session } = await api('GET', '/api/diwaniya/active');
+    applyDiwaniyaSession(session);
+  } catch(e) {}
+}
+
+// Apply a fetched session to the UI (shared by poll + page open)
+function applyDiwaniyaSession(session) {
+  const isOpen = session?.status === 'open';
+  if (isOpen && !state.diwaniyaOpen) {
+    state.diwaniyaOpen = true;
+    state.activeSession = session;
+    const mode = session.mode || 'text';
+    state.diwaniyaMode = mode;
+    const btn = document.getElementById('diwaniya-toggle-btn');
+    if (btn) btn.textContent = '🔒 إغلاق الديوانية';
+    const stat = document.getElementById('stat-diwaniya');
+    if (stat) stat.textContent = '🟢 مفتوحة';
+    const modeLabel = { text: '✍️ كتابي', audio: '🎤 صوتي', video: '🎥 فيديو', both: '📝🎤 كتابي+صوتي', all: '📝🎥🎤 كل شي' };
+    const tl = document.querySelector('#timer-display .timer-label');
+    if (tl) tl.textContent = 'الديوانية مفتوحة - ' + (modeLabel[mode] || mode);
+    if (session.duration_minutes) startDiwaniyaTimer(session.duration_minutes);
+    setupChatMode(mode);
+    enableChat(true);
+    startMessagePolling();
+    if (socket?.connected) socket.emit('join_session', session.id);
+    const audioSection = document.getElementById('live-audio-section');
+    if (audioSection && ['audio','video','both','all'].includes(mode)) audioSection.style.display = 'block';
+    showToast('🕌 الديوانية مفتوحة الآن! انضم', 'success');
+    playNotificationSound();
+  }
+  if (!isOpen && state.diwaniyaOpen) {
+    state.diwaniyaOpen = false;
+    state.activeSession = null;
+    stopDiwaniyaTimer();
+    enableChat(false);
+    stopMessagePolling();
+    const btn = document.getElementById('diwaniya-toggle-btn');
+    if (btn) btn.textContent = '🔓 فتح الديوانية';
+    const stat = document.getElementById('stat-diwaniya');
+    if (stat) stat.textContent = '🔴 متوقفة';
+    const audioSection = document.getElementById('live-audio-section');
+    if (audioSection) audioSection.style.display = 'none';
+    if (inLiveCall) leaveLiveAudio();
+  }
+}
+
 // Live diwaniya status sync (every 15s) - members see it open in real-time
 function startDiwaniyaStatusPoll() {
   if (state._statusPoll) clearInterval(state._statusPoll);
   state._statusPoll = setInterval(async () => {
     try {
       const { session } = await api('GET', '/api/diwaniya/active');
-      const isOpen = session?.status === 'open';
-      // Detected: diwaniya opened (by founder/moderator)
-      if (isOpen && !state.diwaniyaOpen) {
-        const prevSession = state.activeSession;
-        state.diwaniyaOpen = true;
-        state.activeSession = session;
-        const mode = session.mode || 'text';
-        state.diwaniyaMode = mode;
-        // Update UI
-        const btn = document.getElementById('diwaniya-toggle-btn');
-        if (btn) btn.textContent = '🔒 إغلاق الديوانية';
-        const stat = document.getElementById('stat-diwaniya');
-        if (stat) stat.textContent = '🟢 مفتوحة';
-        const modeLabel = { text: '✍️ كتابي', audio: '🎤 صوتي', video: '🎥 فيديو', both: '📝🎤 كتابي+صوتي', all: '📝🎥🎤 كل شي' };
-        const tl = document.querySelector('#timer-display .timer-label');
-        if (tl) tl.textContent = 'الديوانية مفتوحة - ' + (modeLabel[mode] || mode);
-        if (session.duration_minutes) startDiwaniyaTimer(session.duration_minutes);
-        setupChatMode(mode);
-        enableChat(true);
-        startMessagePolling();
-        if (socket?.connected) socket.emit('join_session', session.id);
-        showToast('🕌 الديوانية مفتوحة الآن! انضم', 'success');
-        playNotificationSound();
-        // If mode has audio/video, allow joining the call
-        if (['audio','video','both','all'].includes(mode)) {
-          const audioSection = document.getElementById('live-audio-section');
-          if (audioSection) audioSection.style.display = 'block';
-        }
-      }
-      // Detected: diwaniya closed
-      if (!isOpen && state.diwaniyaOpen) {
-        state.diwaniyaOpen = false;
-        state.activeSession = null;
-        stopDiwaniyaTimer();
-        enableChat(false);
-        stopMessagePolling();
-        const btn = document.getElementById('diwaniya-toggle-btn');
-        if (btn) btn.textContent = '🔓 فتح الديوانية';
-        const stat = document.getElementById('stat-diwaniya');
-        if (stat) stat.textContent = '🔴 متوقفة';
-        const audioSection = document.getElementById('live-audio-section');
-        if (audioSection) audioSection.style.display = 'none';
-        if (inLiveCall) leaveLiveAudio();
-        showToast('🔒 أغلقت الديوانية', 'error');
-      }
+      const wasOpen = state.diwaniyaOpen;
+      applyDiwaniyaSession(session);
+      if (wasOpen && session?.status !== 'open') showToast('🔒 أغلقت الديوانية', 'error');
     } catch(e) {}
   }, 15000);
 }
@@ -1222,6 +1250,23 @@ let peerConnections = {};
 let inLiveCall = false;
 let peerAvatars = {};
 
+// Presence: members currently in the call
+function updateCallPresence() {
+  const countEl = document.getElementById('call-count');
+  if (countEl) countEl.textContent = (Object.keys(state.callMembers || {}).length + 1);
+  const list = document.getElementById('call-participants');
+  if (!list) return;
+  let html = '<div class="call-participant"><span class="call-dot"></span> أنت</div>';
+  Object.entries(state.callMembers || {}).forEach(([id, name]) => {
+    html += '<div class="call-participant" id="participant-' + id + '"><span class="call-dot"></span> ' + name +
+      (state.isFounder || state.user?.role === 'admin' ?
+        ' <button class="member-action-btn" title="طرد من الديوانية" onclick="kickFromDiwaniya(\'' + id + '\')">⛔</button>' +
+        '<button class="member-action-btn" title="تقييد (يستمع فقط)" onclick="restrictMember(\'' + id + '\')">🙊</button>' : '') +
+    '</div>';
+  });
+  list.innerHTML = html;
+}
+
 // ==================== CALL CONTROLS ====================
 let micMuted = false;
 let camOff = false;
@@ -1421,6 +1466,12 @@ async function joinLiveAudio() {
       wantsVideo: !isModeratorVisit
     });
     
+    state.callMembers = {};
+    updateCallPresence();
+    const presenceEl = document.getElementById('call-presence');
+    if (presenceEl) presenceEl.style.display = 'block';
+    const invBtn = document.getElementById('cam-invite-btn');
+    if (invBtn) invBtn.style.display = (state.isFounder || state.user?.role === 'admin') ? 'block' : 'none';
     updateAudioCallUI(true);
     startCallWatermark();
     if (isModeratorVisit) {
@@ -1462,6 +1513,9 @@ function leaveLiveAudio() {
   if (tileState) { tileState.textContent = ''; tileState.classList.remove('muted-state'); }
   
   inLiveCall = false;
+  state.callMembers = {};
+  const presenceEl2 = document.getElementById('call-presence');
+  if (presenceEl2) presenceEl2.style.display = 'none';
   // Remove local video tile content + close overlays (gifts/zoom)
   const myTile = document.getElementById('my-video-tile');
   if (myTile) {
@@ -1761,20 +1815,96 @@ function addRemoteAudio(peerId, peerName, stream) {
   // Setup speaking detection for this peer
   setupSpeakingDetection(peerId, peerName, stream);
   
-  // Show in call indicator
-  const participantsDiv = document.getElementById('call-participants');
-  if (participantsDiv) {
-    const p = document.createElement('div');
-    p.id = 'participant-' + peerId;
-    p.className = 'call-participant';
-    p.innerHTML = '<span class="call-dot"></span> ' + peerName +
-      (state.isFounder ? ' <button class="member-action-btn" title="طرد من الديوانية" onclick="kickFromDiwaniya(\'' + peerId + '\')">⛔</button>' +
-        '<button class="member-action-btn" title="تقييد (يستمع فقط)" onclick="restrictMember(\'' + peerId + '\')">🙊</button>' : '');
-    participantsDiv.appendChild(p);
-  }
+  // Presence list is rendered by updateCallPresence (from callMembers)
 }
 
 let founderActionTarget = null; // { userId, action }
+
+// ==================== CAMERA INVITE (founder -> member) ====================
+function openCameraInvite() {
+  const sel = document.getElementById('cam-invite-target');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">اختر العضو...</option>';
+  const members = state.callMembers || {};
+  if (!Object.keys(members).length) return showToast('لا يوجد متواجدون في المكالمة حالياً', 'error');
+  Object.entries(members).forEach(([id, name]) => {
+    sel.innerHTML += '<option value="' + id + '">' + name + '</option>';
+  });
+  document.getElementById('cam-invite-modal').style.display = 'flex';
+}
+
+function sendCameraInvite() {
+  const to = document.getElementById('cam-invite-target')?.value;
+  if (!to) return showToast('اختر العضو', 'error');
+  socket.emit('camera_invite', {
+    to,
+    sessionId: state.activeSession?.id,
+    founderId: state.user?.id,
+    founderName: state.user?.name
+  });
+  document.getElementById('cam-invite-modal').style.display = 'none';
+  showToast('📹 تم إرسال دعوة الكاميرا - بانتظار الموافقة', 'success');
+}
+
+// Member: accept/decline camera invite
+async function enableMyCamera() {
+  try {
+    if (!localStream) return false;
+    let videoTrack = localStream.getVideoTracks()[0];
+    if (!videoTrack) {
+      const ms = await navigator.mediaDevices.getUserMedia({ video: true });
+      videoTrack = ms.getVideoTracks()[0];
+      if (!videoTrack) return false;
+      localStream.addTrack(videoTrack);
+      // Send new video track to all peers
+      Object.entries(peerConnections).forEach(([pid, pc]) => {
+        const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
+        if (sender) sender.replaceTrack(videoTrack).catch(() => {});
+        else { try { pc.addTrack(videoTrack, localStream); } catch(e) {} }
+        // Renegotiate
+        pc.createOffer().then(o => pc.setLocalDescription(o)).then(() => {
+          socket.emit('audio_offer', {
+            to: pid, offer: pc.localDescription,
+            sessionId: state.activeSession?.id,
+            userName: state.user?.name
+          });
+        }).catch(() => {});
+      });
+    } else {
+      videoTrack.enabled = true;
+    }
+    camOff = false;
+    const myVideo = document.getElementById('my-video');
+    if (myVideo) { myVideo.srcObject = localStream; myVideo.style.display = 'block'; }
+    const camBtn = document.getElementById('cam-toggle-btn');
+    if (camBtn) { camBtn.textContent = '🎥'; camBtn.classList.remove('off'); }
+    const myTile = document.getElementById('my-video-tile');
+    const ov = myTile?.querySelector('.cam-off-overlay');
+    if (ov) ov.style.display = 'none';
+    return true;
+  } catch(e) { console.error('Camera enable error:', e); return false; }
+}
+
+let pendingCameraInvite = null;
+function respondCameraInvite(accept) {
+  const modal = document.getElementById('camera-invite-modal');
+  if (accept && !pendingCameraInvite) return;
+  if (accept) {
+    enableMyCamera().then(ok => {
+      socket.emit('camera_invite_response', {
+        to: pendingCameraInvite.founderId,
+        accept: ok,
+        inviteeName: state.user?.name
+      });
+      showToast(ok ? '🎥 تم تشغيل كاميرتك - أنت الآن بالمشاركة!' : 'تعذر تشغيل الكاميرا - ارفض أو جرب مرة أخرى', ok ? 'success' : 'error');
+    });
+  } else {
+    socket.emit('camera_invite_response', { to: pendingCameraInvite?.founderId, accept: false, inviteeName: state.user?.name });
+    showToast('❌ رفضت الدعوة', 'error');
+  }
+  pendingCameraInvite = null;
+  if (modal) modal.style.display = 'none';
+}
 
 // Founder: kick member from diwaniya (any mode) - with reason
 function kickFromDiwaniya(userId) {
