@@ -2064,23 +2064,35 @@ io.on('connection', (socket) => {
   });
   
   socket.on('audio_offer', async (data) => {
-    const { to, offer, sessionId, userName } = data;
+    const { to, offer, sessionId, userName, fromUserId } = data;
+    const senderId = fromUserId || socket.userId || null;
     let avatar = null;
-    try {
-      const urow = await db.getUserById(data.userId || socket.data?.userId);
-      avatar = urow?.avatar || null;
-    } catch(e) {}
-    io.to(to).emit('audio_offer', { from: socket.id, offer, userName, avatar, sessionId });
+    if (senderId) {
+      try { const urow = await db.getUserById(senderId); avatar = urow?.avatar || null; } catch(e) {}
+    }
+    io.to(`user_${to}`).emit('audio_offer', { from: senderId, fromSocket: socket.id, offer, userName, avatar, sessionId });
   });
   
   socket.on('audio_answer', async (data) => {
-    const { to, answer, sessionId } = data;
-    io.to(to).emit('audio_answer', { from: socket.id, answer, sessionId });
+    const { to, answer, sessionId, fromUserId } = data;
+    io.to(`user_${to}`).emit('audio_answer', { from: fromUserId || socket.userId || null, answer, sessionId });
   });
   
   socket.on('audio_ice_candidate', async (data) => {
-    const { to, candidate, sessionId } = data;
-    io.to(to).emit('audio_ice_candidate', { from: socket.id, candidate, sessionId });
+    const { to, candidate, sessionId, fromUserId } = data;
+    io.to(`user_${to}`).emit('audio_ice_candidate', { from: fromUserId || socket.userId || null, candidate, sessionId });
+  });
+  
+  // Clean up on disconnect (remove from all audio rooms + notify)
+  socket.on('disconnect', () => {
+    for (const [sessId, arr] of Object.entries(audioRooms)) {
+      const me = arr.find(p => p.socketId === socket.id);
+      if (me) {
+        audioRooms[sessId] = arr.filter(p => p.socketId !== socket.id);
+        socket.to(`audio_${sessId}`).emit('user_left_call', { userId: me.userId });
+        console.log('🔌 Disconnected from audio room ' + sessId);
+      }
+    }
   });
 });
 

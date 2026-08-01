@@ -403,6 +403,16 @@ function connectSocket() {
     if (state.family?.id) socket.emit('join_family', state.family.id);
     if (state.user?.id) socket.emit('join_user', state.user.id);
     if (state.activeSession?.id) socket.emit('join_session', state.activeSession.id);
+    // Re-join the audio call if I was in it (server restarts wipe rooms)
+    if (inLiveCall && state.activeSession?.id && localStream) {
+      socket.emit('join_audio_call', {
+        sessionId: state.activeSession.id,
+        userId: state.user.id,
+        userName: state.user.name,
+        isObserver: state.user?.role === 'moderator',
+        wantsVideo: state.user?.role !== 'moderator'
+      });
+    }
   });
   socket.on('diwaniya_opened', (s) => {
     state.diwaniyaOpen = true; state.activeSession = s;
@@ -1596,7 +1606,8 @@ function createPeerConnection(peerId, peerName) {
       socket.emit('audio_ice_candidate', {
         to: peerId,
         candidate: e.candidate,
-        sessionId: state.activeSession.id
+        sessionId: state.activeSession.id,
+        fromUserId: state.user.id
       });
     }
   };
@@ -1625,7 +1636,8 @@ async function createOffer(peerId, peerName) {
       to: peerId,
       offer: pc.localDescription,
       sessionId: state.activeSession.id,
-      userName: state.user.name
+      userName: state.user.name,
+      fromUserId: state.user.id
     });
   } catch(e) {
     console.error('Offer error:', e);
@@ -1643,7 +1655,8 @@ async function handleAudioOffer(fromId, fromName, offer) {
     socket.emit('audio_answer', {
       to: fromId,
       answer: pc.localDescription,
-      sessionId: state.activeSession.id
+      sessionId: state.activeSession.id,
+      fromUserId: state.user.id
     });
   } catch(e) {
     console.error('Answer error:', e);
