@@ -178,6 +178,11 @@ function logout() {
 // ==================== LOAD APP ====================
 async function loadApp(user, family) {
   Object.assign(state, { user, family, isFounder: user.role === 'founder', isLoggedIn: true, points: user.points || 0 });
+  // Load coins (private - only for this user)
+  try {
+    const { wallet } = await api('GET', '/api/wallet');
+    state.coins = wallet.coins || 0;
+  } catch(e) { state.coins = 0; }
   
   // For admin or users without family, skip family-dependent calls
   const hasFamily = !!family || !!user.family_id;
@@ -239,6 +244,8 @@ function updateAllUI() {
   document.getElementById('menu-user-role').textContent = state.isFounder ? 'المؤسس 👑' : 'عضو';
   document.getElementById('menu-avatar').textContent = state.user?.avatar || '👤';
   document.getElementById('points-display').textContent = state.points || 0;
+  const headerCoins = document.getElementById('header-coins');
+  if (headerCoins) headerCoins.textContent = state.coins || 0;
   document.getElementById('family-badge').textContent = state.family?.name || 'العائلة';
   
   // Show family subscription code next to family name
