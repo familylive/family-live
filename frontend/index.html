@@ -2443,7 +2443,7 @@ async function loadLandingPackages() {
     div.innerHTML = packages.map(p =>
       '<div class="pricing-card' + (p.title.includes('مميز') || p.title.includes('مخصص') ? ' premium' : '') + '">' +
         '<div class="pricing-type">' + (p.title || '') + '</div>' +
-        (p.code_example ? '<div class="pricing-code-example">' + p.code_example + '</div>' : '') +
+        (p.code_example ? '<div class="pricing-code-example' + (p.title.includes('مميز') || p.title.includes('مخصص') ? ' rainbow-text' : '') + '">' + p.code_example + '</div>' : '') +
         '<div class="pricing-price">' + (p.price || 0) + ' ريال</div>' +
         featureList(p.features) +
         '<button class="btn btn-accent btn-full" onclick="packageBuyClick()">💳 شراء</button>' +
