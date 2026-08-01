@@ -800,4 +800,10 @@ module.exports = {
   addModeratorStars, getModeratorProfile, rateModerator, getModeratorTier, updateModeratorTier, getTierSettings,
   getActivePackages, getAllPackages, addPackage, updatePackage, deletePackage, getPaymentSettings, savePaymentSettings, createPayment, getAllPayments, getMyPayments, confirmPayment, rejectPayment, getFamilyEditInfo, recordFamilyNameChange, getFamilyCapacity, purchaseCapacity, setDiwaniyaCapacity, getCapacityPackages,
   createAnnouncement, getFamilyAnnouncements, getAnnouncementsForUser, deleteAnnouncement,
+  getGiftItems, getAllGiftItems, addGiftItem, updateGiftItem, deleteGiftItem,
+  getWallet, addCoins, sendGift, convertCoinsToWallet, getCoinPackages, getAllCoinPackages, addCoinPackage, updateCoinPackage, deleteCoinPackage,
+  requestWithdrawal, getMyWithdrawals, getAllWithdrawals, updateWithdrawal,
+  getMyTransactions, getAllTransactions, getMyGifts, getGiftsByUser,
+  getCurrencyRate, setCurrencyRate, getSecretRoomStatus, enableSecretRoom,
+  recordRecordingAttempt, setVideoLimit,
 };
