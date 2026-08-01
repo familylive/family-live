@@ -444,6 +444,13 @@
           <div><div class="member-name" id="founder-name" style="font-size:16px">الاسم</div><span class="member-role-tag">المؤسس</span></div>
         </div>
       </div>
+      <div class="card" id="family-image-card" style="display:none">
+        <div class="card-title">📸 صورة العائلة <span style="font-size:12px;color:var(--text-muted)">(تظهر للأعضاء والعائلات المميزة)</span></div>
+        <div style="text-align:center;margin-bottom:8px"><img id="family-image-current" src="" style="width:130px;height:100px;border-radius:12px;object-fit:cover;border:3px solid var(--gold);display:none"></div>
+        <input class="form-input" id="family-image-file" type="file" accept="image/*" onchange="previewFamilyImage(this)">
+        <div style="text-align:center;margin-top:8px"><img id="family-image-preview" src="" style="width:130px;height:100px;border-radius:12px;object-fit:cover;display:none;border:3px solid var(--gold)"></div>
+        <button class="btn btn-primary btn-full" style="margin-top:10px" onclick="saveFamilyImage()">📸 حفظ صورة العائلة</button>
+      </div>
       <div class="card">
         <div class="card-title">👥 الأعضاء (<span id="members-count">0</span>)</div>
         <button class="btn btn-accent btn-full" id="invite-all-btn" onclick="notifyAllMembers()" style="margin-bottom:10px">🔔 دعوة جميع الأعضاء للتواجد</button>
@@ -1626,6 +1633,7 @@ async function loadLandingPage() {
     if (families?.length) {
       featuredDiv.innerHTML = families.map(f =>
         '<div class="family-card-featured">' +
+          (f.image && f.image.startsWith('data:') ? '<img src="' + f.image + '" style="width:100%;height:90px;object-fit:cover;border-radius:10px 10px 0 0;display:block">' : '') +
           '<div class="fc-name">' + (f.name || '') + '</div>' +
           '<div class="fc-code rainbow-text">' + (f.subscription_code || '') + '</div>' +
           '<div class="fc-founder">👑 ' + (f.founder_name || '') + '</div>' +

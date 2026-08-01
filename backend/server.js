@@ -385,16 +385,17 @@ app.get('/api/family/edit-info', authMiddleware, async (req, res) => {
   res.json({ info: await db.getFamilyEditInfo(req.user.familyId) });
 });
 
-// Founder edits own family name (90-day rule + 3 free changes + 100 SAR payment)
+// Founder edits own family (name 90-day rule + 3 free changes + 100 SAR payment + image)
 app.post('/api/family/edit', authMiddleware, async (req, res) => {
   if (!req.user.familyId) return res.status(400).json({ error: 'لا يوجد عائلة' });
   if (req.user.role !== 'founder') return res.status(403).json({ error: 'فقط مؤسس العائلة يمكنه التعديل' });
-  const { name, subscription_code, paid } = req.body;
+  const { name, subscription_code, image, paid } = req.body;
   
-  const info = await db.getFamilyEditInfo(req.user.familyId);
-  const isNameChange = name && name !== await db.getFamily(req.user.familyId).name;
+  const current = await db.getFamily(req.user.familyId);
+  const isNameChange = name && name !== current.name;
   
   if (isNameChange) {
+    const info = await db.getFamilyEditInfo(req.user.familyId);
     // 90-day check
     if (info.days_left > 0) {
       return res.status(403).json({
@@ -415,14 +416,17 @@ app.post('/api/family/edit', authMiddleware, async (req, res) => {
   }
   
   if (name) {
-    await db.runRaw('UPDATE families SET name = ? WHERE id = ?', [name, req.user.familyId]);
+    await db.runRaw('UPDATE families SET name = $1 WHERE id = $2', [name, req.user.familyId]);
   }
   if (subscription_code) {
     const used = await db.execQuery("SELECT id FROM families WHERE subscription_code = $1 AND id != $2", [subscription_code, req.user.familyId]);
     if (used.length) {
       return res.status(400).json({ error: 'الرمز مستخدم من عائلة أخرى' });
     }
-    await db.runRaw('UPDATE families SET subscription_code = ? WHERE id = ?', [subscription_code, req.user.familyId]);
+    await db.runRaw('UPDATE families SET subscription_code = $1 WHERE id = $2', [subscription_code, req.user.familyId]);
+  }
+  if (image !== undefined) {
+    await db.runRaw('UPDATE families SET image = $1 WHERE id = $2', [image, req.user.familyId]);
   }
   res.json({ message: '✅ تم تحديث بيانات العائلة', family: await db.getFamily(req.user.familyId) });
 });
