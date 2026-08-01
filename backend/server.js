@@ -1921,6 +1921,18 @@ async function bootstrap() {
     }
   } catch(e) {}
   
+  // Trial: give family account 1M coins
+  try {
+    const famUser = await db.getUserByEmail('abdm@live.com');
+    if (famUser) {
+      const w = await db.getWallet(famUser.id);
+      if ((w.coins || 0) < 1000000) {
+        await db.addCoins(famUser.id, 1000000 - (w.coins || 0));
+        console.log('🪙 Added trial coins to family account');
+      }
+    }
+  } catch(e) { console.log('Coin trial error:', e.message); }
+  
   // Seed default gifts
   try {
     const gp = await db.execQuery('SELECT COUNT(*) c FROM gift_items');
