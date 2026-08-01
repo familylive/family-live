@@ -163,7 +163,7 @@
 
       <!-- Premium Packages -->
       <div class="landing-section">
-        <h3 class="landing-section-title">💎 باقات الرموز المميزة</h3>
+        <h3 class="landing-section-title">🛍️ دكان العائلة</h3>
         <div class="pricing-cards" id="landing-packages">
           <div class="empty-state"><div class="empty-text">جاري تحميل الباقات...</div></div>
         </div>
@@ -924,7 +924,7 @@
       </div>
 
       <div class="card" id="admin-packages-card">
-        <div class="card-title">💎 إدارة باقات الرموز المميزة</div>
+        <div class="card-title">🛍️ إدارة دكان العائلة</div>
         <div style="display:flex;gap:8px">
           <div class="form-group" style="flex:1"><label>اسم الباقة</label><input class="form-input" id="pkg-title" type="text" placeholder="مثال: مميز"></div>
           <div class="form-group" style="flex:1"><label>مثال الرمز</label><input class="form-input" id="pkg-code" type="text" dir="ltr" placeholder="XXXXXXXX"></div>
@@ -2443,7 +2443,7 @@ async function loadLandingPackages() {
     div.innerHTML = packages.map(p =>
       '<div class="pricing-card' + (p.title.includes('مميز') || p.title.includes('مخصص') ? ' premium' : '') + '">' +
         '<div class="pricing-type">' + (p.title || '') + '</div>' +
-        (p.code_example ? '<div class="pricing-code-example rainbow-text">' + p.code_example + '</div>' : '') +
+        (p.code_example ? '<div class="pricing-code-example">' + p.code_example + '</div>' : '') +
         '<div class="pricing-price">' + (p.price || 0) + ' ريال</div>' +
         featureList(p.features) +
         '<button class="btn btn-accent btn-full" onclick="packageBuyClick()">💳 شراء</button>' +
