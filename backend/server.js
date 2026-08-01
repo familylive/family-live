@@ -431,8 +431,8 @@ app.post('/api/family/edit', authMiddleware, async (req, res) => {
 
 // Update profile
 app.post('/api/profile/update', authMiddleware, async (req, res) => {
-  const { name, country, city, phone, whatsapp, avatar } = req.body;
-  const user = await db.updateProfile(req.user.id, { name, country, city, phone, whatsapp, avatar });
+  const { name, country, city, phone, whatsapp, avatar, currency } = req.body;
+  const user = await db.updateProfile(req.user.id, { name, country, city, phone, whatsapp, avatar, currency });
   res.json({ message: '✅ تم تحديث الملف الشخصي', user });
 });
 
