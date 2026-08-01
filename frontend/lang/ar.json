@@ -2,7 +2,6 @@
   "app.title": "العائلة",
   "app.subtitle": "تواصل عائلتنا في كل مكان",
   "app.loading": "جاري التحميل...",
-
   "nav.home": "الرئيسية",
   "nav.family": "العائلة",
   "nav.diwaniya": "الديوانية",
@@ -10,7 +9,6 @@
   "nav.challenges": "التحديات",
   "nav.leaderboard": "قادة النقاط",
   "nav.logout": "تسجيل الخروج",
-
   "auth.login": "تسجيل الدخول",
   "auth.register": "إنشاء حساب",
   "auth.welcome_back": "مرحباً بعودتك",
@@ -21,7 +19,6 @@
   "auth.have_account": "لديك حساب بالفعل؟",
   "auth.sign_up": "سجل الآن",
   "auth.sign_in": "تسجيل دخول",
-
   "auth.found_family": "تأسيس عائلة",
   "auth.join_family": "انضمام لعائلة",
   "auth.family_name": "اسم العائلة",
@@ -31,20 +28,17 @@
   "auth.phone": "رقم الجوال",
   "auth.password": "كلمة المرور",
   "auth.invite_token": "رمز الدعوة",
-
   "dashboard.title": "الرئيسية",
   "dashboard.subtitle": "نشاط عائلتك اليوم",
   "dashboard.welcome": "مرحباً",
   "dashboard.your_points": "نقاطك",
   "dashboard.quick_actions": "إجراءات سريعة",
   "dashboard.recent": "آخر التحديات",
-
   "stats.members": "الأعضاء",
   "stats.challenges": "التحديات",
   "stats.diwaniya": "الديوانية",
   "stats.open": "مفتوحة",
   "stats.closed": "متوقفة",
-
   "family.title": "العائلة",
   "family.subtitle": "أفراد عائلتك وإدارة الدعوات",
   "family.founder": "المؤسس",
@@ -54,7 +48,6 @@
   "family.send_invites": "إرسال الدعوات",
   "family.pending_invites": "الدعوات المرسلة",
   "family.add_email": "إضافة بريد آخر",
-
   "diwaniya.title": "الديوانية",
   "diwaniya.subtitle": "مجلس العائلة الافتراضي",
   "diwaniya.controls": "التحكم",
@@ -78,7 +71,6 @@
   "diwaniya.mode_text": "✍️ كتابي فقط",
   "diwaniya.mode_audio": "🎤 صوتي فقط",
   "diwaniya.mode_both": "📝🎤 كتابي + صوتي",
-
   "games.title": "الألعاب",
   "games.subtitle": "اختر لعبتك وتحدى عائلتك",
   "games.new_challenge": "تحدٍ جديد",
@@ -93,7 +85,6 @@
   "games.memory": "الذاكرة",
   "games.players_2": "2-4 لاعبين",
   "games.players_2_8": "2-8 لاعبين",
-
   "challenges.title": "التحديات",
   "challenges.subtitle": "سجل التحديات كاملاً",
   "challenges.all": "جميع التحديات",
@@ -106,7 +97,6 @@
   "challenges.cancelled": "ملغي",
   "challenges.from": "من",
   "challenges.vs": "←",
-
   "leaderboard.title": "قادة النقاط",
   "leaderboard.subtitle": "أكثر الأعضاء نشاطاً وتفاعلاً",
   "leaderboard.rank": "#",
@@ -114,7 +104,6 @@
   "leaderboard.points": "النقاط",
   "leaderboard.wins": "الفوز",
   "leaderboard.games": "الألعاب",
-
   "common.empty": "لا توجد بيانات بعد",
   "common.no_members": "لا يوجد أعضاء",
   "common.no_invites": "لا توجد دعوات",
@@ -126,5 +115,6 @@
   "common.loading": "جاري...",
   "common.error": "خطأ",
   "common.success": "نجاح",
-  "common.required": "يرجى ملء جميع الحقول المطلوبة"
+  "common.required": "يرجى ملء جميع الحقول المطلوبة",
+  "nav.wallet": "محفظتي"
 }

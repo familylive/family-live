@@ -57,7 +57,7 @@ const i18n = {
     const active = document.querySelector('.page-content.active');
     if (active) {
       const pageName = active.id.replace('page-', '');
-      const titleKeys = { dashboard:'dashboard.title', family:'family.title', diwaniya:'diwaniya.title', games:'games.title', challenges:'challenges.title', leaderboard:'leaderboard.title', codes:'nav.codes', auctions:'nav.auctions', profile:'nav.profile', support:'nav.support', myviolations:'nav.violations' };
+      const titleKeys = { dashboard:'dashboard.title', family:'family.title', diwaniya:'diwaniya.title', games:'games.title', challenges:'challenges.title', leaderboard:'leaderboard.title', codes:'nav.codes', auctions:'nav.auctions', profile:'nav.profile', support:'nav.support', myviolations:'nav.violations', wallet:'nav.wallet' };
       const titleEl = document.querySelector('.page-content.active .page-title');
       const t = this.t(titleKeys[pageName]);
       if (titleEl && t && t !== titleKeys[pageName]) titleEl.textContent = t;

@@ -1235,6 +1235,109 @@ app.post('/api/admin/packages/delete', authMiddleware, adminMiddleware, async (r
   res.json({ message: '🗑️ تم حذف الباقة' });
 });
 
+// =============== COINS & WALLET ===============
+
+// My wallet (coins + money)
+app.get('/api/wallet', authMiddleware, async (req, res) => {
+  const wallet = await db.getWallet(req.user.id);
+  const rate = await db.getSetting('coin_to_sar', '1');
+  res.json({ wallet, rate, packages: await db.getCoinPackages() });
+});
+
+// Buy coins (creates payment)
+app.post('/api/wallet/buy-coins', authMiddleware, async (req, res) => {
+  const { packageId } = req.body;
+  const pkg = await db.execQuery("SELECT * FROM coin_packages WHERE id = $1 AND status = 'active'", [packageId]);
+  if (!pkg.length) return res.status(400).json({ error: 'الباقة غير متاحة' });
+  const user = await db.getUserById(req.user.id);
+  const payment = await db.createPayment(req.user.id, user.name, 'stcpay', pkg[0].price, 'شراء كوينزات (' + pkg[0].coins + ')', '');
+  res.json({ requiresPayment: true, price: pkg[0].price, coins: pkg[0].coins, paymentId: payment.id });
+});
+
+// Send gift
+app.post('/api/wallet/gift', authMiddleware, async (req, res) => {
+  const { toId, coins, message } = req.body;
+  if (!toId || !coins || coins < 1) return res.status(400).json({ error: 'البيانات ناقصة' });
+  const fromUser = await db.getUserById(req.user.id);
+  const result = await db.sendGift(req.user.id, toId, parseInt(coins), message);
+  if (result.error) return res.status(400).json(result);
+  // Notify receiver
+  io.to(`user_${toId}`).emit('gift_received', { fromName: fromUser.name, coins, message: message || '' });
+  res.json({ message: '🎁 تم إرسال هدية ' + coins + ' كوينز', wallet: result.wallet });
+});
+
+// Convert coins to wallet money
+app.post('/api/wallet/convert', authMiddleware, async (req, res) => {
+  const { coins } = req.body;
+  if (!coins || coins < 1) return res.status(400).json({ error: 'عدد الكوينزات مطلوب' });
+  const result = await db.convertCoinsToWallet(req.user.id, parseInt(coins));
+  if (result.error) return res.status(400).json(result);
+  res.json({ message: '💰 تم تحويل ' + coins + ' كوينز إلى المحفظة', wallet: result });
+});
+
+// Request withdrawal
+app.post('/api/wallet/withdraw', authMiddleware, async (req, res) => {
+  const { amount, phone } = req.body;
+  if (!amount || amount < 10) return res.status(400).json({ error: 'الحد الأدنى للسحب 10 ريال' });
+  const user = await db.getUserById(req.user.id);
+  const result = await db.requestWithdrawal(req.user.id, user.name, parseInt(amount), phone);
+  if (result.error) return res.status(400).json(result);
+  res.json({ message: '📤 تم تقديم طلب السحب — التحويل خلال 3 أيام', withdrawal: result });
+});
+
+// My wallet history
+app.get('/api/wallet/transactions', authMiddleware, async (req, res) => {
+  const transactions = await db.getMyTransactions(req.user.id);
+  const withdrawals = await db.getMyWithdrawals(req.user.id);
+  const giftsReceived = await db.getMyGifts(req.user.id);
+  const giftsSent = await db.getGiftsByUser(req.user.id);
+  res.json({ transactions, withdrawals, giftsReceived, giftsSent });
+});
+
+// Admin: all coin packages management
+app.get('/api/admin/coin-packages', authMiddleware, adminMiddleware, async (req, res) => {
+  res.json({ packages: await db.getAllCoinPackages() });
+});
+app.post('/api/admin/coin-packages/add', authMiddleware, adminMiddleware, async (req, res) => {
+  const { coins, price } = req.body;
+  if (!coins || !price) return res.status(400).json({ error: 'البيانات مطلوبة' });
+  const pkg = await db.addCoinPackage(parseInt(coins), parseInt(price));
+  res.json({ message: '✅ تمت إضافة الباقة', package: pkg });
+});
+app.post('/api/admin/coin-packages/update', authMiddleware, adminMiddleware, async (req, res) => {
+  const { id, coins, price, status } = req.body;
+  const pkg = await db.updateCoinPackage(id, { coins, price, status });
+  res.json({ message: '✅ تم التحديث', package: pkg });
+});
+app.post('/api/admin/coin-packages/delete', authMiddleware, adminMiddleware, async (req, res) => {
+  const { id } = req.body;
+  await db.deleteCoinPackage(id);
+  res.json({ message: '🗑️ تم الحذف' });
+});
+
+// Admin: withdrawals management
+app.get('/api/admin/withdrawals', authMiddleware, adminMiddleware, async (req, res) => {
+  res.json({ withdrawals: await db.getAllWithdrawals() });
+});
+app.post('/api/admin/withdrawals/update', authMiddleware, adminMiddleware, async (req, res) => {
+  const { id, status } = req.body;
+  if (!['pending','processing','paid','rejected'].includes(status)) return res.status(400).json({ error: 'حالة غير صحيحة' });
+  const withdrawal = await db.updateWithdrawal(id, status);
+  res.json({ message: '✅ تم تحديث حالة السحب', withdrawal });
+});
+
+// Admin: set coin conversion rate
+app.post('/api/admin/wallet/rate', authMiddleware, adminMiddleware, async (req, res) => {
+  const { rate } = req.body;
+  await db.setSetting('coin_to_sar', rate);
+  res.json({ message: '✅ تم تحديث سعر الكوينز', rate });
+});
+
+// Admin: all transactions
+app.get('/api/admin/transactions', authMiddleware, adminMiddleware, async (req, res) => {
+  res.json({ transactions: await db.getAllTransactions() });
+});
+
 // =============== PAYMENT GATEWAYS ===============
 
 // Get payment settings (public - shows what's enabled)
@@ -1277,6 +1380,13 @@ app.post('/api/admin/payments/confirm', authMiddleware, adminMiddleware, async (
     const user = await db.getUserById(payment.user_id);
     if (user && user.family_id) {
       await db.enableSecretRoom(user.family_id);
+    }
+  }
+  // If buying coins, add coins to user wallet
+  if (payment && payment.purpose && payment.purpose.startsWith('شراء كوينزات')) {
+    const coinsMatch = payment.purpose.match(/\((\d+)\)/);
+    if (coinsMatch) {
+      await db.addCoins(payment.user_id, parseInt(coinsMatch[1]));
     }
   }
   res.json({ message: '✅ تم تأكيد الدفع', payment });

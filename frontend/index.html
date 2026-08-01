@@ -106,6 +106,9 @@
       <div class="menu-nav-item" data-page="myviolations" onclick="navigateTo('myviolations');toggleMenu()">
         <span class="nav-icon">⚠️</span> نظام المخالفات
       </div>
+      <div class="menu-nav-item" data-page="wallet" onclick="navigateTo('wallet');toggleMenu()">
+        <span class="nav-icon">💰</span> محفظتي
+      </div>
       <div class="menu-nav-item" id="menu-login-item" onclick="showAuth('login');toggleMenu()" style="display:none">
         <span class="nav-icon">🔐</span> تسجيل الدخول
       </div>
@@ -766,6 +769,49 @@
       </div>
     </div>
 
+    <!-- Wallet Page -->
+    <div id="page-wallet" class="page-content">
+      <div class="page-title">💰 محفظتي</div>
+      <div class="page-subtitle">الكوينزات والمحفظة والسحب</div>
+      
+      <div class="card card-glow">
+        <div style="display:flex;justify-content:space-around;text-align:center;padding:8px 0">
+          <div><div style="font-size:28px;font-weight:900;color:var(--gold)" id="wallet-coins">0</div><div style="font-size:12px;color:var(--text-secondary)">🪙 كوينزات</div></div>
+          <div><div style="font-size:28px;font-weight:900;color:var(--success)" id="wallet-money">0</div><div style="font-size:12px;color:var(--text-secondary)">💵 ريال في المحفظة</div></div>
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);text-align:center" id="wallet-rate">1 كوينز = 1 ريال</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">🛍️ باقات شراء الكوينزات</div>
+        <div id="coin-packages-list"><div class="empty-state"><div class="empty-text">لا توجد باقات</div></div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">💰 تحويل الكوينزات إلى مبلغ</div>
+        <div style="display:flex;gap:8px">
+          <input class="form-input" id="convert-coins-input" type="number" placeholder="عدد الكوينزات" style="flex:1">
+          <button class="btn btn-accent" onclick="convertCoins()">تحويل</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">📤 طلب سحب</div>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:8px">التحويل خلال 3 أيام عبر STC Pay</p>
+        <div style="display:flex;gap:8px;margin-bottom:8px">
+          <input class="form-input" id="withdraw-amount" type="number" placeholder="المبلغ (ريال)" style="flex:1">
+          <input class="form-input" id="withdraw-phone" type="text" placeholder="رقم STC" dir="ltr" style="flex:1">
+        </div>
+        <button class="btn btn-primary btn-full" onclick="requestWithdraw()">📤 تقديم طلب السحب</button>
+        <div id="my-withdrawals" style="margin-top:10px"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">📜 سجل الحركات</div>
+        <div id="wallet-transactions"><div class="empty-state"><div class="empty-text">لا توجد حركات</div></div></div>
+      </div>
+    </div>
+
     <!-- Support Page -->
     <div id="page-support" class="page-content">
       <div class="page-title">🎧 الدعم الفني والمساعدة</div>
@@ -1274,7 +1320,7 @@ function navigateTo(pageName) {
   const navItem = document.querySelector('.menu-nav-item[data-page="' + pageName + '"]');
   if (page) page.classList.add('active');
   if (navItem) navItem.classList.add('active');
-  const titles = { dashboard:'الرئيسية', family:'العائلة', diwaniya:'الديوانية', games:'الألعاب', challenges:'التحديات', leaderboard:'قادة النقاط', codes:'رموزي', profile:'ملفي الشخصي', moderator:'زيارات المودريتر', myviolations:'نظام المخالفات', login:'تسجيل الدخول', register:'إنشاء حساب' };
+  const titles = { dashboard:'الرئيسية', family:'العائلة', diwaniya:'الديوانية', games:'الألعاب', challenges:'التحديات', leaderboard:'قادة النقاط', codes:'رموزي', profile:'ملفي الشخصي', moderator:'زيارات المودريتر', myviolations:'نظام المخالفات', wallet:'محفظتي', login:'تسجيل الدخول', register:'إنشاء حساب' };
   const titleEl = document.getElementById('header-title-text');
   if (titleEl && titles[pageName]) titleEl.textContent = titles[pageName];
   toggleHeaderVisibility(pageName);
@@ -1285,6 +1331,7 @@ function navigateTo(pageName) {
   if (pageName === 'profile' && state.isLoggedIn) { loadProfilePage(); loadMyFamilies(); }
   if (pageName === 'support' && state.isLoggedIn) loadMyTickets();
   if (pageName === 'myviolations' && state.isLoggedIn) loadMyViolations();
+  if (pageName === 'wallet' && state.isLoggedIn) loadWallet();
   if (pageName === 'admin' && state.user?.role === 'admin') loadAdminSupport();
   if (pageName === 'family' && state.isLoggedIn) { loadAnnouncements(); populateAnnTarget(); populateManagerSelect(); loadFamilyPageData(); }
   if (pageName === 'admin' && state.user?.role === 'admin') { loadBannedWords(); loadAdminBans(); loadAIUsers(); loadViolations(); loadAdminAgreements(); loadAdminUsers(); loadModeratorVisitsAdmin(); }
@@ -2674,6 +2721,95 @@ async function deletePackageAdmin(id) {
     showToast('🗑️ تم الحذف', 'success');
     loadAdminPackages();
     loadLandingPackages();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+// ==================== WALLET (COINS & GIFTS) ====================
+let walletData = { coins: 0, wallet: 0, rate: 1 };
+
+async function loadWallet() {
+  try {
+    const data = await api('GET', '/api/wallet');
+    walletData = data.wallet;
+    document.getElementById('wallet-coins').textContent = data.wallet.coins || 0;
+    document.getElementById('wallet-money').textContent = data.wallet.wallet || 0;
+    document.getElementById('wallet-rate').textContent = '1 كوينز = ' + data.rate + ' ريال';
+    // Render packages
+    const pkgs = document.getElementById('coin-packages-list');
+    if (data.packages?.length) {
+      pkgs.innerHTML = data.packages.map(p =>
+        '<div class="my-family-item" style="justify-content:space-between">' +
+          '<div><b>' + p.coins + ' كوينز</b></div>' +
+          '<div style="color:var(--gold)">' + p.price + ' ريال</div>' +
+          '<button class="btn btn-sm btn-accent" onclick="buyCoinsPackage(\'' + p.id + '\', ' + p.price + ', ' + p.coins + ')">💳 شراء</button>' +
+        '</div>'
+      ).join('');
+    }
+  } catch(e) {}
+  loadWalletHistory();
+}
+
+async function loadWalletHistory() {
+  try {
+    const { transactions, withdrawals, giftsReceived } = await api('GET', '/api/wallet/transactions');
+    const tx = document.getElementById('wallet-transactions');
+    if (!transactions?.length && !giftsReceived?.length) {
+      tx.innerHTML = '<div class="empty-state"><div class="empty-text">لا توجد حركات</div></div>';
+    } else {
+      let html = '';
+      (transactions || []).forEach(t => {
+        const type = { gift_out:'🎁 هدية مرسلة', gift_in:'🎁 هدية مستلمة', convert:'💰 تحويل', withdraw:'📤 سحب' }[t.type] || t.type;
+        html += '<div class="admin-family-item"><div class="admin-family-name">' + type + '</div><div class="admin-family-meta">' + (t.coins ? t.coins + ' كوينز' : '') + (t.amount ? ' · ' + t.amount + ' ريال' : '') + ' · ' + (t.created_at||'') + '</div></div>';
+      });
+      tx.innerHTML = html || '<div class="empty-state"><div class="empty-text">لا توجد حركات</div></div>';
+    }
+    // Withdrawals
+    const wd = document.getElementById('my-withdrawals');
+    if (withdrawals?.length) {
+      wd.innerHTML = withdrawals.map(w => {
+        const st = { pending:'⏳ قيد المراجعة', processing:'🔄 جاري التحويل', paid:'✅ تم التحويل', rejected:'❌ مرفوض' }[w.status] || w.status;
+        return '<div class="admin-family-item"><div class="admin-family-name">📤 ' + w.amount + ' ريال <span style="font-size:11px">' + st + '</span></div><div class="admin-family-meta">' + (w.phone||'') + ' · ' + (w.created_at||'') + '</div></div>';
+      }).join('');
+    }
+  } catch(e) {}
+}
+
+async function buyCoinsPackage(id, price, coins) {
+  try {
+    const result = await api('POST', '/api/wallet/buy-coins', { packageId: id });
+    showPaymentModal(price, 'شراء كوينزات (' + coins + ')');
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function convertCoins() {
+  const coins = parseInt(document.getElementById('convert-coins-input').value);
+  if (!coins) return showToast('أدخل عدد الكوينزات', 'error');
+  try {
+    const result = await api('POST', '/api/wallet/convert', { coins });
+    showToast(result.message, 'success');
+    loadWallet();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function requestWithdraw() {
+  const amount = parseInt(document.getElementById('withdraw-amount').value);
+  const phone = document.getElementById('withdraw-phone').value.trim();
+  if (!amount) return showToast('أدخل المبلغ', 'error');
+  if (!phone) return showToast('أدخل رقم STC Pay', 'error');
+  try {
+    const result = await api('POST', '/api/wallet/withdraw', { amount, phone });
+    showToast(result.message, 'success');
+    loadWallet();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function sendGiftTo(userId, userName) {
+  const coins = prompt('🎁 أرسل هدية إلى ' + userName + ' — عدد الكوينزات:');
+  if (!coins) return;
+  const message = prompt('📝 رسالة الهدية (اختياري):');
+  try {
+    const result = await api('POST', '/api/wallet/gift', { toId: userId, coins: parseInt(coins), message });
+    showToast(result.message, 'success');
   } catch(e) { showToast(e.message, 'error'); }
 }
 

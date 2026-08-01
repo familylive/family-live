@@ -29,7 +29,7 @@ async function getDb() { return getPool(); }
 
 async function initDb() {
   await run(`CREATE TABLE IF NOT EXISTS families (id TEXT PRIMARY KEY, name TEXT NOT NULL, subscription_code TEXT NOT NULL UNIQUE, founder_id TEXT, status TEXT DEFAULT 'active', diwaniya_locked_until TEXT, diwaniya_lock_reason TEXT, diwaniya_locked_by TEXT, name_changed_at TEXT, name_changes_count INTEGER DEFAULT 0, diwaniya_capacity INTEGER DEFAULT 15, secret_room_enabled INTEGER DEFAULT 0, secret_room_purchased_at TEXT, created_at TEXT DEFAULT now())`);
-  await run(`CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, password TEXT NOT NULL, phone TEXT, whatsapp TEXT, country TEXT, city TEXT, family_id TEXT, role TEXT DEFAULT 'member', avatar TEXT DEFAULT '👤', points INTEGER DEFAULT 0, stars INTEGER DEFAULT 0, moderator_tier TEXT DEFAULT 'none', last_seen TEXT, can_open_diwaniya INTEGER DEFAULT 0, currency TEXT DEFAULT 'sar', recording_attempts INTEGER DEFAULT 0, created_at TEXT DEFAULT now())`);
+  await run(`CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, password TEXT NOT NULL, phone TEXT, whatsapp TEXT, country TEXT, city TEXT, family_id TEXT, role TEXT DEFAULT 'member', avatar TEXT DEFAULT '👤', points INTEGER DEFAULT 0, stars INTEGER DEFAULT 0, moderator_tier TEXT DEFAULT 'none', last_seen TEXT, can_open_diwaniya INTEGER DEFAULT 0, currency TEXT DEFAULT 'sar', recording_attempts INTEGER DEFAULT 0, coins INTEGER DEFAULT 0, wallet INTEGER DEFAULT 0, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS invitations (id TEXT PRIMARY KEY, family_id TEXT NOT NULL, email TEXT NOT NULL, invited_by TEXT NOT NULL, status TEXT DEFAULT 'pending', token TEXT NOT NULL UNIQUE, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS diwaniya_sessions (id TEXT PRIMARY KEY, family_id TEXT NOT NULL, opened_by TEXT NOT NULL, opened_at TEXT DEFAULT now(), closed_at TEXT, duration_minutes INTEGER DEFAULT 30, status TEXT DEFAULT 'open', topic TEXT, mode TEXT DEFAULT 'text', capacity INTEGER DEFAULT 15, secret_code TEXT, video_limit INTEGER DEFAULT 6)`);
   await run(`CREATE TABLE IF NOT EXISTS diwaniya_messages (id TEXT PRIMARY KEY, session_id TEXT NOT NULL, user_id TEXT NOT NULL, message TEXT NOT NULL, created_at TEXT DEFAULT now())`);
@@ -51,6 +51,10 @@ async function initDb() {
   await run(`CREATE TABLE IF NOT EXISTS support_messages (id TEXT PRIMARY KEY, title TEXT NOT NULL, content TEXT NOT NULL, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS support_tickets (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, user_name TEXT, subject TEXT, message TEXT NOT NULL, status TEXT DEFAULT 'open', admin_reply TEXT, replied_at TEXT, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS payments (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, user_name TEXT, gateway TEXT NOT NULL, amount INTEGER NOT NULL, purpose TEXT, reference TEXT, status TEXT DEFAULT 'pending', created_at TEXT DEFAULT now(), confirmed_at TEXT)`);
+  await run(`CREATE TABLE IF NOT EXISTS coin_packages (id TEXT PRIMARY KEY, coins INTEGER NOT NULL, price INTEGER NOT NULL, status TEXT DEFAULT 'active', created_at TEXT DEFAULT now())`);
+  await run(`CREATE TABLE IF NOT EXISTS gifts (id TEXT PRIMARY KEY, from_user TEXT NOT NULL, to_user TEXT NOT NULL, coins INTEGER NOT NULL, message TEXT, created_at TEXT DEFAULT now())`);
+  await run(`CREATE TABLE IF NOT EXISTS coin_transactions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, type TEXT NOT NULL, coins INTEGER DEFAULT 0, amount INTEGER DEFAULT 0, detail TEXT, created_at TEXT DEFAULT now())`);
+  await run(`CREATE TABLE IF NOT EXISTS withdrawals (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, user_name TEXT, amount INTEGER NOT NULL, method TEXT DEFAULT 'stcpay', phone TEXT, status TEXT DEFAULT 'pending', created_at TEXT DEFAULT now(), paid_at TEXT)`);
   await run(`CREATE TABLE IF NOT EXISTS packages (id TEXT PRIMARY KEY, title TEXT NOT NULL, code_example TEXT, price INTEGER DEFAULT 0, features TEXT DEFAULT '[]', status TEXT DEFAULT 'active', sort_order INTEGER DEFAULT 0, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS capacity_purchases (id TEXT PRIMARY KEY, family_id TEXT NOT NULL, capacity INTEGER NOT NULL, price INTEGER NOT NULL, purchased_at TEXT DEFAULT now())`);
   
@@ -60,6 +64,8 @@ async function initDb() {
   try { await run("ALTER TABLE users ADD COLUMN IF NOT EXISTS moderator_tier TEXT DEFAULT 'none'"); } catch(e) {}
   try { await run("ALTER TABLE users ADD COLUMN IF NOT EXISTS whatsapp TEXT"); } catch(e) {}
   try { await run("ALTER TABLE users ADD COLUMN IF NOT EXISTS recording_attempts INTEGER DEFAULT 0"); } catch(e) {}
+  try { await run("ALTER TABLE users ADD COLUMN IF NOT EXISTS coins INTEGER DEFAULT 0"); } catch(e) {}
+  try { await run("ALTER TABLE users ADD COLUMN IF NOT EXISTS wallet INTEGER DEFAULT 0"); } catch(e) {}
   try { await run("ALTER TABLE families ADD COLUMN IF NOT EXISTS diwaniya_capacity INTEGER DEFAULT 15"); } catch(e) {}
   try { await run("ALTER TABLE families ADD COLUMN IF NOT EXISTS secret_room_enabled INTEGER DEFAULT 0"); } catch(e) {}
   try { await run("ALTER TABLE families ADD COLUMN IF NOT EXISTS secret_room_purchased_at TEXT"); } catch(e) {}
@@ -563,6 +569,73 @@ async function updatePackage(id, data) {
   return queryOne('SELECT * FROM packages WHERE id = $1', [id]);
 }
 async function deletePackage(id) { await run('DELETE FROM packages WHERE id = $1', [id]); return true; }
+
+// =============== COINS & WALLET ===============
+async function getCoinPackages() { return query("SELECT * FROM coin_packages WHERE status = 'active' ORDER BY price"); }
+async function getAllCoinPackages() { return query('SELECT * FROM coin_packages ORDER BY price'); }
+async function addCoinPackage(coins, price) {
+  const id = uuidv4();
+  await run('INSERT INTO coin_packages (id, coins, price) VALUES ($1,$2,$3)', [id, coins, price]);
+  return queryOne('SELECT * FROM coin_packages WHERE id = $1', [id]);
+}
+async function updateCoinPackage(id, data) {
+  const { coins, price, status } = data;
+  if (coins !== undefined) await run('UPDATE coin_packages SET coins = $1 WHERE id = $2', [coins, id]);
+  if (price !== undefined) await run('UPDATE coin_packages SET price = $1 WHERE id = $2', [price, id]);
+  if (status !== undefined) await run('UPDATE coin_packages SET status = $1 WHERE id = $2', [status, id]);
+  return queryOne('SELECT * FROM coin_packages WHERE id = $1', [id]);
+}
+async function deleteCoinPackage(id) { await run('DELETE FROM coin_packages WHERE id = $1', [id]); return true; }
+
+async function getWallet(userId) {
+  const user = await queryOne('SELECT coins, wallet FROM users WHERE id = $1', [userId]);
+  return { coins: user ? user.coins : 0, wallet: user ? user.wallet : 0 };
+}
+async function addCoins(userId, coins) { await run('UPDATE users SET coins = coins + $1 WHERE id = $2', [coins, userId]); return getWallet(userId); }
+async function deductCoins(userId, coins) {
+  const w = await getWallet(userId);
+  if (w.coins < coins) return null;
+  await run('UPDATE users SET coins = coins - $1 WHERE id = $2', [coins, userId]);
+  return getWallet(userId);
+}
+async function sendGift(fromId, toId, coins, message) {
+  const w = await deductCoins(fromId, coins);
+  if (!w) return { error: 'رصيدك لا يكفي' };
+  await run('UPDATE users SET coins = coins + $1 WHERE id = $2', [coins, toId]);
+  const id = uuidv4();
+  await run('INSERT INTO gifts (id, from_user, to_user, coins, message) VALUES ($1,$2,$3,$4,$5)', [id, fromId, toId, coins, message || '']);
+  await run("INSERT INTO coin_transactions (id, user_id, type, coins, detail) VALUES ($1,$2,'gift_out',$3,$4)", [uuidv4(), fromId, coins, 'هدية إلى ' + toId]);
+  await run("INSERT INTO coin_transactions (id, user_id, type, coins, detail) VALUES ($1,$2,'gift_in',$3,$4)", [uuidv4(), toId, coins, 'هدية من ' + fromId]);
+  return { ok: true, wallet: w };
+}
+async function convertCoinsToWallet(userId, coins) {
+  const w = await getWallet(userId);
+  if (w.coins < coins) return { error: 'رصيد الكوينزات لا يكفي' };
+  const rate = parseFloat(await getSetting('coin_to_sar', '1'));
+  const amount = Math.floor(coins * rate);
+  await run('UPDATE users SET coins = coins - $1, wallet = wallet + $2 WHERE id = $3', [coins, amount, userId]);
+  await run("INSERT INTO coin_transactions (id, user_id, type, coins, amount, detail) VALUES ($1,$2,'convert',$3,$4,$5)", [uuidv4(), userId, coins, amount, 'تحويل كوينزات إلى مبلغ']);
+  return getWallet(userId);
+}
+async function requestWithdrawal(userId, userName, amount, phone) {
+  const w = await getWallet(userId);
+  if (w.wallet < amount) return { error: 'رصيد المحفظة لا يكفي' };
+  await run('UPDATE users SET wallet = wallet - $1 WHERE id = $2', [amount, userId]);
+  const id = uuidv4();
+  await run("INSERT INTO withdrawals (id, user_id, user_name, amount, phone, status) VALUES ($1,$2,$3,$4,$5,'pending')", [id, userId, userName, amount, phone || '']);
+  await run("INSERT INTO coin_transactions (id, user_id, type, amount, detail) VALUES ($1,$2,'withdraw',$3,$4)", [uuidv4(), userId, amount, 'طلب سحب']);
+  return queryOne('SELECT * FROM withdrawals WHERE id = $1', [id]);
+}
+async function getAllWithdrawals() { return query("SELECT * FROM withdrawals ORDER BY created_at DESC LIMIT 100"); }
+async function getMyWithdrawals(userId) { return query('SELECT * FROM withdrawals WHERE user_id = $1 ORDER BY created_at DESC', [userId]); }
+async function updateWithdrawal(id, status) {
+  await run('UPDATE withdrawals SET status = $1, paid_at = CASE WHEN $1 = 'paid' THEN now() ELSE paid_at END WHERE id = $2', [status, id]);
+  return queryOne('SELECT * FROM withdrawals WHERE id = $1', [id]);
+}
+async function getMyTransactions(userId) { return query('SELECT * FROM coin_transactions WHERE user_id = $1 ORDER BY created_at DESC LIMIT 100', [userId]); }
+async function getAllTransactions() { return query('SELECT * FROM coin_transactions ORDER BY created_at DESC LIMIT 100'); }
+async function getMyGifts(userId) { return query('SELECT g.*, u.name as from_name FROM gifts g JOIN users u ON g.from_user = u.id WHERE g.to_user = $1 ORDER BY g.created_at DESC', [userId]); }
+async function getGiftsByUser(userId) { return query('SELECT g.*, u.name as to_name FROM gifts g JOIN users u ON g.to_user = u.id WHERE g.from_user = $1 ORDER BY g.created_at DESC', [userId]); }
 
 async function getPaymentSettings() {
   return {
