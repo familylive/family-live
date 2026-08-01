@@ -1042,6 +1042,29 @@ app.post('/api/family/diwaniya-manager', authMiddleware, async (req, res) => {
   res.json({ message: canOpen ? '✅ تم منح الصلاحية' : 'تم سحب الصلاحية' });
 });
 
+// =============== SECRET ROOM (PAID) ===============
+
+// Get secret room status
+app.get('/api/diwaniya/secret-room', authMiddleware, async (req, res) => {
+  if (!req.user.familyId) return res.json({ enabled: false, price: 100 });
+  res.json(await db.getSecretRoomStatus(req.user.familyId));
+});
+
+// Purchase secret room (creates payment, admin confirms)
+app.post('/api/diwaniya/secret-room/purchase', authMiddleware, async (req, res) => {
+  if (!req.user.familyId) return res.status(400).json({ error: 'لا يوجد عائلة' });
+  if (req.user.role !== 'founder') return res.status(403).json({ error: 'فقط المؤسس' });
+  const status = await db.getSecretRoomStatus(req.user.familyId);
+  if (status.enabled) return res.json({ message: 'الغرفة المغلقة مفعلة بالفعل', enabled: true });
+  // Create payment via gateway
+  const user = await db.getUserById(req.user.id);
+  const payment = await db.createPayment(req.user.id, user.name, 'stcpay', status.price, 'تفعيل الغرفة المغلقة', '');
+  res.json({ requiresPayment: true, price: status.price, paymentId: payment.id, message: '📨 أرسل إثبات الدفع ثم تؤكد الإدارة التفعيل' });
+});
+
+// Admin: confirm payment activates secret room automatically
+// (hook into confirmPayment - after confirming, if purpose is secret room, enable)
+
 // =============== DIWANIYA CAPACITY ===============
 
 // Get capacity info + packages
@@ -1228,6 +1251,13 @@ app.get('/api/admin/payments', authMiddleware, adminMiddleware, async (req, res)
 app.post('/api/admin/payments/confirm', authMiddleware, adminMiddleware, async (req, res) => {
   const { paymentId } = req.body;
   const payment = await db.confirmPayment(paymentId);
+  // If payment purpose is secret room, activate it for the family
+  if (payment && payment.purpose === 'تفعيل الغرفة المغلقة') {
+    const user = await db.getUserById(payment.user_id);
+    if (user && user.family_id) {
+      await db.enableSecretRoom(user.family_id);
+    }
+  }
   res.json({ message: '✅ تم تأكيد الدفع', payment });
 });
 

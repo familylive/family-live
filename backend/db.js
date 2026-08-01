@@ -28,7 +28,7 @@ const queryAll = query;
 async function getDb() { return getPool(); }
 
 async function initDb() {
-  await run(`CREATE TABLE IF NOT EXISTS families (id TEXT PRIMARY KEY, name TEXT NOT NULL, subscription_code TEXT NOT NULL UNIQUE, founder_id TEXT, status TEXT DEFAULT 'active', diwaniya_locked_until TEXT, diwaniya_lock_reason TEXT, diwaniya_locked_by TEXT, name_changed_at TEXT, name_changes_count INTEGER DEFAULT 0, diwaniya_capacity INTEGER DEFAULT 15, created_at TEXT DEFAULT now())`);
+  await run(`CREATE TABLE IF NOT EXISTS families (id TEXT PRIMARY KEY, name TEXT NOT NULL, subscription_code TEXT NOT NULL UNIQUE, founder_id TEXT, status TEXT DEFAULT 'active', diwaniya_locked_until TEXT, diwaniya_lock_reason TEXT, diwaniya_locked_by TEXT, name_changed_at TEXT, name_changes_count INTEGER DEFAULT 0, diwaniya_capacity INTEGER DEFAULT 15, secret_room_enabled INTEGER DEFAULT 0, secret_room_purchased_at TEXT, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, password TEXT NOT NULL, phone TEXT, whatsapp TEXT, country TEXT, city TEXT, family_id TEXT, role TEXT DEFAULT 'member', avatar TEXT DEFAULT '👤', points INTEGER DEFAULT 0, stars INTEGER DEFAULT 0, moderator_tier TEXT DEFAULT 'none', last_seen TEXT, can_open_diwaniya INTEGER DEFAULT 0, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS invitations (id TEXT PRIMARY KEY, family_id TEXT NOT NULL, email TEXT NOT NULL, invited_by TEXT NOT NULL, status TEXT DEFAULT 'pending', token TEXT NOT NULL UNIQUE, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS diwaniya_sessions (id TEXT PRIMARY KEY, family_id TEXT NOT NULL, opened_by TEXT NOT NULL, opened_at TEXT DEFAULT now(), closed_at TEXT, duration_minutes INTEGER DEFAULT 30, status TEXT DEFAULT 'open', topic TEXT, mode TEXT DEFAULT 'text', capacity INTEGER DEFAULT 15, secret_code TEXT)`);
@@ -543,6 +543,20 @@ async function getAllPayments() { return query('SELECT * FROM payments ORDER BY 
 async function getMyPayments(userId) { return query('SELECT * FROM payments WHERE user_id = $1 ORDER BY created_at DESC', [userId]); }
 async function confirmPayment(paymentId) { await run("UPDATE payments SET status = 'confirmed', confirmed_at = now() WHERE id = $1", [paymentId]); return queryOne('SELECT * FROM payments WHERE id = $1', [paymentId]); }
 async function rejectPayment(paymentId) { await run("UPDATE payments SET status = 'rejected' WHERE id = $1", [paymentId]); return queryOne('SELECT * FROM payments WHERE id = $1', [paymentId]); }
+
+async function getSecretRoomStatus(familyId) {
+  const family = await queryOne('SELECT secret_room_enabled, secret_room_purchased_at FROM families WHERE id = $1', [familyId]);
+  const price = parseInt(await getSetting('secret_room_price', '100'));
+  return {
+    enabled: family ? (family.secret_room_enabled == 1) : false,
+    purchased_at: family ? family.secret_room_purchased_at : null,
+    price: price
+  };
+}
+async function enableSecretRoom(familyId) {
+  await run("UPDATE families SET secret_room_enabled = 1, secret_room_purchased_at = now() WHERE id = $1", [familyId]);
+  return getSecretRoomStatus(familyId);
+}
 
 async function getFamilyEditInfo(familyId) {
   const family = await queryOne('SELECT name_changed_at, name_changes_count FROM families WHERE id = $1', [familyId]);

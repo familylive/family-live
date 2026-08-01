@@ -515,7 +515,8 @@
           <select class="form-input" id="diwaniya-capacity-select">
             <option value="15">👥 الحد الأقصى: 15 عضو</option>
           </select>
-          <input class="form-input" id="diwaniya-secret-code" type="text" placeholder="🗝️ رقم سري (اختياري)" dir="ltr" style="max-width:130px">
+          <input class="form-input" id="diwaniya-secret-code" type="text" placeholder="🗝️ رقم سري (اختياري)" dir="ltr" style="max-width:130px" disabled>
+          <button class="btn btn-sm" id="secret-room-btn" onclick="toggleSecretRoomPurchase()" style="white-space:nowrap">🔒 الغرفة المغلقة</button>
           <input class="form-input" id="diwaniya-topic" type="text" placeholder="موضوع الجلسة (اختياري)" style="flex:1">
           <select class="form-input" id="diwaniya-mode">
             <option value="text">✍️ كتابي فقط</option>
@@ -527,6 +528,11 @@
           <button class="btn btn-primary" id="diwaniya-toggle-btn" onclick="diwaniyaOpenHandler()">🔓 فتح الديوانية</button>
         </div>
         <div id="capacity-info" style="font-size:12px;color:var(--text-muted);margin-top:8px">👥 الحد الأقصى للعائلة: 15</div>
+        <div id="secret-room-banner" style="display:none;margin-top:10px;padding:12px;background:rgba(201,147,12,.08);border:1px solid rgba(201,147,12,.3);border-radius:var(--radius-sm)">
+          <p style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:6px">🔒 تفعيل الغرفة المغلقة (رقم سري للدخول)</p>
+          <p style="font-size:13px;color:var(--text-secondary);margin-bottom:8px">الاشتراك: <b style="color:var(--gold)" id="secret-room-price">100</b> ريال / شهرياً</p>
+          <button class="btn btn-accent btn-full" onclick="purchaseSecretRoom()">💳 اشترك الآن</button>
+        </div>
         <div id="capacity-packages" style="margin-top:8px;display:none">
           <p style="font-size:13px;color:var(--text-secondary);margin-bottom:6px">💳 باقات توسعة سعة الديوانية:</p>
           <div style="display:flex;gap:8px">
