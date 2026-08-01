@@ -2185,8 +2185,8 @@ body {
 
 /* ===== Luxury call control buttons ===== */
 .call-control-btn {
-  width: 54px;
-  height: 54px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
   background: radial-gradient(circle at 32% 28%, #2a3c63, #101b36 70%);
   border: 1.5px solid rgba(232,184,48,.55);
@@ -2205,9 +2205,9 @@ body {
 .call-control-btn:active { transform: scale(.92); }
 .call-control-btn:hover { border-color: #ffd75e; box-shadow: 0 4px 20px rgba(232,184,48,.35), inset 0 1px 0 rgba(255,255,255,.12); }
 .call-control-btn svg {
-  width: 26px;
-  height: 26px;
-  filter: drop-shadow(0 0 4px rgba(232,184,48,.45));
+  width: 27px;
+  height: 27px;
+  filter: drop-shadow(0 0 5px rgba(232,184,48,.5));
 }
 .call-control-btn .ic-off { display: none; }
 
