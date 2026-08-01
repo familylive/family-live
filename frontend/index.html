@@ -1513,7 +1513,6 @@ async function loadLandingPage() {
       featuredDiv.innerHTML = families.map(f =>
         '<div class="family-card-featured">' +
           '<div class="fc-name">' + (f.name || '') + '</div>' +
-          '<div class="fc-code">' + (f.subscription_code || '') + '</div>' +
           '<div class="fc-founder">👑 ' + (f.founder_name || '') + '</div>' +
           '<div class="fc-members">👥 ' + (f.members_count || 0) + ' عضو</div>' +
         '</div>'
