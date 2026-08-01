@@ -740,6 +740,33 @@ async function sendInvites() {
   } catch(e) { showToast(e.message || 'فشل الإرسال', 'error'); }
 }
 
+// Invite by phone -> WhatsApp (from founder's own WhatsApp)
+async function inviteByWhatsApp() {
+  const phone = document.getElementById('invite-phone')?.value.trim() || '';
+  if (!phone) return showToast('أدخل رقم جوال العضو', 'error');
+  try {
+    const result = await api('POST', '/api/family/invite-phone', { phone });
+    const box = document.getElementById('invite-wa-result');
+    if (box) {
+      box.innerHTML = '<div class="invite-result success">✅ تم تجهيز الدعوة لرقم ' + result.phone +
+        '<div style="display:flex;gap:6px;margin-top:6px">' +
+          '<a class="btn btn-success btn-sm" style="flex:1" target="_blank" rel="noopener" href="' + result.waLink + '">📤 أرسل الآن عبر واتساب</a>' +
+          '<button class="btn btn-sm" onclick="copyText(\'' + result.inviteUrl + '\')">📋 نسخ الرابط</button>' +
+        '</div></div>';
+    }
+    showToast('📱 افتح واتساب وأرسل الدعوة', 'success');
+    // Also refresh invitations list
+    try {
+      const { invitations } = await api('GET', '/api/family/invitations');
+      state.invites = invitations; updateInvitations();
+    } catch(e) {}
+  } catch(e) { showToast(e.message, 'error'); }
+}
+function copyText(text) {
+  if (navigator.clipboard) { navigator.clipboard.writeText(text).then(() => showToast('📋 تم النسخ', 'success')).catch(()=>{}); }
+  else { const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); showToast('📋 تم النسخ', 'success'); }
+}
+
 // ==================== CHALLENGES ====================
 async function sendChallenge() {
   const gameType = document.getElementById('challenge-game-type').value;
