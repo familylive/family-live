@@ -2524,3 +2524,56 @@ body {
   bottom: 4px;
 }
 #tiktok-mode-btn.zoom { border-color: rgba(232,184,48,.9); box-shadow: 0 0 16px rgba(232,184,48,.5); }
+
+/* ===== TikTok on-screen chat ===== */
+.tiktok-chat {
+  position: absolute;
+  left: 0; right: 0;
+  bottom: 0;
+  height: 34%;
+  min-height: 150px;
+  display: none;
+  flex-direction: column;
+  justify-content: flex-end;
+  background: linear-gradient(to top, rgba(0,0,0,.85), rgba(0,0,0,.35) 70%, transparent);
+  z-index: 30;
+  padding: 8px;
+  pointer-events: auto;
+}
+.video-grid.tiktok-mode .tiktok-chat { display: flex; }
+.tiktok-chat-list {
+  overflow-y: auto;
+  padding: 4px 6px;
+  max-height: 100%;
+  scrollbar-width: none;
+}
+.tiktok-chat-list::-webkit-scrollbar { display: none; }
+.tiktok-chat-msg {
+  font-size: 12.5px;
+  color: #fff;
+  background: rgba(0,0,0,.45);
+  border-radius: 14px;
+  padding: 5px 10px;
+  margin-bottom: 5px;
+  width: fit-content;
+  max-width: 85%;
+  backdrop-filter: blur(2px);
+  animation: tkMsgIn .25s ease;
+}
+.tiktok-chat-msg.mine { background: rgba(232,184,48,.25); margin-left: auto; }
+.tiktok-chat-name { color: #ffd75e; font-weight: 800; }
+@keyframes tkMsgIn { from { transform: translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } }
+.tiktok-chat-row {
+  display: flex;
+  gap: 6px;
+  padding-top: 6px;
+}
+.tiktok-chat-row .form-input {
+  flex: 1;
+  border-radius: 20px;
+  background: rgba(0,0,0,.6);
+  border-color: rgba(232,184,48,.4);
+  color: #fff;
+  font-size: 13px;
+}
+.tiktok-send-btn { border-radius: 20px; padding: 0 14px; }

@@ -462,7 +462,11 @@ function connectSocket() {
   socket.on('family_notification', (data) => {
     showFamilyNotification(data.title, data.message);
   });
-  socket.on('diwaniya_message', (msg) => addChatMessage(msg.user_name, msg.message, msg.user_id === state.user?.id));
+  socket.on('diwaniya_message', (msg) => {
+    addChatMessage(msg.user_name, msg.message, msg.user_id === state.user?.id);
+    const tk = document.getElementById('tiktok-chat');
+    if (tk && tk.style.display !== 'none') addTikTokChatMessage(msg.user_name, msg.message, msg.user_id === state.user?.id);
+  });
   socket.on('diwaniya_audio', (msg) => addAudioMessage(msg.user_name, msg.audio, msg.audioType, msg.user_id === state.user?.id));
   socket.on('new_challenge', () => { showToast('⚔️ تحدٍ جديد!', 'success'); refreshData(); });
   socket.on('challenge_completed', () => { showToast('🏆 تم التحدي!', 'success'); refreshData(); });
@@ -802,6 +806,9 @@ async function loadDiwaniyaMessages(sessionId, isPoll = false) {
     const room = document.getElementById('chat-room'); if (!room) return;
     room.innerHTML = '';
     messages.forEach(msg => addChatMessage(msg.user_name, msg.message, msg.user_id === state.user?.id, msg.avatar));
+    // Sync TikTok overlay chat if visible
+    const tk = document.getElementById('tiktok-chat');
+    if (tk && tk.style.display !== 'none') syncTikTokChat();
     
     // Popup notification for NEW moderator/system messages (from others)
     if (isPoll && messages.length > lastMsgCount) {
@@ -1759,6 +1766,54 @@ function toggleCallFullscreen() {
     if (btn) btn.classList.toggle('zoom', grid.classList.contains('video-zoom'));
   }
 }
+// ==================== TIKTOK CHAT (on the black screen) ====================
+function sendTikTokChat() {
+  const input = document.getElementById('tiktok-chat-input');
+  const text = input.value.trim();
+  if (!text || !state.diwaniyaOpen) return;
+  input.value = '';
+  if (socket?.connected) {
+    socket.emit('diwaniya_message', { sessionId: state.activeSession.id, userId: state.user.id, message: text });
+  } else {
+    api('POST', '/api/diwaniya/message', { sessionId: state.activeSession.id, message: text }).catch(() => {});
+  }
+}
+
+function addTikTokChatMessage(name, text, isSent) {
+  const list = document.getElementById('tiktok-chat-list');
+  if (!list) return;
+  const msg = document.createElement('div');
+  msg.className = 'tiktok-chat-msg' + (isSent ? ' mine' : '');
+  msg.innerHTML = '<span class="tiktok-chat-name">' + (name || '') + '</span> ' + escapeHtml(text);
+  list.appendChild(msg);
+  // Keep max 30 messages
+  while (list.children.length > 30) list.removeChild(list.firstChild);
+  list.scrollTop = list.scrollHeight;
+}
+
+function escapeHtml(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function syncTikTokChat() {
+  // Re-render from the main chat room messages if available
+  const list = document.getElementById('tiktok-chat-list');
+  const room = document.getElementById('chat-room');
+  if (!list || !room) return;
+  list.innerHTML = '';
+  Array.from(room.querySelectorAll('.chat-msg')).forEach(m => {
+    const name = m.querySelector('.chat-sender')?.textContent || '';
+    const text = m.querySelector('.chat-bubble')?.textContent || '';
+    const isSent = m.classList.contains('sent');
+    const msg = document.createElement('div');
+    msg.className = 'tiktok-chat-msg' + (isSent ? ' mine' : '');
+    msg.innerHTML = '<span class="tiktok-chat-name">' + escapeHtml(name) + '</span> ' + escapeHtml(text);
+    list.appendChild(msg);
+  });
+  while (list.children.length > 30) list.removeChild(list.firstChild);
+  list.scrollTop = list.scrollHeight;
+}
+
 // TikTok mode: self big + participants as small corner tiles
 function toggleTikTokMode() {
   const grid = document.getElementById('video-grid');
@@ -1766,9 +1821,13 @@ function toggleTikTokMode() {
   grid.classList.toggle('tiktok-mode');
   const btn = document.getElementById('tiktok-mode-btn');
   if (btn) btn.classList.toggle('zoom');
+  // Show/hide the on-screen chat
+  const tk = document.getElementById('tiktok-chat');
+  if (tk) tk.style.display = grid.classList.contains('tiktok-mode') ? 'flex' : 'none';
+  if (grid.classList.contains('tiktok-mode')) setTimeout(syncTikTokChat, 300);
   // Exit fullscreen if switching layouts
   if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-  showToast(grid.classList.contains('tiktok-mode') ? '🎬 وضع تيك توك - أنت كبير والأعضاء بالزاوية' : '🖼 وضع الشبكة - بجوار بعض', 'success');
+  showToast(grid.classList.contains('tiktok-mode') ? '🎬 وضع تيك توك - أنت كبير والدردشة تحت' : '🖼 وضع الشبكة - بجوار بعض', 'success');
 }
 
 // Tap on any video tile to zoom
