@@ -29,7 +29,7 @@ async function getDb() { return getPool(); }
 
 async function initDb() {
   await run(`CREATE TABLE IF NOT EXISTS families (id TEXT PRIMARY KEY, name TEXT NOT NULL, subscription_code TEXT NOT NULL UNIQUE, founder_id TEXT, status TEXT DEFAULT 'active', diwaniya_locked_until TEXT, diwaniya_lock_reason TEXT, diwaniya_locked_by TEXT, name_changed_at TEXT, name_changes_count INTEGER DEFAULT 0, diwaniya_capacity INTEGER DEFAULT 15, secret_room_enabled INTEGER DEFAULT 0, secret_room_purchased_at TEXT, created_at TEXT DEFAULT now())`);
-  await run(`CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, password TEXT NOT NULL, phone TEXT, whatsapp TEXT, country TEXT, city TEXT, family_id TEXT, role TEXT DEFAULT 'member', avatar TEXT DEFAULT '👤', points INTEGER DEFAULT 0, stars INTEGER DEFAULT 0, moderator_tier TEXT DEFAULT 'none', last_seen TEXT, can_open_diwaniya INTEGER DEFAULT 0, created_at TEXT DEFAULT now())`);
+  await run(`CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, password TEXT NOT NULL, phone TEXT, whatsapp TEXT, country TEXT, city TEXT, family_id TEXT, role TEXT DEFAULT 'member', avatar TEXT DEFAULT '👤', points INTEGER DEFAULT 0, stars INTEGER DEFAULT 0, moderator_tier TEXT DEFAULT 'none', last_seen TEXT, can_open_diwaniya INTEGER DEFAULT 0, currency TEXT DEFAULT 'sar', created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS invitations (id TEXT PRIMARY KEY, family_id TEXT NOT NULL, email TEXT NOT NULL, invited_by TEXT NOT NULL, status TEXT DEFAULT 'pending', token TEXT NOT NULL UNIQUE, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS diwaniya_sessions (id TEXT PRIMARY KEY, family_id TEXT NOT NULL, opened_by TEXT NOT NULL, opened_at TEXT DEFAULT now(), closed_at TEXT, duration_minutes INTEGER DEFAULT 30, status TEXT DEFAULT 'open', topic TEXT, mode TEXT DEFAULT 'text', capacity INTEGER DEFAULT 15, secret_code TEXT)`);
   await run(`CREATE TABLE IF NOT EXISTS diwaniya_messages (id TEXT PRIMARY KEY, session_id TEXT NOT NULL, user_id TEXT NOT NULL, message TEXT NOT NULL, created_at TEXT DEFAULT now())`);
@@ -62,16 +62,17 @@ async function createUser(name, email, password, familyId, role = 'member') {
   return queryOne('SELECT id, name, email, family_id, role, points, avatar, created_at FROM users WHERE id = $1', [id]);
 }
 async function getUserByEmail(email) { return queryOne('SELECT * FROM users WHERE lower(email) = lower($1)', [email]); }
-async function getUserById(id) { return queryOne('SELECT id, name, email, phone, whatsapp, country, city, family_id, role, avatar, points, stars, moderator_tier, can_open_diwaniya, last_seen, created_at FROM users WHERE id = $1', [id]); }
+async function getUserById(id) { return queryOne('SELECT id, name, email, phone, whatsapp, country, city, family_id, role, avatar, points, stars, moderator_tier, can_open_diwaniya, last_seen, currency, created_at FROM users WHERE id = $1', [id]); }
 async function getFamilyMembers(familyId) { return query('SELECT id, name, email, phone, whatsapp, role, avatar, points, last_seen, can_open_diwaniya FROM users WHERE family_id = $1 ORDER BY role DESC, points DESC', [familyId]); }
 async function updateProfile(userId, data) {
-  const { name, country, city, phone, whatsapp, avatar } = data;
+  const { name, country, city, phone, whatsapp, avatar, currency } = data;
   if (name !== undefined) await run('UPDATE users SET name = $1 WHERE id = $2', [name, userId]);
   if (country !== undefined) await run('UPDATE users SET country = $1 WHERE id = $2', [country, userId]);
   if (city !== undefined) await run('UPDATE users SET city = $1 WHERE id = $2', [city, userId]);
   if (phone !== undefined) await run('UPDATE users SET phone = $1 WHERE id = $2', [phone, userId]);
   if (whatsapp !== undefined) await run('UPDATE users SET whatsapp = $1 WHERE id = $2', [whatsapp, userId]);
   if (avatar !== undefined) await run('UPDATE users SET avatar = $1 WHERE id = $2', [avatar, userId]);
+  if (currency !== undefined && ['sar','usd'].includes(currency)) await run('UPDATE users SET currency = $1 WHERE id = $2', [currency, userId]);
   return getUserById(userId);
 }
 async function updateLastSeen(userId) { await run("UPDATE users SET last_seen = now() WHERE id = $1", [userId]); }
@@ -354,6 +355,9 @@ async function addUserToFamily(userId, familyId, isCurrent = 0) {
 async function setCurrentFamily(userId, familyId) { await run('UPDATE user_families SET is_current = 0 WHERE user_id = $1', [userId]); await run('UPDATE user_families SET is_current = 1 WHERE user_id = $1 AND family_id = $2', [userId, familyId]); }
 
 // =============== SETTINGS ===============
+async function getCurrencyRate() { return parseFloat(await getSetting('currency_rate', '3.75')); }
+async function setCurrencyRate(rate) { await setSetting('currency_rate', rate); }
+
 async function getSetting(key, def) { const r = await queryOne('SELECT value FROM settings WHERE key = $1', [key]); return r ? r.value : def; }
 async function setSetting(key, value) { await run('INSERT INTO settings (key, value) VALUES ($1,$2) ON CONFLICT (key) DO UPDATE SET value = $2', [key, String(value)]); }
 

@@ -1178,6 +1178,22 @@ app.post('/api/admin/auctions/cancel', authMiddleware, adminMiddleware, async (r
   res.json({ message: '❌ تم إلغاء المزاد', auction });
 });
 
+// =============== CURRENCY ===============
+
+// Get currency rate + user preference
+app.get('/api/currency', authMiddleware, async (req, res) => {
+  const user = await db.getUserById(req.user.id);
+  res.json({ currency: user ? user.currency || 'sar' : 'sar', rate: await db.getCurrencyRate() });
+});
+
+// Admin: set currency rate
+app.post('/api/admin/currency/rate', authMiddleware, adminMiddleware, async (req, res) => {
+  const { rate } = req.body;
+  if (!rate) return res.status(400).json({ error: 'السعر مطلوب' });
+  await db.setCurrencyRate(parseFloat(rate));
+  res.json({ message: '✅ تم تحديث سعر الصرف', rate });
+});
+
 // =============== PACKAGES MANAGEMENT ===============
 
 // Public: get active packages for home page

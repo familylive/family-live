@@ -691,6 +691,7 @@
           <div class="info-row"><span>🏙️ المدينة</span><span id="profile-city">-</span></div>
           <div class="info-row"><span>⭐ النقاط</span><span id="profile-points" style="color:var(--gold);font-weight:700">0</span></div>
           <div class="info-row"><span>📱 الواتساب</span><span id="profile-whatsapp">-</span></div>
+          <div class="info-row"><span>💱 العملة</span><span id="profile-currency">ريال (SAR)</span></div>
           <div class="info-row"><span>📧 البريد</span><span id="profile-email">-</span></div>
         </div>
       </div>
@@ -724,6 +725,13 @@
         <div class="form-group">
           <label>📱 رقم الواتساب</label>
           <input class="form-input" id="profile-edit-whatsapp" type="text" dir="ltr" placeholder="05xxxxxxxx">
+        </div>
+        <div class="form-group">
+          <label>💱 العملة</label>
+          <select class="form-input" id="profile-edit-currency">
+            <option value="sar">🇸🇦 ريال سعودي (SAR)</option>
+            <option value="usd">🇺🇸 دولار أمريكي (USD)</option>
+          </select>
         </div>
         <button class="btn btn-primary btn-full" onclick="saveProfile()">💾 حفظ التعديلات</button>
       </div>
@@ -961,6 +969,13 @@
         <div class="form-group">
           <label>🏦 بيانات الحساب البنكي (IBAN)</label>
           <input class="form-input" id="bank-details" type="text" dir="ltr" placeholder="SA0000000000000000000000">
+        </div>
+        <div class="form-group" style="margin-top:8px">
+          <label>💱 سعر الصرف (1 دولار = ? ريال)</label>
+          <div style="display:flex;gap:8px">
+            <input class="form-input" id="currency-rate-input" type="number" step="0.01" value="3.75" style="flex:1">
+            <button class="btn btn-sm" onclick="saveCurrencyRate()">💾 حفظ</button>
+          </div>
         </div>
         <button class="btn btn-accent btn-full" onclick="savePaymentSettings()">💾 حفظ إعدادات الدفع</button>
         <div class="card-title" style="font-size:14px;margin-top:16px">📨 إثباتات الدفع الواردة</div>
@@ -1406,7 +1421,7 @@ async function loadLandingAuctions() {
       return '<div class="auction-card compact">' +
         '<div class="auction-header"><span class="auction-code">🏷️ <span class="rainbow-text">' + a.code + '</span></span><span class="auction-live">🔴 مباشر</span></div>' +
         '<div class="auction-timer" data-end="' + end + '" data-id="' + a.id + '"><span class="timer-icon">⏱️</span> <span class="countdown">--:--:--</span></div>' +
-        '<div class="auction-price">💰 <span class="current-price">' + (a.current_price || a.starting_price) + '</span> ريال</div>' +
+        '<div class="auction-price">💰 <span class="current-price">' + fmtPrice(a.current_price || a.starting_price) + '</span></div>' +
         '<div class="auction-meta"><span>رسوم الدخول: ' + a.entry_fee + ' ريال</span></div>' +
         '<button class="btn btn-accent btn-full" onclick="landingBidClick()">' + (state.isLoggedIn ? '💥 مزايدة' : '🔐 سجل للمزايدة') + '</button>' +
       '</div>';
@@ -1801,7 +1816,7 @@ async function loadDashboardAuctions() {
     list.innerHTML = auctions.slice(0, 3).map(a =>
       '<div class="dash-auction-item">' +
         '<span class="dash-auction-code">🏷️ <span class="rainbow-text">' + a.code + '</span></span>' +
-        '<span class="dash-auction-price">💰 ' + (a.current_price || a.starting_price) + ' ريال</span>' +
+        '<span class="dash-auction-price">💰 ' + fmtPrice(a.current_price || a.starting_price) + '</span>' +
         '<button class="btn btn-sm btn-accent" onclick="navigateTo(\'auctions\')">شارك</button>' +
       '</div>'
     ).join('');
@@ -1828,6 +1843,8 @@ async function loadProfilePage() {
   document.getElementById('profile-edit-phone').value = user?.phone || '';
   document.getElementById('profile-edit-whatsapp').value = user?.whatsapp || '';
   document.getElementById('profile-whatsapp').textContent = user?.whatsapp || '-';
+  document.getElementById('profile-edit-currency').value = user?.currency || 'sar';
+  document.getElementById('profile-currency').textContent = (user?.currency === 'usd') ? 'دولار (USD)' : 'ريال (SAR)';
   
   // Hide leave family for admin
   const leaveCard = document.getElementById('leave-family-card');
@@ -1870,9 +1887,12 @@ async function saveProfile() {
   const city = document.getElementById('profile-edit-city').value.trim();
   const phone = document.getElementById('profile-edit-phone').value.trim();
   const whatsapp = document.getElementById('profile-edit-whatsapp').value.trim();
+  const currency = document.getElementById('profile-edit-currency').value;
   if (!name) return showToast('الاسم مطلوب', 'error');
   try {
-    const { user } = await api('POST', '/api/profile/update', { name, country, city, phone, whatsapp });
+    const { user } = await api('POST', '/api/profile/update', { name, country, city, phone, whatsapp, currency });
+    state.user.currency = currency;
+    updateAllUI();
     state.user = { ...state.user, ...user };
     updateAllUI();
     loadProfilePage();
@@ -2443,6 +2463,43 @@ async function sendModeratorMessage() {
   } catch(e) { showToast(e.message, 'error'); }
 }
 
+// ==================== CURRENCY CONVERSION ====================
+let userCurrency = 'sar';
+let currencyRate = 3.75;
+
+function fmtPrice(price) {
+  const p = parseFloat(price) || 0;
+  if (userCurrency === 'usd') {
+    return (p / currencyRate).toFixed(2) + ' $';
+  }
+  return p + ' ريال';
+}
+
+async function loadCurrencyPref() {
+  try {
+    const { currency, rate } = await api('GET', '/api/currency');
+    userCurrency = currency || 'sar';
+    currencyRate = parseFloat(rate) || 3.75;
+  } catch(e) {}
+}
+
+async function loadCurrencyRateInput() {
+  try {
+    const { rate } = await api('GET', '/api/currency');
+    const input = document.getElementById('currency-rate-input');
+    if (input) input.value = rate;
+  } catch(e) {}
+}
+
+async function saveCurrencyRate() {
+  const rate = document.getElementById('currency-rate-input').value;
+  try {
+    await api('POST', '/api/admin/currency/rate', { rate });
+    currencyRate = parseFloat(rate);
+    showToast('✅ تم تحديث سعر الصرف', 'success');
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
 // ==================== PACKAGES MANAGEMENT ====================
 async function loadLandingPackages() {
   try {
@@ -2464,7 +2521,7 @@ async function loadLandingPackages() {
       '<div class="pricing-card' + (p.title.includes('مميز') || p.title.includes('مخصص') ? ' premium' : '') + '">' +
         '<div class="pricing-type">' + (p.title || '') + '</div>' +
         (p.code_example ? '<div class="pricing-code-example' + (p.title.includes('مميز') || p.title.includes('مخصص') ? ' rainbow-text' : '') + '">' + p.code_example + '</div>' : '') +
-        '<div class="pricing-price">' + (p.price || 0) + ' ريال</div>' +
+        '<div class="pricing-price">' + fmtPrice(p.price) + '</div>' +
         featureList(p.features) +
         '<button class="btn btn-accent btn-full" onclick="packageBuyClick()">💳 شراء</button>' +
       '</div>'
@@ -3161,7 +3218,7 @@ async function loadAuctionsPage() {
         '<div class="auction-timer" data-end="' + end + '" data-id="' + a.id + '">' +
           '<span class="timer-icon">⏱️</span> <span class="countdown">--:--</span>' +
         '</div>' +
-        '<div class="auction-price">💰 <span class="current-price">' + (a.current_price || a.starting_price) + '</span> ريال</div>' +
+        '<div class="auction-price">💰 <span class="current-price">' + fmtPrice(a.current_price || a.starting_price) + '</span></div>' +
         '<div class="auction-meta">' +
           '<span>رسوم الدخول: ' + a.entry_fee + ' ريال</span>' +
           '<span>أقل زيادة: ' + (a.min_increment || 10) + ' ريال</span>' +
