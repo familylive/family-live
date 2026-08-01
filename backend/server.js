@@ -1235,6 +1235,56 @@ app.post('/api/admin/packages/delete', authMiddleware, adminMiddleware, async (r
   res.json({ message: '🗑️ تم حذف الباقة' });
 });
 
+// =============== GIFTS (BROADCAST) ===============
+
+// Get gift items (public for users)
+app.get('/api/gifts/items', async (req, res) => {
+  res.json({ gifts: await db.getGiftItems() });
+});
+
+// Send gift to member on camera (via socket)
+app.post('/api/gifts/send', authMiddleware, async (req, res) => {
+  const { giftId, toId, sessionId } = req.body;
+  const gift = await db.execQuery("SELECT * FROM gift_items WHERE id = $1 AND status = 'active'", [giftId]);
+  if (!gift.length) return res.status(400).json({ error: 'الهدية غير متاحة' });
+  const fromUser = await db.getUserById(req.user.id);
+  const result = await db.sendGift(req.user.id, toId, gift[0].coins, 'هدية: ' + gift[0].emoji + ' ' + gift[0].name);
+  if (result.error) return res.status(400).json(result);
+  // Broadcast gift animation to the session
+  io.to(`session_${sessionId}`).emit('gift_on_camera', {
+    giftName: gift[0].name,
+    giftEmoji: gift[0].emoji,
+    giftCoins: gift[0].coins,
+    fromName: fromUser.name,
+    toId: toId,
+    fromId: req.user.id
+  });
+  // Notify recipient
+  io.to(`user_${toId}`).emit('gift_received', { fromName: fromUser.name, coins: gift[0].coins, message: gift[0].emoji + ' ' + gift[0].name });
+  res.json({ message: '🎁 أرسلت ' + gift[0].emoji + ' ' + gift[0].name + ' إلى العضو', wallet: result.wallet });
+});
+
+// Admin: gift items management
+app.get('/api/admin/gift-items', authMiddleware, adminMiddleware, async (req, res) => {
+  res.json({ gifts: await db.getAllGiftItems() });
+});
+app.post('/api/admin/gift-items/add', authMiddleware, adminMiddleware, async (req, res) => {
+  const { name, emoji, coins } = req.body;
+  if (!name) return res.status(400).json({ error: 'اسم الهدية مطلوب' });
+  const gift = await db.addGiftItem(name, emoji, coins);
+  res.json({ message: '✅ تمت إضافة الهدية', gift });
+});
+app.post('/api/admin/gift-items/update', authMiddleware, adminMiddleware, async (req, res) => {
+  const { id, name, emoji, coins, status } = req.body;
+  const gift = await db.updateGiftItem(id, { name, emoji, coins, status });
+  res.json({ message: '✅ تم التحديث', gift });
+});
+app.post('/api/admin/gift-items/delete', authMiddleware, adminMiddleware, async (req, res) => {
+  const { id } = req.body;
+  await db.deleteGiftItem(id);
+  res.json({ message: '🗑️ تم الحذف' });
+});
+
 // =============== COINS & WALLET ===============
 
 // My wallet (coins + money)
@@ -1870,6 +1920,19 @@ async function bootstrap() {
       console.log('📋 رموز الاشتراك المتاحة: ' + newCodes.join(', '));
     }
   } catch(e) {}
+  
+  // Seed default gifts
+  try {
+    const gp = await db.execQuery('SELECT COUNT(*) c FROM gift_items');
+    if (!gp.length || gp[0].c === 0) {
+      await db.addGiftItem('ورد', '🌹', 10);
+      await db.addGiftItem('قلب', '❤️', 20);
+      await db.addGiftItem('تاج', '👑', 50);
+      await db.addGiftItem('ماسة', '💎', 100);
+      await db.addGiftItem('شلال', '🎆', 200);
+      console.log('✅ Seeded default gifts');
+    }
+  } catch(e) { console.log('Gift seed error:', e.message); }
   
   // Seed default coin packages
   try {
