@@ -1155,6 +1155,42 @@ app.post('/api/admin/auctions/cancel', authMiddleware, adminMiddleware, async (r
   res.json({ message: '❌ تم إلغاء المزاد', auction });
 });
 
+// =============== PACKAGES MANAGEMENT ===============
+
+// Public: get active packages for home page
+app.get('/api/packages', async (req, res) => {
+  const packages = await db.getActivePackages();
+  res.json({ packages });
+});
+
+// Admin: all packages
+app.get('/api/admin/packages', authMiddleware, adminMiddleware, async (req, res) => {
+  res.json({ packages: await db.getAllPackages() });
+});
+
+// Admin: add package
+app.post('/api/admin/packages/add', authMiddleware, adminMiddleware, async (req, res) => {
+  const { title, code_example, price, features } = req.body;
+  if (!title) return res.status(400).json({ error: 'عنوان الباقة مطلوب' });
+  const pkg = await db.addPackage(title, code_example, price, features);
+  res.json({ message: '✅ تمت إضافة الباقة', package: pkg });
+});
+
+// Admin: update package
+app.post('/api/admin/packages/update', authMiddleware, adminMiddleware, async (req, res) => {
+  const { id, title, code_example, price, features, status } = req.body;
+  if (!id) return res.status(400).json({ error: 'معرف الباقة مطلوب' });
+  const pkg = await db.updatePackage(id, { title, code_example, price, features, status });
+  res.json({ message: '✅ تم تحديث الباقة', package: pkg });
+});
+
+// Admin: delete package
+app.post('/api/admin/packages/delete', authMiddleware, adminMiddleware, async (req, res) => {
+  const { id } = req.body;
+  await db.deletePackage(id);
+  res.json({ message: '🗑️ تم حذف الباقة' });
+});
+
 // =============== PAYMENT GATEWAYS ===============
 
 // Get payment settings (public - shows what's enabled)
@@ -1630,6 +1666,18 @@ async function bootstrap() {
       console.log('📋 رموز الاشتراك المتاحة: ' + newCodes.join(', '));
     }
   } catch(e) {}
+  
+  // Seed default packages
+  try {
+    const pkgs = await db.execQuery('SELECT COUNT(*) c FROM packages');
+    if (!pkgs.length || pkgs[0].c === 0) {
+      await db.addPackage('🎁 مجاني', '0X7K9M2F', 0, JSON.stringify(['رمز عشوائي 8 أحرف', 'تأسيس عائلة واحدة']));
+      await db.addPackage('👑 مخصص', 'FAMILY88', 500, JSON.stringify(['رمز مخصص من اختيارك', 'رمز فريد لعائلتك']));
+      await db.addPackage('👥 زيادة الأعضاء', '20 عضو', 50, JSON.stringify(['توسعة الديوانية إلى 20 عضو', 'من 15 إلى 20']));
+      await db.addPackage('👥 زيادة الأعضاء', '40 عضو', 100, JSON.stringify(['توسعة الديوانية إلى 40 عضو', 'من 15 إلى 40']));
+      console.log('✅ Seeded default packages');
+    }
+  } catch(e) { console.log('Packages seed error:', e.message); }
   
   // Create default admin account
   try {

@@ -164,51 +164,8 @@
       <!-- Premium Packages -->
       <div class="landing-section">
         <h3 class="landing-section-title">💎 باقات الرموز المميزة</h3>
-        <div class="pricing-cards">
-          <div class="pricing-card">
-            <div class="pricing-type">🎁 مجاني</div>
-            <div class="pricing-code-example">0X7K9M2F</div>
-            <div class="pricing-price">0 ريال</div>
-            <ul class="pricing-features">
-              <li>✅ رمز عشوائي 8 أحرف</li>
-              <li>✅ تأسيس عائلة واحدة</li>
-            </ul>
-          </div>
-          <div class="pricing-card">
-            <div class="pricing-type">👑 مخصص</div>
-            <div class="pricing-code-example">FAMILY88</div>
-            <div class="pricing-price">500 ريال</div>
-            <ul class="pricing-features">
-              <li>✅ رمز مخصص من اختيارك</li>
-              <li>👑 رمز فريد لعائلتك</li>
-            </ul>
-            <button class="btn btn-accent btn-full" onclick="customPackageClick()">💳 شراء</button>
-          </div>
-          <div class="pricing-card">
-            <div class="pricing-type">👥 زيادة الأعضاء</div>
-            <div class="pricing-code-example">20 عضو</div>
-            <div class="pricing-price">50 ريال</div>
-            <ul class="pricing-features">
-              <li>✅ توسعة الديوانية إلى 20 عضو</li>
-              <li>✅ من 15 إلى 20</li>
-            </ul>
-            <button class="btn btn-accent btn-full" onclick="landingCapacityClick()">💳 شراء</button>
-          </div>
-          <div class="pricing-card">
-            <div class="pricing-type">👥 زيادة الأعضاء</div>
-            <div class="pricing-code-example">40 عضو</div>
-            <div class="pricing-price">100 ريال</div>
-            <ul class="pricing-features">
-              <li>✅ توسعة الديوانية إلى 40 عضو</li>
-              <li>✅ من 15 إلى 40</li>
-            </ul>
-            <button class="btn btn-accent btn-full" onclick="landingCapacityClick()">💳 شراء</button>
-          </div>
-          <div class="pricing-card" style="grid-column:span 2;background:linear-gradient(135deg,rgba(59,130,196,.08),var(--bg-card))">
-            <div class="pricing-type">🔐 للبدء</div>
-            <div class="pricing-price" style="font-size:16px;color:var(--text-secondary)">سجل حسابك للانضمام أو تأسيس عائلة</div>
-            <button class="btn btn-accent btn-full" onclick="showAuth('register')">📝 سجل الآن</button>
-          </div>
+        <div class="pricing-cards" id="landing-packages">
+          <div class="empty-state"><div class="empty-text">جاري تحميل الباقات...</div></div>
         </div>
       </div>
 
@@ -966,6 +923,20 @@
         </div>
       </div>
 
+      <div class="card" id="admin-packages-card">
+        <div class="card-title">💎 إدارة باقات الرموز المميزة</div>
+        <div style="display:flex;gap:8px">
+          <div class="form-group" style="flex:1"><label>اسم الباقة</label><input class="form-input" id="pkg-title" type="text" placeholder="مثال: مميز"></div>
+          <div class="form-group" style="flex:1"><label>مثال الرمز</label><input class="form-input" id="pkg-code" type="text" dir="ltr" placeholder="XXXXXXXX"></div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <div class="form-group" style="flex:1"><label>السعر (ريال)</label><input class="form-input" id="pkg-price" type="number" value="0"></div>
+          <div class="form-group" style="flex:2"><label>المميزات (افصل بـ ;)</label><input class="form-input" id="pkg-features" type="text" placeholder="رمز مميز; سهل الحفظ"></div>
+        </div>
+        <button class="btn btn-accent btn-full" onclick="addPackageAdmin()">➕ إضافة باقة</button>
+        <div id="admin-packages-list" style="margin-top:12px"></div>
+      </div>
+
       <div class="card" id="admin-payments-card">
         <div class="card-title">💳 بوابات الدفع</div>
         <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
@@ -1474,6 +1445,7 @@ function landingBidClick() {
 }
 
 async function loadLandingPage() {
+  loadLandingPackages();
   loadLandingAuctions();
   try {
     // Load ads
@@ -2451,6 +2423,131 @@ async function sendModeratorMessage() {
   } catch(e) { showToast(e.message, 'error'); }
 }
 
+// ==================== PACKAGES MANAGEMENT ====================
+async function loadLandingPackages() {
+  try {
+    const { packages } = await api('GET', '/api/packages');
+    const div = document.getElementById('landing-packages');
+    if (!packages?.length) {
+      div.innerHTML = '<div class="empty-state"><div class="empty-text">لا توجد باقات</div></div>';
+      return;
+    }
+    const featureList = (f) => {
+      try {
+        const arr = JSON.parse(f || '[]');
+        return arr.length ? '<ul class="pricing-features">' + arr.map(x => '<li>✅ ' + x + '</li>').join('') + '</ul>' : '';
+      } catch(e) {
+        return f ? '<ul class="pricing-features"><li>✅ ' + f + '</li></ul>' : '';
+      }
+    };
+    div.innerHTML = packages.map(p =>
+      '<div class="pricing-card' + (p.title.includes('مميز') || p.title.includes('مخصص') ? ' premium' : '') + '">' +
+        '<div class="pricing-type">' + (p.title || '') + '</div>' +
+        (p.code_example ? '<div class="pricing-code-example">' + p.code_example + '</div>' : '') +
+        '<div class="pricing-price">' + (p.price || 0) + ' ريال</div>' +
+        featureList(p.features) +
+        '<button class="btn btn-accent btn-full" onclick="packageBuyClick()">💳 شراء</button>' +
+      '</div>'
+    ).join('') +
+    '<div class="pricing-card" style="grid-column:span 2;background:linear-gradient(135deg,rgba(59,130,196,.08),var(--bg-card))">' +
+      '<div class="pricing-type">🔐 للبدء</div>' +
+      '<div class="pricing-price" style="font-size:16px;color:var(--text-secondary)">سجل حسابك للانضمام أو تأسيس عائلة</div>' +
+      '<button class="btn btn-accent btn-full" onclick="showAuth(\'register\')">📝 سجل الآن</button>' +
+    '</div>';
+  } catch(e) { console.error('Packages:', e); }
+}
+
+function packageBuyClick() {
+  if (state.isLoggedIn) {
+    navigateTo('codes');
+  } else {
+    showToast('📝 سجل دخول أولاً', 'success');
+    setTimeout(() => showAuth('login'), 600);
+  }
+}
+
+async function loadAdminPackages() {
+  try {
+    const { packages } = await api('GET', '/api/admin/packages');
+    const list = document.getElementById('admin-packages-list');
+    if (!packages?.length) {
+      list.innerHTML = '<div class="empty-state"><div class="empty-text">لا توجد باقات</div></div>';
+      return;
+    }
+    list.innerHTML = packages.map(p =>
+      '<div class="admin-family-item">' +
+        '<div class="admin-family-name">' + (p.title || '') + ' · ' + (p.price || 0) + ' ريال <span style="font-size:11px;color:' + (p.status === 'active' ? 'var(--success)' : 'var(--danger)') + '">' + (p.status === 'active' ? 'نشطة' : 'موقوفة') + '</span></div>' +
+        '<div class="admin-family-meta">' + (p.code_example || '') + ' · ' + (p.features || '') + '</div>' +
+        '<div class="admin-family-actions">' +
+          '<button class="btn btn-sm" onclick="editPackageAdmin(\'' + p.id + '\')">✏️ تعديل</button>' +
+          '<button class="btn btn-sm ' + (p.status === 'active' ? 'btn-danger' : 'btn-success') + '" onclick="togglePackageAdmin(\'' + p.id + '\', \'' + (p.status === 'active' ? 'inactive' : 'active') + '\')">' + (p.status === 'active' ? '⛔ إيقاف' : '🟢 تفعيل') + '</button>' +
+          '<button class="btn btn-sm btn-danger" onclick="deletePackageAdmin(\'' + p.id + '\')">🗑️ حذف</button>' +
+        '</div>' +
+        '<div id="pkg-edit-' + p.id + '" style="display:none;margin-top:8px">' +
+          '<div class="form-group"><label>الاسم</label><input class="form-input" id="pkg-edit-title-' + p.id + '" value="' + (p.title||'') + '"></div>' +
+          '<div class="form-group"><label>مثال الرمز</label><input class="form-input" id="pkg-edit-code-' + p.id + '" value="' + (p.code_example||'') + '" dir="ltr"></div>' +
+          '<div class="form-group"><label>السعر</label><input class="form-input" id="pkg-edit-price-' + p.id + '" type="number" value="' + (p.price||0) + '"></div>' +
+          '<button class="btn btn-primary btn-full" onclick="savePackageAdmin(\'' + p.id + '\')">💾 حفظ</button>' +
+        '</div>' +
+      '</div>'
+    ).join('');
+  } catch(e) {}
+}
+
+async function addPackageAdmin() {
+  const title = document.getElementById('pkg-title').value.trim();
+  const code_example = document.getElementById('pkg-code').value.trim();
+  const price = document.getElementById('pkg-price').value;
+  const featuresRaw = document.getElementById('pkg-features').value.trim();
+  const features = featuresRaw ? JSON.stringify(featuresRaw.split(';').map(s => s.trim()).filter(Boolean)) : '[]';
+  if (!title) return showToast('اسم الباقة مطلوب', 'error');
+  try {
+    await api('POST', '/api/admin/packages/add', { title, code_example, price, features });
+    showToast('✅ تمت إضافة الباقة', 'success');
+    document.getElementById('pkg-title').value = '';
+    document.getElementById('pkg-code').value = '';
+    document.getElementById('pkg-features').value = '';
+    loadAdminPackages();
+    loadLandingPackages();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+function editPackageAdmin(id) {
+  const el = document.getElementById('pkg-edit-' + id);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+async function savePackageAdmin(id) {
+  const title = document.getElementById('pkg-edit-title-' + id).value.trim();
+  const code_example = document.getElementById('pkg-edit-code-' + id).value.trim();
+  const price = document.getElementById('pkg-edit-price-' + id).value;
+  try {
+    await api('POST', '/api/admin/packages/update', { id, title, code_example, price });
+    showToast('✅ تم الحفظ', 'success');
+    loadAdminPackages();
+    loadLandingPackages();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function togglePackageAdmin(id, status) {
+  try {
+    await api('POST', '/api/admin/packages/update', { id, status });
+    showToast(status === 'active' ? '🟢 تم التفعيل' : '⛔ تم الإيقاف', 'success');
+    loadAdminPackages();
+    loadLandingPackages();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function deletePackageAdmin(id) {
+  if (!confirm('🗑️ حذف هذه الباقة؟')) return;
+  try {
+    await api('POST', '/api/admin/packages/delete', { id });
+    showToast('🗑️ تم الحذف', 'success');
+    loadAdminPackages();
+    loadLandingPackages();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
 // ==================== PAYMENT GATEWAYS ====================
 let paymentSettings = { stcpay_enabled: '1', stcpay_number: '', bank_enabled: '1', bank_details: '' };
 let pendingPayment = null;
@@ -3023,14 +3120,7 @@ async function loadAuctionsPage() {
   
   // Load available codes into dropdowns for admin
   if (state.user?.role === 'admin') {
-    try {
-      const { codes } = await api('GET', '/api/admin/auctions/available-codes');
-      const sel1 = document.getElementById('auction-code-2');
-      const sel2 = document.getElementById('auction-code');
-      const opts = '<option value="">اختر رمزاً...</option>' + codes.map(c => '<option value="' + c.code + '">' + c.code + '</option>').join('');
-      if (sel1) sel1.innerHTML = opts;
-      if (sel2) sel2.innerHTML = opts;
-    } catch(e) { console.error('Codes load:', e); }
+    loadAvailableCodesDropdowns();
   }
   
   try {
@@ -3159,7 +3249,20 @@ async function generateCodeAndAuction() {
     showToast('✅ تم توليد ' + code + ' وفتح مزاد عليه', 'success');
     loadAuctionsPage();
     loadAdminAuctions();
+    loadAvailableCodesDropdowns();
   } catch(e) { showToast(e.message, 'error'); }
+}
+
+// Load available codes into all dropdowns (refresh after generation)
+async function loadAvailableCodesDropdowns() {
+  try {
+    const { codes } = await api('GET', '/api/admin/auctions/available-codes');
+    const opts = '<option value="">اختر رمزاً...</option>' + codes.map(c => '<option value="' + c.code + '">' + c.code + '</option>').join('');
+    const sel1 = document.getElementById('auction-code-2');
+    const sel2 = document.getElementById('auction-code');
+    if (sel1) sel1.innerHTML = opts;
+    if (sel2) sel2.innerHTML = opts;
+  } catch(e) {}
 }
 
 async function createAuction() {

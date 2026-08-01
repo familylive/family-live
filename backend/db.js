@@ -51,6 +51,7 @@ async function initDb() {
   await run(`CREATE TABLE IF NOT EXISTS support_messages (id TEXT PRIMARY KEY, title TEXT NOT NULL, content TEXT NOT NULL, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS support_tickets (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, user_name TEXT, subject TEXT, message TEXT NOT NULL, status TEXT DEFAULT 'open', admin_reply TEXT, replied_at TEXT, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS payments (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, user_name TEXT, gateway TEXT NOT NULL, amount INTEGER NOT NULL, purpose TEXT, reference TEXT, status TEXT DEFAULT 'pending', created_at TEXT DEFAULT now(), confirmed_at TEXT)`);
+  await run(`CREATE TABLE IF NOT EXISTS packages (id TEXT PRIMARY KEY, title TEXT NOT NULL, code_example TEXT, price INTEGER DEFAULT 0, features TEXT DEFAULT '[]', status TEXT DEFAULT 'active', sort_order INTEGER DEFAULT 0, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS capacity_purchases (id TEXT PRIMARY KEY, family_id TEXT NOT NULL, capacity INTEGER NOT NULL, price INTEGER NOT NULL, purchased_at TEXT DEFAULT now())`);
 }
 
@@ -492,6 +493,24 @@ async function getTierSettings() {
 }
 
 // =============== FAMILY EDIT & CAPACITY ===============
+async function getActivePackages() { return query("SELECT * FROM packages WHERE status = 'active' ORDER BY sort_order, price"); }
+async function getAllPackages() { return query('SELECT * FROM packages ORDER BY sort_order, price'); }
+async function addPackage(title, codeExample, price, features) {
+  const id = uuidv4();
+  await run('INSERT INTO packages (id, title, code_example, price, features) VALUES ($1,$2,$3,$4,$5)', [id, title, codeExample || '', parseInt(price) || 0, features || '[]']);
+  return queryOne('SELECT * FROM packages WHERE id = $1', [id]);
+}
+async function updatePackage(id, data) {
+  const { title, code_example, price, features, status } = data;
+  if (title !== undefined) await run('UPDATE packages SET title = $1 WHERE id = $2', [title, id]);
+  if (code_example !== undefined) await run('UPDATE packages SET code_example = $1 WHERE id = $2', [code_example, id]);
+  if (price !== undefined) await run('UPDATE packages SET price = $1 WHERE id = $2', [price, id]);
+  if (features !== undefined) await run('UPDATE packages SET features = $1 WHERE id = $2', [features, id]);
+  if (status !== undefined) await run('UPDATE packages SET status = $1 WHERE id = $2', [status, id]);
+  return queryOne('SELECT * FROM packages WHERE id = $1', [id]);
+}
+async function deletePackage(id) { await run('DELETE FROM packages WHERE id = $1', [id]); return true; }
+
 async function getPaymentSettings() {
   return {
     stcpay_enabled: await getSetting('stcpay_enabled', '1'),
@@ -580,6 +599,6 @@ module.exports = {
   addSupportMessage, getSupportMessages, deleteSupportMessage, countSupportMessages, createSupportTicket, getSupportTickets, getMyTickets, replyTicket, closeTicket,
   requestModeratorVisit, approveModeratorVisit, enterModeratorVisit, exitModeratorVisit, getModeratorVisits, getModeratorVisitsByUser, getPendingVisitByModerator, getFamiliesWithActiveDiwaniya,
   addModeratorStars, getModeratorProfile, rateModerator, getModeratorTier, updateModeratorTier, getTierSettings,
-  getPaymentSettings, savePaymentSettings, createPayment, getAllPayments, getMyPayments, confirmPayment, rejectPayment, getFamilyEditInfo, recordFamilyNameChange, getFamilyCapacity, purchaseCapacity, setDiwaniyaCapacity, getCapacityPackages,
+  getActivePackages, getAllPackages, addPackage, updatePackage, deletePackage, getPaymentSettings, savePaymentSettings, createPayment, getAllPayments, getMyPayments, confirmPayment, rejectPayment, getFamilyEditInfo, recordFamilyNameChange, getFamilyCapacity, purchaseCapacity, setDiwaniyaCapacity, getCapacityPackages,
   createAnnouncement, getFamilyAnnouncements, getAnnouncementsForUser, deleteAnnouncement,
 };
