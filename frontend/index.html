@@ -584,6 +584,14 @@
             <span id="speaking-name">يتكلم...</span>
           </div>
           <div id="call-watermark" class="call-watermark" style="display:none"></div>
+          <div id="entry-banner" class="entry-banner" style="display:none">
+            <div class="entry-avatar" id="entry-avatar">👤</div>
+            <div class="entry-text">
+              <div class="entry-name" id="entry-name">عضو</div>
+              <div class="entry-sub" id="entry-sub">انضم للديوانية 🎉</div>
+            </div>
+            <div class="entry-confetti">🎊</div>
+          </div>
           <div class="video-grid" id="video-grid" style="display:none">
             <div class="video-tile local" id="my-video-tile">
               <video id="my-video" autoplay playsinline muted style="display:none"></video>
@@ -3007,8 +3015,12 @@ function showGiftOnCamera(data) {
     '<div class="gift-sparkles"><span></span><span></span><span></span><span></span><span></span><span></span></div>' +
     '<div class="gift-media-wrap">' + media + '</div>' +
     '<div class="gift-beams"></div>' +
-    '<div class="gift-from-name">' + data.fromName + '</div>' +
-    '<div class="gift-coins-bottom">🪙 ' + data.giftCoins + '</div>';
+    '<div class="gift-info-box">' +
+      '<div class="gift-from-name">' + data.fromName + '</div>' +
+      '<div class="gift-family-line">👪 ' + (data.familyName || '') + '</div>' +
+      '<div class="gift-to-line">إلى: ' + data.toName + '</div>' +
+      '<div class="gift-coins-line">🪙 ' + data.giftCoins + '</div>' +
+    '</div>';
   tile.appendChild(giftOverlay);
   setTimeout(() => giftOverlay.remove(), 6000);
 }

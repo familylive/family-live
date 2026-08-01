@@ -456,6 +456,7 @@ function connectSocket() {
   socket.on('user_joined_call', (data) => {
     if (data.avatar) peerAvatars[data.userId] = data.avatar;
     if (inLiveCall && data.userId !== state.user?.id) {
+      showEntryBanner(data.userName, data.avatar, 'انضم للديوانية 🎉');
       if (!state.callMembers) state.callMembers = {};
       state.callMembers[data.userId] = data.userName;
       updateCallPresence();
@@ -605,6 +606,11 @@ function connectSocket() {
         setTimeout(() => createOffer(p.userId, p.userName), 500);
       }
     });
+    // Fancy entry: show the first existing member banner briefly (TikTok style)
+    if (data.participants.length && data.participants[0].userId !== state.user?.id) {
+      const first = data.participants[0];
+      showEntryBanner(first.userName, first.avatar, 'موجود في الديوانية 👋');
+    }
     updateCallPresence();
   });
 }
@@ -1250,6 +1256,32 @@ let peerConnections = {};
 let inLiveCall = false;
 let peerAvatars = {};
 
+// TikTok-style entry banner (shows for ~5s when a member enters)
+let entryBannerTimer = null;
+function showEntryBanner(name, avatar, subText) {
+  const banner = document.getElementById('entry-banner');
+  if (!banner) return;
+  const nameEl = document.getElementById('entry-name');
+  const subEl = document.getElementById('entry-sub');
+  const avEl = document.getElementById('entry-avatar');
+  if (nameEl) nameEl.textContent = name || 'عضو';
+  if (subEl) subEl.textContent = subText || 'انضم للديوانية 🎉';
+  if (avEl) {
+    avEl.innerHTML = (avatar && avatar.startsWith('data:'))
+      ? '<img src="' + avatar + '" alt="">'
+      : (avatar || '👤');
+  }
+  banner.style.display = 'flex';
+  banner.classList.remove('show');
+  void banner.offsetWidth; // restart animation
+  banner.classList.add('show');
+  if (entryBannerTimer) clearTimeout(entryBannerTimer);
+  entryBannerTimer = setTimeout(() => {
+    banner.classList.remove('show');
+    setTimeout(() => { banner.style.display = 'none'; }, 600);
+  }, 5000);
+}
+
 // Presence: members currently in the call
 function updateCallPresence() {
   const countEl = document.getElementById('call-count');
@@ -1466,6 +1498,7 @@ async function joinLiveAudio() {
     
     state.callMembers = {};
     updateCallPresence();
+    showEntryBanner(state.user?.name, state.user?.avatar, 'انضممت للديوانية 🎉');
     const presenceEl = document.getElementById('call-presence');
     if (presenceEl) presenceEl.style.display = 'block';
     const invBtn = document.getElementById('cam-invite-btn');

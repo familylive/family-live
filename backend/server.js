@@ -1262,13 +1262,18 @@ app.post('/api/gifts/send', authMiddleware, async (req, res) => {
   const fromUser = await db.getUserById(req.user.id);
   const result = await db.sendGift(req.user.id, toId, gift[0].coins, 'هدية: ' + gift[0].emoji + ' ' + gift[0].name);
   if (result.error) return res.status(400).json(result);
-  // Broadcast gift animation to the session
+  // Broadcast gift animation to the session (with sender/recipient/family info)
+  const toUser = await db.getUserById(toId);
+  const sess = await db.getActiveDiwaniya(sessionId);
+  const fam = sess ? await db.getFamily(sess.family_id) : null;
   io.to(`session_${sessionId}`).emit('gift_on_camera', {
     giftName: gift[0].name,
     giftEmoji: gift[0].emoji,
     giftCoins: gift[0].coins,
     giftImage: gift[0].gift_image || null,
     fromName: fromUser.name,
+    toName: toUser?.name || 'عضو',
+    familyName: fam?.name || state?.family?.name || '',
     toId: toId,
     fromId: req.user.id
   });
@@ -2094,12 +2099,18 @@ async function bootstrap() {
   try {
     const gp = await db.execQuery('SELECT COUNT(*) c FROM gift_items');
     if (!gp.length || gp[0].c === 0) {
-      await db.addGiftItem('ورد', '🌹', 10);
-      await db.addGiftItem('قلب', '❤️', 20);
-      await db.addGiftItem('تاج', '👑', 50);
-      await db.addGiftItem('ماسة', '💎', 100);
-      await db.addGiftItem('شلال', '🎆', 200);
-      console.log('✅ Seeded default gifts');
+      // 10 default gifts
+      await db.addGiftItem('ورد', '🌹', 10, null, 1);
+      await db.addGiftItem('قلب', '❤️', 20, null, 2);
+      await db.addGiftItem('دبدوب', '🧸', 30, null, 3);
+      await db.addGiftItem('شوكولاتة', '🍫', 50, null, 5);
+      await db.addGiftItem('تاج', '👑', 100, null, 10);
+      await db.addGiftItem('ميدالية', '🏅', 150, null, 15);
+      await db.addGiftItem('ماسة', '💎', 200, null, 20);
+      await db.addGiftItem('سيارة', '🚗', 350, null, 35);
+      await db.addGiftItem('شلال', '🎆', 500, null, 50);
+      await db.addGiftItem('قلعة', '🏰', 1000, null, 100);
+      console.log('✅ Seeded 10 default gifts');
     }
   } catch(e) { console.log('Gift seed error:', e.message); }
   
