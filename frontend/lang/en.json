@@ -2,7 +2,6 @@
   "app.title": "The Family",
   "app.subtitle": "Connecting your family everywhere",
   "app.loading": "Loading...",
-
   "nav.home": "Home",
   "nav.family": "Family",
   "nav.diwaniya": "Diwaniya",
@@ -10,7 +9,6 @@
   "nav.challenges": "Challenges",
   "nav.leaderboard": "Leaderboard",
   "nav.logout": "Logout",
-
   "auth.login": "Login",
   "auth.register": "Sign Up",
   "auth.welcome_back": "Welcome Back",
@@ -21,7 +19,6 @@
   "auth.have_account": "Already have an account?",
   "auth.sign_up": "Sign Up",
   "auth.sign_in": "Sign In",
-
   "auth.found_family": "Found Family",
   "auth.join_family": "Join Family",
   "auth.family_name": "Family Name",
@@ -31,20 +28,17 @@
   "auth.phone": "Phone",
   "auth.password": "Password",
   "auth.invite_token": "Invite Token",
-
   "dashboard.title": "Dashboard",
   "dashboard.subtitle": "Your family's activity today",
   "dashboard.welcome": "Welcome",
   "dashboard.your_points": "Your Points",
   "dashboard.quick_actions": "Quick Actions",
   "dashboard.recent": "Recent Challenges",
-
   "stats.members": "Members",
   "stats.challenges": "Challenges",
   "stats.diwaniya": "Diwaniya",
   "stats.open": "Open",
   "stats.closed": "Closed",
-
   "family.title": "Family",
   "family.subtitle": "Family members & invitation management",
   "family.founder": "Founder",
@@ -54,7 +48,6 @@
   "family.send_invites": "Send Invitations",
   "family.pending_invites": "Sent Invitations",
   "family.add_email": "Add another email",
-
   "diwaniya.title": "Diwaniya",
   "diwaniya.subtitle": "Virtual family gathering room",
   "diwaniya.controls": "Controls",
@@ -78,7 +71,6 @@
   "diwaniya.mode_text": "✍️ Text Only",
   "diwaniya.mode_audio": "🎤 Audio Only",
   "diwaniya.mode_both": "📝🎤 Text + Audio",
-
   "games.title": "Games",
   "games.subtitle": "Pick a game and challenge your family",
   "games.new_challenge": "New Challenge",
@@ -93,7 +85,6 @@
   "games.memory": "Memory",
   "games.players_2": "2-4 Players",
   "games.players_2_8": "2-8 Players",
-
   "challenges.title": "Challenges",
   "challenges.subtitle": "Full challenge history",
   "challenges.all": "All Challenges",
@@ -106,7 +97,6 @@
   "challenges.cancelled": "Cancelled",
   "challenges.from": "From",
   "challenges.vs": "vs",
-
   "leaderboard.title": "Leaderboard",
   "leaderboard.subtitle": "Most active and engaged members",
   "leaderboard.rank": "#",
@@ -114,7 +104,6 @@
   "leaderboard.points": "Points",
   "leaderboard.wins": "Wins",
   "leaderboard.games": "Games",
-
   "common.empty": "No data yet",
   "common.no_members": "No members",
   "common.no_invites": "No invitations",
@@ -126,5 +115,11 @@
   "common.loading": "Loading...",
   "common.error": "Error",
   "common.success": "Success",
-  "common.required": "Please fill all required fields"
+  "common.required": "Please fill all required fields",
+  "nav.violations": "Violations",
+  "nav.moderator": "Moderator Visits",
+  "nav.profile": "My Profile",
+  "nav.support": "Support",
+  "nav.auctions": "Auctions",
+  "nav.codes": "My Codes"
 }

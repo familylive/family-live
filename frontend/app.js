@@ -1070,7 +1070,7 @@ async function submitDiwaniyaCode() {
     // If user was trying to join the call, proceed
     if (pendingCallJoin) {
       pendingCallJoin = false;
-      joinLiveAudioNow();
+      joinLiveAudio();
     }
   } catch(e) { showToast(e.message, 'error'); }
 }
@@ -1152,7 +1152,6 @@ async function joinLiveAudio() {
   // Verify secret code before joining
   const canJoin = await checkDiwaniyaSecretCode();
   if (!canJoin) return;
-  joinLiveAudioNow();
   
   const isModeratorVisit = (state.user?.role === 'moderator') || (state.user?.role === 'admin' && document.getElementById('moderator-send-box')?.style.display === 'block');
   
