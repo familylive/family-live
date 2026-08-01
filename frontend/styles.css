@@ -2066,3 +2066,57 @@ body {
   from { transform: scale(.5); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
 }
+
+/* Camera-off: avatar circle + watermark */
+.cam-off-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 50% 40%, #1a2a4a, #0a1220);
+  z-index: 10;
+}
+.cam-off-circle {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  border: 3px solid var(--gold);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-hover);
+  box-shadow: 0 0 20px rgba(232,184,48,.25);
+}
+.cam-off-circle img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.cam-off-circle .avatar-emoji {
+  font-size: 34px;
+}
+.cam-off-icon {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(0,0,0,.75);
+  color: #ff5f6d;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid rgba(255,95,109,.6);
+  z-index: 12;
+}
+.cam-off-label {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 700;
+}

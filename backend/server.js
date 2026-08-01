@@ -1842,12 +1842,19 @@ io.on('connection', (socket) => {
       return;
     }
     
+    // Fetch avatar for the joining user
+    let avatar = null;
+    try {
+      const urow = await db.getUserById(userId);
+      avatar = urow?.avatar || null;
+    } catch(e) {}
+    
     // Tell existing participants about new user (observers included so they receive audio)
     participants.forEach(p => {
-      io.to(p.socketId).emit('user_joined_call', { userId, userName, isObserver: !!isObserver });
+      io.to(p.socketId).emit('user_joined_call', { userId, userName, avatar, isObserver: !!isObserver });
     });
     
-    participants.push({ socketId: socket.id, userId, userName, isObserver: !!isObserver });
+    participants.push({ socketId: socket.id, userId, userName, avatar, isObserver: !!isObserver });
     
     // Send current participants to the new user
     socket.emit('call_participants', { 
@@ -1872,7 +1879,12 @@ io.on('connection', (socket) => {
   
   socket.on('audio_offer', async (data) => {
     const { to, offer, sessionId, userName } = data;
-    io.to(to).emit('audio_offer', { from: socket.id, offer, userName, sessionId });
+    let avatar = null;
+    try {
+      const urow = await db.getUserById(data.userId || socket.data?.userId);
+      avatar = urow?.avatar || null;
+    } catch(e) {}
+    io.to(to).emit('audio_offer', { from: socket.id, offer, userName, avatar, sessionId });
   });
   
   socket.on('audio_answer', async (data) => {

@@ -435,10 +435,11 @@ function connectSocket() {
   socket.on('leaderboard_update', () => refreshData());
   
   // WebRTC Audio Call Signaling
-  socket.on('audio_offer', (data) => handleAudioOffer(data.from, data.userName, data.offer));
+  socket.on('audio_offer', (data) => { if (data.avatar) peerAvatars[data.from] = data.avatar; handleAudioOffer(data.from, data.userName, data.offer); });
   socket.on('audio_answer', (data) => handleAudioAnswer(data.from, data.answer));
   socket.on('audio_ice_candidate', (data) => handleIceCandidate(data.from, data.candidate));
   socket.on('user_joined_call', (data) => {
+    if (data.avatar) peerAvatars[data.userId] = data.avatar;
     if (inLiveCall && data.userId !== state.user?.id) {
       // New user joined, send them an offer
       setTimeout(() => createOffer(data.userId, data.userName), 500);
@@ -471,6 +472,7 @@ function connectSocket() {
   socket.on('call_participants', (data) => {
     // Join existing participants
     data.participants.forEach(p => {
+      if (p.avatar) peerAvatars[p.userId] = p.avatar;
       if (p.userId !== state.user?.id) {
         setTimeout(() => createOffer(p.userId, p.userName), 500);
       }
@@ -1003,6 +1005,7 @@ function addAudioMessage(name, audioBase64, audioType, isSent) {
 let localStream = null;
 let peerConnections = {};
 let inLiveCall = false;
+let peerAvatars = {};
 
 // ==================== CALL CONTROLS ====================
 let micMuted = false;
@@ -1038,9 +1041,21 @@ function toggleCamera() {
     btn.classList.toggle('off', camOff);
   }
   if (myVideo) myVideo.style.display = camOff ? 'none' : 'block';
+  const myTile = document.getElementById('my-video-tile');
+  if (myTile) {
+    let overlay = myTile.querySelector('.cam-off-overlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.className = 'cam-off-overlay';
+      overlay.style.display = 'none';
+      overlay.innerHTML = '<div class="cam-off-circle">' + avatarHtml(state.user?.avatar) + '</div><div class="cam-off-icon">🚫</div><div class="cam-off-label">كاميرا مغلقة</div>';
+      myTile.appendChild(overlay);
+    }
+    overlay.style.display = camOff ? 'flex' : 'none';
+  }
   const state = document.getElementById('my-tile-state');
   if (state) {
-    state.textContent = camOff ? '🎥 كاميرا مغلقة' : '';
+    state.textContent = camOff ? '' : '';
     if (!micMuted) state.classList.remove('muted-state');
   }
   showToast(camOff ? '🚫 أغلقت الكاميرا - يسمعونك فقط' : '🎥 فتحت الكاميرا', camOff ? 'error' : 'success');
@@ -1326,6 +1341,20 @@ async function handleIceCandidate(fromId, candidate) {
   }
 }
 
+function avatarHtml(avatar) {
+  if (avatar && avatar.startsWith('data:')) return '<img src="' + avatar + '" alt="">';
+  return '<div class="avatar-emoji">' + (avatar || '👤') + '</div>';
+}
+
+function setRemoteCamOverlay(peerId, off) {
+  const tile = document.getElementById('video-' + peerId);
+  if (!tile) return;
+  const overlay = tile.querySelector('.cam-off-overlay');
+  const video = tile.querySelector('video');
+  if (overlay) overlay.style.display = off ? 'flex' : 'none';
+  if (video) video.style.display = off ? 'none' : 'block';
+}
+
 function addRemoteAudio(peerId, peerName, stream) {
   // Remove old elements if exist
   const old = document.getElementById('audio-' + peerId);
@@ -1347,10 +1376,29 @@ function addRemoteAudio(peerId, peerName, stream) {
     const tile = document.createElement('div');
     tile.id = 'video-' + peerId;
     tile.className = 'video-tile';
-    tile.innerHTML = '<video autoplay playsinline muted></video><div class="video-name">' + peerName + '</div>';
+    tile.innerHTML =
+      '<video autoplay playsinline muted></video>' +
+      '<div class="cam-off-overlay" style="display:none">' +
+        '<div class="cam-off-circle">' + avatarHtml(peerAvatars[peerId]) + '</div>' +
+        '<div class="cam-off-icon">🚫</div>' +
+        '<div class="cam-off-label">كاميرا مغلقة</div>' +
+      '</div>' +
+      '<div class="video-name">' + peerName + '</div>';
     const video = tile.querySelector('video');
-    const videoStream = new MediaStream(stream.getVideoTracks());
-    video.srcObject = videoStream;
+    const videoTracks = stream.getVideoTracks();
+    // If participant has NO video track at all (audio-only listener) -> show overlay
+    if (!videoTracks.length) {
+      setRemoteCamOverlay(peerId, true);
+    } else {
+      const videoStream = new MediaStream(videoTracks);
+      video.srcObject = videoStream;
+      // Track mute/unmute -> camera on/off
+      videoTracks.forEach(t => {
+        t.onmute = () => setRemoteCamOverlay(peerId, true);
+        t.onunmute = () => setRemoteCamOverlay(peerId, false);
+        if (t.muted || !t.enabled) setRemoteCamOverlay(peerId, true);
+      });
+    }
     videoGrid.appendChild(tile);
   }
   
