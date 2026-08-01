@@ -1660,7 +1660,9 @@ async function createOffer(peerId, peerName) {
 }
 
 async function handleAudioOffer(fromId, fromName, offer) {
-  const pc = createPeerConnection(fromId, fromName);
+  // Reuse existing peer connection for renegotiation (e.g. member adds camera later)
+  let pc = peerConnections[fromId];
+  if (!pc) pc = createPeerConnection(fromId, fromName);
   if (!pc) return;
   
   try {
@@ -1670,7 +1672,7 @@ async function handleAudioOffer(fromId, fromName, offer) {
     socket.emit('audio_answer', {
       to: fromId,
       answer: pc.localDescription,
-      sessionId: state.activeSession.id,
+      sessionId: state.activeSession?.id,
       fromUserId: state.user.id
     });
   } catch(e) {

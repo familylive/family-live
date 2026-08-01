@@ -3070,14 +3070,21 @@ function sendSelectedGift() { window._sendSelectedGift && window._sendSelectedGi
 
 async function sendGiftItem(giftId) {
   const toId = document.getElementById('gift-recipient').value;
-  if (!toId) return showToast('اختر العضو المرسل إليه', 'error');
-  if (!state.activeSession?.id) return;
+  if (!toId) return showToast('⚠️ اختر العضو المرسل إليه من القائمة أولاً', 'error');
+  // Ensure we have an active session (never silent-fail)
+  if (!state.activeSession?.id) {
+    try {
+      const { session } = await api('GET', '/api/diwaniya/active');
+      if (session?.status === 'open') { state.activeSession = session; state.diwaniyaOpen = true; }
+    } catch(e) {}
+    if (!state.activeSession?.id) return showToast('⚠️ الديوانية غير متاحة الآن - تأكد أنها مفتوحة وأنك في المكالمة', 'error');
+  }
   try {
     const result = await api('POST', '/api/gifts/send', { giftId, toId, sessionId: state.activeSession.id });
     showToast(result.message, 'success');
     refreshWalletHeader();
     document.getElementById('gift-box-modal').style.display = 'none';
-  } catch(e) { showToast(e.message, 'error'); }
+  } catch(e) { showToast(e.message || 'فشل إرسال الهدية', 'error'); }
 }
 
 // Show gift FULL-SCREEN (TikTok style) - covers the whole diwaniya screen
