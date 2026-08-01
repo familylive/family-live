@@ -1643,6 +1643,8 @@ function createPeerConnection(peerId, peerName) {
 async function createOffer(peerId, peerName) {
   const pc = createPeerConnection(peerId, peerName);
   if (!pc) return;
+  // Glare fix: if we already have a pending offer, skip - the peer's offer will arrive
+  if (pc.signalingState !== 'stable') return;
   
   try {
     const offer = await pc.createOffer();
@@ -1666,6 +1668,10 @@ async function handleAudioOffer(fromId, fromName, offer) {
   if (!pc) return;
   
   try {
+    // Glare fix: both sides may send offers simultaneously - rollback ours and answer theirs
+    if (pc.signalingState === 'have-local-offer') {
+      await pc.setLocalDescription({ type: 'rollback' }).catch(() => {});
+    }
     await pc.setRemoteDescription(new RTCSessionDescription(offer));
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
