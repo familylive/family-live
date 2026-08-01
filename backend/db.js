@@ -51,6 +51,7 @@ async function initDb() {
   await run(`CREATE TABLE IF NOT EXISTS support_messages (id TEXT PRIMARY KEY, title TEXT NOT NULL, content TEXT NOT NULL, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS support_tickets (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, user_name TEXT, subject TEXT, message TEXT NOT NULL, status TEXT DEFAULT 'open', admin_reply TEXT, replied_at TEXT, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS payments (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, user_name TEXT, gateway TEXT NOT NULL, amount INTEGER NOT NULL, purpose TEXT, reference TEXT, status TEXT DEFAULT 'pending', created_at TEXT DEFAULT now(), confirmed_at TEXT)`);
+  await run(`CREATE TABLE IF NOT EXISTS diwaniya_restrictions (id TEXT PRIMARY KEY, session_id TEXT NOT NULL, user_id TEXT NOT NULL, type TEXT DEFAULT 'restrict', created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS gift_items (id TEXT PRIMARY KEY, name TEXT NOT NULL, emoji TEXT DEFAULT '🎁', coins INTEGER DEFAULT 10, price INTEGER DEFAULT 0, status TEXT DEFAULT 'active', gift_image TEXT, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS coin_packages (id TEXT PRIMARY KEY, coins INTEGER NOT NULL, price INTEGER NOT NULL, status TEXT DEFAULT 'active', created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS gifts (id TEXT PRIMARY KEY, from_user TEXT NOT NULL, to_user TEXT NOT NULL, coins INTEGER NOT NULL, message TEXT, created_at TEXT DEFAULT now())`);
@@ -574,6 +575,28 @@ async function updatePackage(id, data) {
 async function deletePackage(id) { await run('DELETE FROM packages WHERE id = $1', [id]); return true; }
 
 // =============== COINS & WALLET ===============
+async function isDiwaniyaRestricted(sessionId, userId) {
+  const r = await queryOne('SELECT * FROM diwaniya_restrictions WHERE session_id = $1 AND user_id = $2', [sessionId, userId]);
+  return r || null;
+}
+async function restrictFromDiwaniya(sessionId, userId, type = 'restrict') {
+  const ex = await isDiwaniyaRestricted(sessionId, userId);
+  if (ex) {
+    await run('UPDATE diwaniya_restrictions SET type = $1 WHERE id = $2', [type, ex.id]);
+    return queryOne('SELECT * FROM diwaniya_restrictions WHERE id = $1', [ex.id]);
+  }
+  const id = uuidv4();
+  await run('INSERT INTO diwaniya_restrictions (id, session_id, user_id, type) VALUES ($1,$2,$3,$4)', [id, sessionId, userId, type]);
+  return queryOne('SELECT * FROM diwaniya_restrictions WHERE id = $1', [id]);
+}
+async function unrestrictFromDiwaniya(sessionId, userId) {
+  await run('DELETE FROM diwaniya_restrictions WHERE session_id = $1 AND user_id = $2', [sessionId, userId]);
+  return true;
+}
+async function getDiwaniyaRestrictions(sessionId) {
+  return query('SELECT r.*, u.name as user_name FROM diwaniya_restrictions r JOIN users u ON r.user_id = u.id WHERE r.session_id = $1', [sessionId]);
+}
+
 async function getGiftItems() { return query("SELECT * FROM gift_items WHERE status = 'active' ORDER BY coins"); }
 async function getAllGiftItems() { return query('SELECT * FROM gift_items ORDER BY coins'); }
 async function addGiftItem(name, emoji, coins, giftImage, price) {
@@ -800,6 +823,7 @@ module.exports = {
   addModeratorStars, getModeratorProfile, rateModerator, getModeratorTier, updateModeratorTier, getTierSettings,
   getActivePackages, getAllPackages, addPackage, updatePackage, deletePackage, getPaymentSettings, savePaymentSettings, createPayment, getAllPayments, getMyPayments, confirmPayment, rejectPayment, getFamilyEditInfo, recordFamilyNameChange, getFamilyCapacity, purchaseCapacity, setDiwaniyaCapacity, getCapacityPackages,
   createAnnouncement, getFamilyAnnouncements, getAnnouncementsForUser, deleteAnnouncement,
+  isDiwaniyaRestricted, restrictFromDiwaniya, unrestrictFromDiwaniya, getDiwaniyaRestrictions,
   getGiftItems, getAllGiftItems, addGiftItem, updateGiftItem, deleteGiftItem,
   getWallet, addCoins, sendGift, convertCoinsToWallet, getCoinPackages, getAllCoinPackages, addCoinPackage, updateCoinPackage, deleteCoinPackage,
   requestWithdrawal, getMyWithdrawals, getAllWithdrawals, updateWithdrawal,

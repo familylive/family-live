@@ -1610,6 +1610,57 @@ app.post('/api/diwaniya/video-limit', authMiddleware, async (req, res) => {
 });
 
 // Verify diwaniya secret code
+// Founder: kick member from diwaniya (any mode)
+app.post('/api/diwaniya/kick', authMiddleware, async (req, res) => {
+  const { userId, sessionId } = req.body;
+  if (!userId || !sessionId) return res.status(400).json({ error: 'بيانات ناقصة' });
+  if (req.user.role !== 'founder') return res.status(403).json({ error: 'فقط المؤسس يمكنه الطرد' });
+  const session = await db.getActiveDiwaniya(sessionId);
+  if (!session) return res.status(404).json({ error: 'الديوانية غير موجودة' });
+  if (session.family_id !== req.user.familyId) return res.status(403).json({ error: 'ليست ديوانية عائلتك' });
+  if (userId === req.user.id) return res.status(400).json({ error: 'لا يمكنك طرد نفسك' });
+  
+  await db.restrictFromDiwaniya(sessionId, userId, 'kick');
+  // Notify user + session
+  io.to(`user_${userId}`).emit('diwaniya_kicked', { sessionId, byName: req.user.name });
+  io.to(`session_${sessionId}`).emit('diwaniya_member_kicked', { userId, byName: req.user.name });
+  // Remove from audio room
+  io.to(`audio_${sessionId}`).emit('audio_kick', { userId });
+  console.log('👢 Founder kicked user ' + userId + ' from diwaniya ' + sessionId);
+  res.json({ message: '👢 تم طرد العضو من الديوانية' });
+});
+
+// Founder: restrict member (listen only - no typing, no camera)
+app.post('/api/diwaniya/restrict', authMiddleware, async (req, res) => {
+  const { userId, sessionId, restricted } = req.body;
+  if (!userId || !sessionId) return res.status(400).json({ error: 'بيانات ناقصة' });
+  if (req.user.role !== 'founder') return res.status(403).json({ error: 'فقط المؤسس يمكنه التقييد' });
+  const session = await db.getActiveDiwaniya(sessionId);
+  if (!session) return res.status(404).json({ error: 'الديوانية غير موجودة' });
+  if (session.family_id !== req.user.familyId) return res.status(403).json({ error: 'ليست ديوانية عائلتك' });
+  if (userId === req.user.id) return res.status(400).json({ error: 'لا يمكنك تقييد نفسك' });
+  
+  if (restricted) {
+    await db.restrictFromDiwaniya(sessionId, userId, 'restrict');
+    io.to(`user_${userId}`).emit('diwaniya_restricted', { sessionId, restricted: true, byName: req.user.name });
+    io.to(`session_${sessionId}`).emit('diwaniya_member_restricted', { userId, restricted: true, byName: req.user.name });
+    // Force audio-only: turn off camera + mute mic
+    io.to(`audio_${sessionId}`).emit('audio_restrict', { userId });
+    res.json({ message: '🙊 تم التقييد - العضو يستمع فقط' });
+  } else {
+    await db.unrestrictFromDiwaniya(sessionId, userId);
+    io.to(`user_${userId}`).emit('diwaniya_restricted', { sessionId, restricted: false, byName: req.user.name });
+    io.to(`session_${sessionId}`).emit('diwaniya_member_restricted', { userId, restricted: false, byName: req.user.name });
+    res.json({ message: '✅ تم رفع التقييد عن العضو' });
+  }
+});
+
+// Founder: list restrictions (to restore buttons state)
+app.get('/api/diwaniya/restrictions/:sessionId', authMiddleware, async (req, res) => {
+  const restrictions = await db.getDiwaniyaRestrictions(req.params.sessionId);
+  res.json({ restrictions });
+});
+
 app.post('/api/diwaniya/verify-code', authMiddleware, async (req, res) => {
   const { sessionId, code } = req.body;
   if (!sessionId || !code) return res.status(400).json({ error: 'رقم الجلسة والرمز مطلوبان' });
@@ -1648,6 +1699,12 @@ app.post('/api/diwaniya/message', authMiddleware, async (req, res) => {
   const msgUser = await db.getUserById(req.user.id);
   if (msgUser && msgUser.role === 'moderator') {
     return res.status(403).json({ error: '🕵️ المشرف مراقب فقط ولا يحق له المشاركة' });
+  }
+  
+  // Founder restriction: listen-only members cannot post
+  const restr = await db.isDiwaniyaRestricted(sessionId, req.user.id);
+  if (restr) {
+    return res.status(403).json({ error: '🙊 وضع الاستماع فقط - تم تقييدك من الكتابة من قبل المؤسس' });
   }
   
   // Check banned words
@@ -1832,6 +1889,18 @@ io.on('connection', (socket) => {
     if (!audioRooms[sessionId]) audioRooms[sessionId] = [];
     const participants = audioRooms[sessionId];
     
+    // Founder-restricted members: listen only (camera off + mic muted)
+    let forcedAudioOnly = false;
+    try {
+      const restr = await db.isDiwaniyaRestricted(sessionId, userId);
+      if (restr && restr.type === 'restrict') forcedAudioOnly = true;
+      if (restr && restr.type === 'kick') {
+        socket.emit('diwaniya_kicked', { sessionId, byName: 'المؤسس' });
+        socket.leave(`audio_${sessionId}`);
+        return;
+      }
+    } catch(e) {}
+    
     // Observers (moderators) don't count toward the capacity limit
     const familyId = await db.getActiveDiwaniya(sessionId)?.family_id;
     const maxCap = familyId ? await db.getFamilyCapacity(familyId) : 15;
@@ -1851,15 +1920,20 @@ io.on('connection', (socket) => {
     
     // Tell existing participants about new user (observers included so they receive audio)
     participants.forEach(p => {
-      io.to(p.socketId).emit('user_joined_call', { userId, userName, avatar, isObserver: !!isObserver });
+      io.to(p.socketId).emit('user_joined_call', { userId, userName, avatar, isObserver: !!isObserver || forcedAudioOnly });
     });
     
-    participants.push({ socketId: socket.id, userId, userName, avatar, isObserver: !!isObserver });
+    participants.push({ socketId: socket.id, userId, userName, avatar, isObserver: !!isObserver || forcedAudioOnly });
     
     // Send current participants to the new user
     socket.emit('call_participants', { 
       participants: participants.filter(p => p.socketId !== socket.id)
     });
+    
+    // Tell restricted member they are listen-only
+    if (forcedAudioOnly) {
+      socket.emit('diwaniya_restricted', { sessionId, restricted: true, byName: 'المؤسس' });
+    }
     
     console.log(`${isObserver ? '🕵️ Observer' : '🎤'} ${userName} joined audio call ${sessionId} (${participants.length})`);
   });

@@ -453,6 +453,82 @@ function connectSocket() {
   socket.on('recording_attempt_announce', (data) => {
     showRecordingAttemptAnnounce(data);
   });
+  socket.on('diwaniya_kicked', (data) => {
+    // I was kicked from the diwaniya
+    showToast('👢 تم طردك من الديوانية بواسطة ' + (data.byName || 'المؤسس'), 'error');
+    leaveLiveAudio();
+    enableChat(false);
+    // Close diwaniya view for me
+    state.diwaniyaOpen = false;
+    state.activeSession = null;
+    stopDiwaniyaTimer();
+    document.getElementById('diwaniya-toggle-btn').textContent = '🔓 فتح الديوانية';
+    document.getElementById('stat-diwaniya').textContent = '🔴 متوقفة';
+  });
+  socket.on('audio_kick', (data) => {
+    if (data.userId === state.user?.id) {
+      showToast('👢 تم طردك من المكالمة', 'error');
+      leaveLiveAudio();
+    } else {
+      removeRemoteAudio(data.userId);
+      const chip = document.getElementById('participant-' + data.userId);
+      if (chip) chip.remove();
+    }
+  });
+  socket.on('diwaniya_restricted', (data) => {
+    if (data.userId && data.userId !== state.user?.id) {
+      // Another member restricted - show badge on their tile
+      const tile = document.getElementById('video-' + data.userId);
+      if (tile) {
+        let badge = tile.querySelector('.restricted-badge');
+        if (data.restricted && !badge) {
+          badge = document.createElement('div');
+          badge.className = 'restricted-badge';
+          badge.textContent = '🙊';
+          tile.appendChild(badge);
+        } else if (!data.restricted && badge) { badge.remove(); }
+      }
+      return;
+    }
+    if (!data.userId || data.userId === state.user?.id) {
+      // I am restricted - listen only
+      if (data.restricted) {
+        showToast('🙊 تم تقييدك - وضع الاستماع فقط (بدون كتابة أو كاميرا)', 'error');
+        enableChat(false);
+        // Force camera off + mic mute
+        if (localStream) {
+          camOff = true;
+          localStream.getVideoTracks().forEach(t => t.enabled = false);
+          const myVideo = document.getElementById('my-video');
+          if (myVideo) myVideo.style.display = 'none';
+          const camBtn = document.getElementById('cam-toggle-btn');
+          if (camBtn) { camBtn.textContent = '🚫'; camBtn.classList.add('off'); }
+        }
+      } else {
+        showToast('✅ تم رفع التقييد - تقدر تشارك من جديد', 'success');
+        enableChat(true);
+      }
+    }
+  });
+  socket.on('audio_restrict', (data) => {
+    if (data.userId === state.user?.id) {
+      if (localStream) {
+        camOff = true;
+        localStream.getVideoTracks().forEach(t => t.enabled = false);
+        const myVideo = document.getElementById('my-video');
+        if (myVideo) myVideo.style.display = 'none';
+        const camBtn = document.getElementById('cam-toggle-btn');
+        if (camBtn) { camBtn.textContent = '🚫'; camBtn.classList.add('off'); }
+      }
+      showToast('🙊 تم إيقاف الكاميرا - وضع الاستماع فقط', 'error');
+    }
+  });
+  socket.on('diwaniya_member_kicked', (data) => {
+    removeRemoteAudio(data.userId);
+    const chip = document.getElementById('participant-' + data.userId);
+    if (chip) chip.remove();
+    showToast('👢 تم طرد عضو بواسطة ' + (data.byName || 'المؤسس'), 'error');
+  });
   socket.on('video_limit_updated', (data) => {
     const el = document.getElementById('video-limit-display');
     if (el) el.textContent = data.videoLimit || 6;
@@ -1411,9 +1487,35 @@ function addRemoteAudio(peerId, peerName, stream) {
     const p = document.createElement('div');
     p.id = 'participant-' + peerId;
     p.className = 'call-participant';
-    p.innerHTML = '<span class="call-dot"></span> ' + peerName;
+    p.innerHTML = '<span class="call-dot"></span> ' + peerName +
+      (state.isFounder ? ' <button class="member-action-btn" title="طرد من الديوانية" onclick="kickFromDiwaniya(\'' + peerId + '\')">⛔</button>' +
+        '<button class="member-action-btn" title="تقييد (يستمع فقط)" onclick="restrictMember(\'' + peerId + '\')">🙊</button>' : '');
     participantsDiv.appendChild(p);
   }
+}
+
+// Founder: kick member from diwaniya (any mode)
+async function kickFromDiwaniya(userId) {
+  const sessionId = state.activeSession?.id;
+  if (!sessionId) return;
+  const name = document.getElementById('participant-' + userId)?.textContent?.replace(/[⛔🙊]/g, '')?.trim() || 'العضو';
+  if (!confirm('👢 طرد ' + name + ' من الديوانية نهائياً؟')) return;
+  try {
+    const result = await api('POST', '/api/diwaniya/kick', { userId, sessionId });
+    showToast(result.message, 'success');
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+// Founder: restrict member (listen only)
+async function restrictMember(userId) {
+  const sessionId = state.activeSession?.id;
+  if (!sessionId) return;
+  const name = document.getElementById('participant-' + userId)?.textContent?.replace(/[⛔🙊]/g, '')?.trim() || 'العضو';
+  if (!confirm('🙊 تقييد ' + name + ' (يستمع فقط - بدون كتابة أو كاميرا)؟')) return;
+  try {
+    const result = await api('POST', '/api/diwaniya/restrict', { userId, sessionId, restricted: true });
+    showToast(result.message, 'success');
+  } catch(e) { showToast(e.message, 'error'); }
 }
 
 function removeRemoteAudio(peerId) {
