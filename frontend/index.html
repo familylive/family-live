@@ -1385,7 +1385,7 @@ async function loadLandingAuctions() {
     div.innerHTML = '<div class="auctions-grid">' + auctions.slice(0, 4).map(a => {
       const end = new Date(a.end_time).getTime();
       return '<div class="auction-card compact">' +
-        '<div class="auction-header"><span class="auction-code">🏷️ ' + a.code + '</span><span class="auction-live">🔴 مباشر</span></div>' +
+        '<div class="auction-header"><span class="auction-code rainbow-text">🏷️ ' + a.code + '</span><span class="auction-live">🔴 مباشر</span></div>' +
         '<div class="auction-timer" data-end="' + end + '" data-id="' + a.id + '"><span class="timer-icon">⏱️</span> <span class="countdown">--:--:--</span></div>' +
         '<div class="auction-price">💰 <span class="current-price">' + (a.current_price || a.starting_price) + '</span> ريال</div>' +
         '<div class="auction-meta"><span>رسوم الدخول: ' + a.entry_fee + ' ريال</span></div>' +
@@ -1780,7 +1780,7 @@ async function loadDashboardAuctions() {
     }
     list.innerHTML = auctions.slice(0, 3).map(a =>
       '<div class="dash-auction-item">' +
-        '<span class="dash-auction-code">🏷️ ' + a.code + '</span>' +
+        '<span class="dash-auction-code rainbow-text">🏷️ ' + a.code + '</span>' +
         '<span class="dash-auction-price">💰 ' + (a.current_price || a.starting_price) + ' ريال</span>' +
         '<button class="btn btn-sm btn-accent" onclick="navigateTo(\'auctions\')">شارك</button>' +
       '</div>'
@@ -2443,7 +2443,7 @@ async function loadLandingPackages() {
     div.innerHTML = packages.map(p =>
       '<div class="pricing-card' + (p.title.includes('مميز') || p.title.includes('مخصص') ? ' premium' : '') + '">' +
         '<div class="pricing-type">' + (p.title || '') + '</div>' +
-        (p.code_example ? '<div class="pricing-code-example">' + p.code_example + '</div>' : '') +
+        (p.code_example ? '<div class="pricing-code-example rainbow-text">' + p.code_example + '</div>' : '') +
         '<div class="pricing-price">' + (p.price || 0) + ' ريال</div>' +
         featureList(p.features) +
         '<button class="btn btn-accent btn-full" onclick="packageBuyClick()">💳 شراء</button>' +

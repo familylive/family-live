@@ -1774,3 +1774,30 @@ body {
   border-radius: var(--radius-sm);
   padding: 10px 12px;
 }
+
+/* Premium codes rainbow effect */
+.rainbow-text {
+  background: linear-gradient(90deg, #ff0000, #ff8000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000);
+  background-size: 400% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: rainbowMove 3s linear infinite;
+  font-weight: 900;
+}
+@keyframes rainbowMove {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 400% 50%; }
+}
+.auction-code.rainbow-text {
+  display: inline-block;
+  padding: 2px 4px;
+}
+.dash-auction-code.rainbow-text {
+  display: inline-block;
+  padding: 2px 4px;
+}
+.pricing-code-example.rainbow-text {
+  display: inline-block;
+  padding: 2px 6px;
+}
