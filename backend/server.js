@@ -22,6 +22,11 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json({ limit: '5mb' }));
 
+// Async route wrapper (Express 4 doesn't catch async errors)
+const asyncHandler = (fn) => (req, res, next) => {
+  Promise.resolve(fn(req, res, next)).catch(next);
+};
+
 // No-cache headers for frontend files
 app.use(async (req, res, next) => {
   if (req.path.endsWith('.html') || req.path.endsWith('.js') || req.path.endsWith('.css')) {
@@ -2162,10 +2167,7 @@ process.on('uncaughtException', (err) => {
   console.log('⚠️ Uncaught exception:', err.message);
 });
 
-// Async route wrapper (Express 4 doesn't catch async errors)
-const asyncHandler = (fn) => (req, res, next) => {
-  Promise.resolve(fn(req, res, next)).catch(next);
-};
+// (asyncHandler defined at top of file)
 
 // =============== GLOBAL ERROR HANDLER ===============
 app.use((err, req, res, next) => {
