@@ -27,6 +27,16 @@ async function api(method, path, body = null) {
 }
 
 // ==================== INIT ====================
+// Tab-conflict guard: if another tab changes the session, reload (prevent token fighting)
+window.addEventListener('storage', (e) => {
+  if (e.key === 'token') {
+    const cur = localStorage.getItem('token') || '';
+    if (e.newValue !== cur && e.newValue !== null) {
+      setTimeout(() => location.reload(), 100);
+    }
+  }
+});
+
 (async function init() {
   // Check for auto-login token in URL (query param or hash)
   const params = new URLSearchParams(window.location.search);
