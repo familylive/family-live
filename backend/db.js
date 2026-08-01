@@ -50,6 +50,7 @@ async function initDb() {
   await run(`CREATE TABLE IF NOT EXISTS moderator_ratings (id TEXT PRIMARY KEY, moderator_id TEXT NOT NULL, visit_id TEXT, family_id TEXT, rating INTEGER NOT NULL, comment TEXT, rated_by TEXT, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS support_messages (id TEXT PRIMARY KEY, title TEXT NOT NULL, content TEXT NOT NULL, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS support_tickets (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, user_name TEXT, subject TEXT, message TEXT NOT NULL, status TEXT DEFAULT 'open', admin_reply TEXT, replied_at TEXT, created_at TEXT DEFAULT now())`);
+  await run(`CREATE TABLE IF NOT EXISTS payments (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, user_name TEXT, gateway TEXT NOT NULL, amount INTEGER NOT NULL, purpose TEXT, reference TEXT, status TEXT DEFAULT 'pending', created_at TEXT DEFAULT now(), confirmed_at TEXT)`);
   await run(`CREATE TABLE IF NOT EXISTS capacity_purchases (id TEXT PRIMARY KEY, family_id TEXT NOT NULL, capacity INTEGER NOT NULL, price INTEGER NOT NULL, purchased_at TEXT DEFAULT now())`);
 }
 
