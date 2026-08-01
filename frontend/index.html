@@ -515,6 +515,7 @@
           <select class="form-input" id="diwaniya-capacity-select">
             <option value="15">👥 الحد الأقصى: 15 عضو</option>
           </select>
+          <input class="form-input" id="diwaniya-secret-code" type="text" placeholder="🗝️ رقم سري (اختياري)" dir="ltr" style="max-width:130px">
           <input class="form-input" id="diwaniya-topic" type="text" placeholder="موضوع الجلسة (اختياري)" style="flex:1">
           <select class="form-input" id="diwaniya-mode">
             <option value="text">✍️ كتابي فقط</option>
@@ -1137,6 +1138,20 @@
         <div class="banned-countdown" style="font-size:32px;font-weight:900;color:var(--danger);direction:ltr;margin:12px 0" id="banned-countdown">--:--:--</div>
         <p style="font-size:12px;color:var(--text-muted)">متبقي على انتهاء الإيقاف</p>
         <button class="btn btn-secondary btn-full" style="margin-top:12px" onclick="logout()">تسجيل الخروج</button>
+      </div>
+    </div>
+
+    <!-- Diwaniya Secret Code Modal -->
+    <div id="diwaniya-code-modal" class="modal-overlay" style="display:none">
+      <div class="modal-box" style="max-width:340px;text-align:center">
+        <div style="font-size:44px;margin-bottom:8px">🗝️</div>
+        <h3 style="color:var(--gold);margin-bottom:10px">الديوانية محمية برقم سري</h3>
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">أدخل الرقم السري للدخول</p>
+        <input class="form-input" id="diwaniya-code-input" type="text" dir="ltr" placeholder="الرقم السري" style="text-align:center;letter-spacing:3px;margin-bottom:10px">
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-accent" style="flex:1" onclick="submitDiwaniyaCode()">🗝️ دخول</button>
+          <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('diwaniya-code-modal').style.display='none'">إلغاء</button>
+        </div>
       </div>
     </div>
 

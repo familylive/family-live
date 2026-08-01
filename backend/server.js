@@ -1320,7 +1320,7 @@ app.post('/api/diwaniya/open', authMiddleware, async (req, res) => {
     }
   }
   
-  const { durationMinutes, topic, mode } = req.body;
+  const { durationMinutes, topic, mode, secretCode } = req.body;
   const duration = durationMinutes || 30;
   const diwaniyaMode = mode || 'text';
   
@@ -1357,6 +1357,15 @@ app.post('/api/diwaniya/close/:sessionId', authMiddleware, async (req, res) => {
   
   io.to(`family_${req.user.familyId}`).emit('diwaniya_closed', result);
   res.json(result);
+});
+
+// Verify diwaniya secret code
+app.post('/api/diwaniya/verify-code', authMiddleware, async (req, res) => {
+  const { sessionId, code } = req.body;
+  if (!sessionId || !code) return res.status(400).json({ error: 'رقم الجلسة والرمز مطلوبان' });
+  const result = await db.verifyDiwaniyaCode(sessionId, code);
+  if (result.error) return res.status(403).json(result);
+  res.json({ ok: true });
 });
 
 // Get active diwaniya + lockdown status

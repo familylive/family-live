@@ -454,12 +454,17 @@ async function toggleDiwaniya() {
   const topic = document.getElementById('diwaniya-topic').value.trim();
   const mode = document.getElementById('diwaniya-mode')?.value || 'text';
   const capacity = parseInt(document.getElementById('diwaniya-capacity-select')?.value || '15');
+  const secretCode = document.getElementById('diwaniya-secret-code')?.value.trim() || '';
   try {
     // Set capacity first if founder
     if (state.isFounder) {
       await api('POST', '/api/diwaniya/capacity/set', { capacity }).catch(() => {});
     }
-    const session = await api('POST', '/api/diwaniya/open', { durationMinutes: duration, topic, mode });
+    const session = await api('POST', '/api/diwaniya/open', { durationMinutes: duration, topic, mode, secretCode });
+    // Show secret code to founder
+    if (secretCode) {
+      showToast('🗝️ الرقم السري: ' + secretCode, 'success');
+    }
     state.diwaniyaOpen = true; state.activeSession = session;
     state.diwaniyaMode = mode;
     document.getElementById('diwaniya-toggle-btn').textContent = '🔒 إغلاق الديوانية';
@@ -1006,8 +1011,46 @@ function toggleCamera() {
   showToast(camOff ? '🚫 أغلقت الكاميرا - يسمعونك فقط' : '🎥 فتحت الكاميرا', camOff ? 'error' : 'success');
 }
 
+let diwaniyaCodeVerified = false;
+
+async function checkDiwaniyaSecretCode() {
+  const session = state.activeSession;
+  if (!session) return true;
+  // Founder always passes
+  if (state.isFounder) return true;
+  // Check if session has code (load fresh)
+  try {
+    const { session: fresh } = await api('GET', '/api/diwaniya/active');
+    if (fresh?.secret_code) {
+      if (!diwaniyaCodeVerified) {
+        // Show code modal
+        document.getElementById('diwaniya-code-modal').style.display = 'flex';
+        document.getElementById('diwaniya-code-input').value = '';
+        return false;
+      }
+    }
+  } catch(e) {}
+  return true;
+}
+
+async function submitDiwaniyaCode() {
+  const code = document.getElementById('diwaniya-code-input').value.trim();
+  const sessionId = state.activeSession?.id;
+  if (!code || !sessionId) return showToast('أدخل الرقم السري', 'error');
+  try {
+    await api('POST', '/api/diwaniya/verify-code', { sessionId, code });
+    diwaniyaCodeVerified = true;
+    document.getElementById('diwaniya-code-modal').style.display = 'none';
+    showToast('🗝️ تم التحقق - أهلاً بك', 'success');
+    enableChat(true);
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
 async function joinLiveAudio() {
   if (inLiveCall) return leaveLiveAudio();
+  // Verify secret code before joining
+  const canJoin = await checkDiwaniyaSecretCode();
+  if (!canJoin) return;
   
   const isModeratorVisit = (state.user?.role === 'moderator') || (state.user?.role === 'admin' && document.getElementById('moderator-send-box')?.style.display === 'block');
   

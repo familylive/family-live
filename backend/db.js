@@ -31,7 +31,7 @@ async function initDb() {
   await run(`CREATE TABLE IF NOT EXISTS families (id TEXT PRIMARY KEY, name TEXT NOT NULL, subscription_code TEXT NOT NULL UNIQUE, founder_id TEXT, status TEXT DEFAULT 'active', diwaniya_locked_until TEXT, diwaniya_lock_reason TEXT, diwaniya_locked_by TEXT, name_changed_at TEXT, name_changes_count INTEGER DEFAULT 0, diwaniya_capacity INTEGER DEFAULT 15, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, password TEXT NOT NULL, phone TEXT, whatsapp TEXT, country TEXT, city TEXT, family_id TEXT, role TEXT DEFAULT 'member', avatar TEXT DEFAULT '👤', points INTEGER DEFAULT 0, stars INTEGER DEFAULT 0, moderator_tier TEXT DEFAULT 'none', last_seen TEXT, can_open_diwaniya INTEGER DEFAULT 0, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS invitations (id TEXT PRIMARY KEY, family_id TEXT NOT NULL, email TEXT NOT NULL, invited_by TEXT NOT NULL, status TEXT DEFAULT 'pending', token TEXT NOT NULL UNIQUE, created_at TEXT DEFAULT now())`);
-  await run(`CREATE TABLE IF NOT EXISTS diwaniya_sessions (id TEXT PRIMARY KEY, family_id TEXT NOT NULL, opened_by TEXT NOT NULL, opened_at TEXT DEFAULT now(), closed_at TEXT, duration_minutes INTEGER DEFAULT 30, status TEXT DEFAULT 'open', topic TEXT, mode TEXT DEFAULT 'text', capacity INTEGER DEFAULT 15)`);
+  await run(`CREATE TABLE IF NOT EXISTS diwaniya_sessions (id TEXT PRIMARY KEY, family_id TEXT NOT NULL, opened_by TEXT NOT NULL, opened_at TEXT DEFAULT now(), closed_at TEXT, duration_minutes INTEGER DEFAULT 30, status TEXT DEFAULT 'open', topic TEXT, mode TEXT DEFAULT 'text', capacity INTEGER DEFAULT 15, secret_code TEXT)`);
   await run(`CREATE TABLE IF NOT EXISTS diwaniya_messages (id TEXT PRIMARY KEY, session_id TEXT NOT NULL, user_id TEXT NOT NULL, message TEXT NOT NULL, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS challenges (id TEXT PRIMARY KEY, family_id TEXT NOT NULL, game_type TEXT NOT NULL, challenger_id TEXT NOT NULL, opponent_id TEXT NOT NULL, status TEXT DEFAULT 'pending', winner_id TEXT, points INTEGER DEFAULT 10, challenger_score INTEGER DEFAULT 0, opponent_score INTEGER DEFAULT 0, created_at TEXT DEFAULT now(), completed_at TEXT)`);
   await run(`CREATE TABLE IF NOT EXISTS subscription_codes (code TEXT PRIMARY KEY, used INTEGER DEFAULT 0, family_id TEXT, type TEXT DEFAULT 'free', price INTEGER DEFAULT 0, purchased_by TEXT, created_at TEXT DEFAULT now())`);
@@ -153,12 +153,20 @@ async function acceptInvitation(token, userId) {
 }
 
 // =============== DIWANIYA ===============
-async function openDiwaniya(familyId, userId, durationMinutes, topic = '', mode = 'text') {
+async function openDiwaniya(familyId, userId, durationMinutes, topic = '', mode = 'text', secretCode = '') {
   const family = await getFamily(familyId);
   const capacity = family ? family.diwaniya_capacity : 15;
   const id = uuidv4();
-  await run("INSERT INTO diwaniya_sessions (id, family_id, opened_by, duration_minutes, status, topic, mode, capacity) VALUES ($1,$2,$3,$4,'open',$5,$6,$7)", [id, familyId, userId, durationMinutes, topic, mode, capacity]);
+  await run("INSERT INTO diwaniya_sessions (id, family_id, opened_by, duration_minutes, status, topic, mode, capacity, secret_code) VALUES ($1,$2,$3,$4,'open',$5,$6,$7,$8)", [id, familyId, userId, durationMinutes, topic, mode, capacity, secretCode || null]);
   return queryOne('SELECT * FROM diwaniya_sessions WHERE id = $1', [id]);
+}
+
+async function verifyDiwaniyaCode(sessionId, code) {
+  const session = await queryOne('SELECT * FROM diwaniya_sessions WHERE id = $1', [sessionId]);
+  if (!session) return { error: 'الجلسة غير موجودة' };
+  if (!session.secret_code) return { ok: true }; // no code required
+  if (session.secret_code !== code) return { error: 'الرقم السري غير صحيح' };
+  return { ok: true };
 }
 async function closeDiwaniya(sessionId) {
   const session = await queryOne("SELECT * FROM diwaniya_sessions WHERE id = $1 AND status = 'open'", [sessionId]);
@@ -586,7 +594,7 @@ module.exports = {
   createFamily, getFamily, validateSubscriptionCode, updateFamilyFounder, leaveFamily,
   generateSubscriptionCodes, generatePremiumCode, getAvailablePremiumCodes, purchaseCode, getUserCodes, getFirstAvailablePremiumCode, updatePrice,
   createInvitation, getInvitationsByFamily, getInvitationByToken, acceptInvitation,
-  openDiwaniya, closeDiwaniya, getActiveDiwaniya, getDiwaniyaHistory, addDiwaniyaMessage, getDiwaniyaMessages,
+  openDiwaniya, closeDiwaniya, getActiveDiwaniya, verifyDiwaniyaCode, getDiwaniyaHistory, addDiwaniyaMessage, getDiwaniyaMessages,
   createChallenge, respondToChallenge, completeChallenge, getFamilyChallenges, getPendingChallenges, getFamilyLeaderboard,
   createAuction, getActiveAuctions, getAllAuctions, getAuctionById, joinAuction, placeBid, endAuction, confirmAuctionPayment, cancelAuction, getAuctionBids, isAuctionParticipant, getAvailableAuctionCodes,
   getAllFamilies, updateFamilyData, setFamilyStatus, deleteFamily, getAllUsersDetailed, updateUserByAdmin, deleteUserByAdmin, createAdminUser, createUserByRole, getAdminStats,
