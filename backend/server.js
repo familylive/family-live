@@ -1485,7 +1485,7 @@ app.post('/api/family/invite', authMiddleware, async (req, res) => {
         email: inv.email,
         token: inv.token,
         status: 'sent',
-        inviteUrl: `${req.protocol}://${req.get('host')}/invite?token=${inv.token}`
+        inviteUrl: `https://${req.get('host')}/invite?token=${inv.token}`
       });
     } else {
       results.push({ email, status: 'already_pending_or_member' });
@@ -1509,7 +1509,7 @@ app.post('/api/family/invite-phone', authMiddleware, async (req, res) => {
   if (!phone.startsWith('966')) phone = '966' + phone;
   
   const inv = await db.createInvitationByPhone(req.user.familyId, phone, req.user.id);
-  const inviteUrl = `${req.protocol}://${req.get('host')}/invite?token=${inv.token}`;
+  const inviteUrl = `https://${req.get('host')}/invite?token=${inv.token}`;
   const waText = encodeURIComponent('👋 انضم لعائلتنا عبر تطبيق «العائلة»!\n📲 افتح الرابط وسجل حسابك:\n' + inviteUrl);
   const waLink = 'https://wa.me/' + phone + '?text=' + waText;
   res.json({ message: '📱 تم تجهيز الدعوة - أرسلها عبر واتساب', inviteUrl, waLink, phone });
