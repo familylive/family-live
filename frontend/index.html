@@ -572,7 +572,14 @@
               <div class="call-participant"><span class="call-dot"></span> أنت</div>
             </div>
             <div class="call-timer" id="call-timer">00:00</div>
-            <div class="call-limit">👥 الحد الأقصى: 6 مشاركين</div>
+            <div class="call-limit">👥 المستمعون: 15 · 🎥 الكاميرات: <span id="video-limit-display">6</span></div>
+            <div id="video-limit-control" style="display:none;margin-top:8px;display:flex;gap:8px;align-items:center;justify-content:center">
+              <label style="font-size:13px">🎥 عدد الكاميرات (حد 6):</label>
+              <select class="form-input" id="video-limit-select" style="width:70px" onchange="setVideoLimit()">
+                <option value="1">1</option><option value="2">2</option><option value="3">3</option>
+                <option value="4">4</option><option value="5">5</option><option value="6" selected>6</option>
+              </select>
+            </div>
             <div class="call-buttons" style="display:flex;gap:8px;justify-content:center;margin-top:10px">
               <button class="call-control-btn" id="mic-toggle-btn" onclick="toggleMic()">🎤</button>
               <button class="call-control-btn" id="cam-toggle-btn" onclick="toggleCamera()">🎥</button>

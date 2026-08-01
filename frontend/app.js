@@ -437,6 +437,13 @@ function connectSocket() {
     showToast(data.message || 'المكالمة ممتلئة', 'error');
     leaveLiveAudio();
   });
+  socket.on('video_limit_updated', (data) => {
+    const el = document.getElementById('video-limit-display');
+    if (el) el.textContent = data.videoLimit || 6;
+  });
+  socket.on('video_slots_full', (data) => {
+    showToast(data.message || '🎥 الكاميرات ممتلئة - ستنضم بالصوت', 'error');
+  });
   socket.on('call_participants', (data) => {
     // Join existing participants
     data.participants.forEach(p => {
@@ -474,6 +481,9 @@ async function toggleDiwaniya() {
     startDiwaniyaTimer(duration);
     setupChatMode(mode);
     startMessagePolling();
+    // Show video limit control for founder
+    const vlc = document.getElementById('video-limit-control');
+    if (vlc) vlc.style.display = state.isFounder ? 'flex' : 'none';
     if (socket?.connected) socket.emit('join_session', session.id);
     showToast('🕌 فتحت الديوانية!', 'success');
   } catch (e) { showToast(e.message || 'فشل فتح الديوانية', 'error'); }
@@ -1054,6 +1064,17 @@ async function submitDiwaniyaCode() {
 }
 
 // ==================== SECRET ROOM (PAID) ====================
+async function setVideoLimit() {
+  const sessionId = state.activeSession?.id;
+  const limit = parseInt(document.getElementById('video-limit-select')?.value || '6');
+  if (!sessionId) return;
+  try {
+    await api('POST', '/api/diwaniya/video-limit', { sessionId, limit });
+    document.getElementById('video-limit-display').textContent = limit;
+    showToast('🎥 عدد الكاميرات: ' + limit, 'success');
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
 async function loadSecretRoomStatus() {
   if (!state.family?.id || !state.isFounder) return;
   try {
@@ -1141,7 +1162,8 @@ async function joinLiveAudio() {
       sessionId: state.activeSession.id, 
       userId: state.user.id, 
       userName: state.user.name,
-      isObserver: isModeratorVisit
+      isObserver: isModeratorVisit,
+      wantsVideo: !isModeratorVisit
     });
     
     updateAudioCallUI(true);

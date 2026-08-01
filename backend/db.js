@@ -31,7 +31,7 @@ async function initDb() {
   await run(`CREATE TABLE IF NOT EXISTS families (id TEXT PRIMARY KEY, name TEXT NOT NULL, subscription_code TEXT NOT NULL UNIQUE, founder_id TEXT, status TEXT DEFAULT 'active', diwaniya_locked_until TEXT, diwaniya_lock_reason TEXT, diwaniya_locked_by TEXT, name_changed_at TEXT, name_changes_count INTEGER DEFAULT 0, diwaniya_capacity INTEGER DEFAULT 15, secret_room_enabled INTEGER DEFAULT 0, secret_room_purchased_at TEXT, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, password TEXT NOT NULL, phone TEXT, whatsapp TEXT, country TEXT, city TEXT, family_id TEXT, role TEXT DEFAULT 'member', avatar TEXT DEFAULT '👤', points INTEGER DEFAULT 0, stars INTEGER DEFAULT 0, moderator_tier TEXT DEFAULT 'none', last_seen TEXT, can_open_diwaniya INTEGER DEFAULT 0, currency TEXT DEFAULT 'sar', created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS invitations (id TEXT PRIMARY KEY, family_id TEXT NOT NULL, email TEXT NOT NULL, invited_by TEXT NOT NULL, status TEXT DEFAULT 'pending', token TEXT NOT NULL UNIQUE, created_at TEXT DEFAULT now())`);
-  await run(`CREATE TABLE IF NOT EXISTS diwaniya_sessions (id TEXT PRIMARY KEY, family_id TEXT NOT NULL, opened_by TEXT NOT NULL, opened_at TEXT DEFAULT now(), closed_at TEXT, duration_minutes INTEGER DEFAULT 30, status TEXT DEFAULT 'open', topic TEXT, mode TEXT DEFAULT 'text', capacity INTEGER DEFAULT 15, secret_code TEXT)`);
+  await run(`CREATE TABLE IF NOT EXISTS diwaniya_sessions (id TEXT PRIMARY KEY, family_id TEXT NOT NULL, opened_by TEXT NOT NULL, opened_at TEXT DEFAULT now(), closed_at TEXT, duration_minutes INTEGER DEFAULT 30, status TEXT DEFAULT 'open', topic TEXT, mode TEXT DEFAULT 'text', capacity INTEGER DEFAULT 15, secret_code TEXT, video_limit INTEGER DEFAULT 6)`);
   await run(`CREATE TABLE IF NOT EXISTS diwaniya_messages (id TEXT PRIMARY KEY, session_id TEXT NOT NULL, user_id TEXT NOT NULL, message TEXT NOT NULL, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS challenges (id TEXT PRIMARY KEY, family_id TEXT NOT NULL, game_type TEXT NOT NULL, challenger_id TEXT NOT NULL, opponent_id TEXT NOT NULL, status TEXT DEFAULT 'pending', winner_id TEXT, points INTEGER DEFAULT 10, challenger_score INTEGER DEFAULT 0, opponent_score INTEGER DEFAULT 0, created_at TEXT DEFAULT now(), completed_at TEXT)`);
   await run(`CREATE TABLE IF NOT EXISTS subscription_codes (code TEXT PRIMARY KEY, used INTEGER DEFAULT 0, family_id TEXT, type TEXT DEFAULT 'free', price INTEGER DEFAULT 0, purchased_by TEXT, created_at TEXT DEFAULT now())`);
@@ -66,6 +66,7 @@ async function initDb() {
   try { await run("ALTER TABLE families ADD COLUMN IF NOT EXISTS name_changes_count INTEGER DEFAULT 0"); } catch(e) {}
   try { await run("ALTER TABLE diwaniya_sessions ADD COLUMN IF NOT EXISTS secret_code TEXT"); } catch(e) {}
   try { await run("ALTER TABLE diwaniya_sessions ADD COLUMN IF NOT EXISTS capacity INTEGER DEFAULT 15"); } catch(e) {}
+  try { await run("ALTER TABLE diwaniya_sessions ADD COLUMN IF NOT EXISTS video_limit INTEGER DEFAULT 6"); } catch(e) {}
   try { await run("ALTER TABLE ads ADD COLUMN IF NOT EXISTS start_time TEXT"); } catch(e) {}
   try { await run("ALTER TABLE ads ADD COLUMN IF NOT EXISTS end_time TEXT"); } catch(e) {}
   try { await run("ALTER TABLE ads ADD COLUMN IF NOT EXISTS views INTEGER DEFAULT 0"); } catch(e) {}
@@ -586,6 +587,11 @@ async function getAllPayments() { return query('SELECT * FROM payments ORDER BY 
 async function getMyPayments(userId) { return query('SELECT * FROM payments WHERE user_id = $1 ORDER BY created_at DESC', [userId]); }
 async function confirmPayment(paymentId) { await run("UPDATE payments SET status = 'confirmed', confirmed_at = now() WHERE id = $1", [paymentId]); return queryOne('SELECT * FROM payments WHERE id = $1', [paymentId]); }
 async function rejectPayment(paymentId) { await run("UPDATE payments SET status = 'rejected' WHERE id = $1", [paymentId]); return queryOne('SELECT * FROM payments WHERE id = $1', [paymentId]); }
+
+async function setVideoLimit(sessionId, limit) {
+  await run('UPDATE diwaniya_sessions SET video_limit = $1 WHERE id = $2', [limit, sessionId]);
+  return queryOne('SELECT * FROM diwaniya_sessions WHERE id = $1', [sessionId]);
+}
 
 async function getSecretRoomStatus(familyId) {
   const family = await queryOne('SELECT secret_room_enabled, secret_room_purchased_at FROM families WHERE id = $1', [familyId]);

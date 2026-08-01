@@ -1405,6 +1405,19 @@ app.post('/api/diwaniya/close/:sessionId', authMiddleware, async (req, res) => {
   res.json(result);
 });
 
+// Set video limit (founder, after opening)
+app.post('/api/diwaniya/video-limit', authMiddleware, async (req, res) => {
+  const { sessionId, limit } = req.body;
+  if (!sessionId || !limit || limit < 1 || limit > 6) return res.status(400).json({ error: 'الحد من 1 إلى 6 كاميرات' });
+  const user = await db.getUserById(req.user.id);
+  const isFounder = req.user.role === 'founder';
+  const isManager = user && user.can_open_diwaniya == 1;
+  if (!isFounder && !isManager) return res.status(403).json({ error: 'فقط المؤسس أو المخول' });
+  const session = await db.setVideoLimit(sessionId, parseInt(limit));
+  io.to(`session_${sessionId}`).emit('video_limit_updated', { videoLimit: parseInt(limit) });
+  res.json({ message: '✅ عدد الكاميرات: ' + limit, session });
+});
+
 // Verify diwaniya secret code
 app.post('/api/diwaniya/verify-code', authMiddleware, async (req, res) => {
   const { sessionId, code } = req.body;
