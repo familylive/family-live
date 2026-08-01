@@ -1303,6 +1303,18 @@ app.post('/api/admin/gift-items/delete', authMiddleware, adminMiddleware, async 
   res.json({ message: '🗑️ تم الحذف' });
 });
 
+// Admin: add coins to any user (support/charge)
+app.post('/api/admin/wallet/add-coins', authMiddleware, adminMiddleware, async (req, res) => {
+  const { userId, coins } = req.body;
+  const amount = parseInt(coins);
+  if (!userId || !amount || amount <= 0) return res.status(400).json({ error: 'المستخدم والمبلغ مطلوبان' });
+  const target = await db.getUserById(userId);
+  if (!target) return res.status(404).json({ error: 'العضو غير موجود' });
+  const wallet = await db.addCoins(userId, amount);
+  await db.runRaw("INSERT INTO coin_transactions (id, user_id, type, coins, detail) VALUES ($1,$2,'admin_credit',$3,$4)", [require('crypto').randomUUID(), userId, amount, 'شحن من الإدارة بواسطة ' + req.user.name]);
+  res.json({ message: '🪙 تم شحن ' + amount + ' كوينز إلى ' + target.name, wallet });
+});
+
 // =============== COINS & WALLET ===============
 
 // My wallet (coins + money)
@@ -2096,6 +2108,18 @@ async function bootstrap() {
     }
     console.log('🎬 Animated gift GIFs attached');
   } catch(e) { console.log('Gift GIF attach error:', e.message); }
+  
+  // Trial: give فارس 500K coins (testing)
+  try {
+    const fares = await db.getUserById('e4e8f6a9-e6e2-4cad-abe8-ee6199e985b9');
+    if (fares) {
+      const w = await db.getWallet(fares.id);
+      if ((w.coins || 0) < 500000) {
+        await db.addCoins(fares.id, 500000 - (w.coins || 0));
+        console.log('🪙 Added 500K trial coins to فارس');
+      }
+    }
+  } catch(e) { console.log('Coin trial (فارس) error:', e.message); }
   
   // Trial: give family account 1M coins
   try {

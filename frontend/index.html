@@ -1080,6 +1080,12 @@
           <button class="btn btn-accent" onclick="addCoinPackageAdmin()">➕</button>
         </div>
         <div id="admin-coin-packages" style="margin-top:8px"></div>
+        <div class="card-title" style="font-size:14px;margin-top:14px">🪙 شحن كوينزات لعضو</div>
+        <div style="display:flex;gap:8px">
+          <select class="form-input" id="admin-charge-user" style="flex:1"><option value="">اختر العضو...</option></select>
+          <input class="form-input" id="admin-charge-amount" type="number" placeholder="كوينز" style="width:90px" value="1000">
+          <button class="btn btn-accent" onclick="adminChargeCoins()">⚡ شحن</button>
+        </div>
         <div class="card-title" style="font-size:14px;margin-top:14px">🎁 إدارة الهدايا</div>
         <div class="form-group"><label>اسم الهدية</label><input class="form-input" id="gift-name" type="text" placeholder="مثال: أسد"></div>
         <div class="form-group"><label>رمز الهدية (إيموجي)</label><input class="form-input" id="gift-emoji" type="text" placeholder="🦁"></div>
@@ -2897,6 +2903,17 @@ async function deletePackageAdmin(id) {
 }
 
 // ==================== ADMIN COINS ====================
+async function adminChargeCoins() {
+  const userId = document.getElementById('admin-charge-user')?.value;
+  const coins = document.getElementById('admin-charge-amount')?.value;
+  if (!userId || !coins) return showToast('اختر العضو وأدخل الكوينزات', 'error');
+  if (!confirm('🪙 شحن ' + coins + ' كوينز للعضو؟')) return;
+  try {
+    const result = await api('POST', '/api/admin/wallet/add-coins', { userId, coins });
+    showToast(result.message, 'success');
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
 async function loadAdminCoins() {
   try {
     const { packages } = await api('GET', '/api/admin/coin-packages');
@@ -2913,6 +2930,12 @@ async function loadAdminCoins() {
     }
   } catch(e) {}
   try {
+    // Fill charge-user select
+    try {
+      const { users } = await api('GET', '/api/admin/users');
+      const sel = document.getElementById('admin-charge-user');
+      if (sel) sel.innerHTML = '<option value="">اختر العضو...</option>' + (users || []).map(u => '<option value="' + u.id + '">' + (u.name || '') + ' (' + (u.email || '') + ')</option>').join('');
+    } catch(e) {}
     const { withdrawals } = await api('GET', '/api/admin/withdrawals');
     const list = document.getElementById('admin-withdrawals-list');
     if (withdrawals?.length) {
