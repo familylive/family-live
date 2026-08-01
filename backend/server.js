@@ -1303,6 +1303,36 @@ app.post('/api/admin/gift-items/delete', authMiddleware, adminMiddleware, async 
   res.json({ message: '🗑️ تم الحذف' });
 });
 
+// Transfer coins by public ID (any user to any user)
+app.post('/api/wallet/transfer', authMiddleware, async (req, res) => {
+  const { toPublicId, coins } = req.body;
+  const amount = parseInt(coins);
+  if (!toPublicId) return res.status(400).json({ error: 'أدخل ايدي العضو' });
+  if (!amount || amount <= 0) return res.status(400).json({ error: 'المبلغ غير صحيح' });
+  const target = await db.getUserByPublicId(String(toPublicId).trim());
+  if (!target) return res.status(404).json({ error: 'لا يوجد عضو بهذا الايدي' });
+  if (target.id === req.user.id) return res.status(400).json({ error: 'لا يمكنك التحويل لنفسك' });
+  const me = await db.getUserById(req.user.id);
+  const result = await db.transferCoins(req.user.id, target.id, amount, me.name, target.name, me.public_id, target.public_id);
+  if (result.error) return res.status(400).json(result);
+  // Notify recipient
+  io.to(`user_${target.id}`).emit('coins_transferred', { amount, fromName: me.name, fromPublicId: me.public_id, toPublicId: target.public_id });
+  res.json({ message: '🔄 حولت ' + amount + ' كوينز إلى ' + target.name + ' (' + target.public_id + ')', wallet: result.wallet });
+});
+
+// Transfer history (out + in)
+app.get('/api/wallet/transfers', authMiddleware, async (req, res) => {
+  const tx = await db.getMyTransactions(req.user.id);
+  const transfers = tx.filter(t => t.type === 'transfer_out' || t.type === 'transfer_in');
+  res.json({ transfers });
+});
+
+// Charge history
+app.get('/api/wallet/charges', authMiddleware, async (req, res) => {
+  const tx = await db.getMyTransactions(req.user.id);
+  res.json({ charges: tx.filter(t => t.type === 'admin_credit' || t.type === 'trial_credit') });
+});
+
 // Admin: add coins to any user (support/charge)
 app.post('/api/admin/wallet/add-coins', authMiddleware, adminMiddleware, async (req, res) => {
   const { userId, coins } = req.body;
@@ -1311,7 +1341,9 @@ app.post('/api/admin/wallet/add-coins', authMiddleware, adminMiddleware, async (
   const target = await db.getUserById(userId);
   if (!target) return res.status(404).json({ error: 'العضو غير موجود' });
   const wallet = await db.addCoins(userId, amount);
-  await db.runRaw("INSERT INTO coin_transactions (id, user_id, type, coins, detail) VALUES ($1,$2,'admin_credit',$3,$4)", [require('crypto').randomUUID(), userId, amount, 'شحن من الإدارة بواسطة ' + req.user.name]);
+  await db.runRaw("INSERT INTO coin_transactions (id, user_id, type, coins, detail, created_at) VALUES ($1,$2,'admin_credit',$3,$4,$5)", [require('crypto').randomUUID(), userId, amount, 'شحن من الإدارة بواسطة ' + req.user.name, new Date().toISOString()]);
+  // Live notification to the charged member
+  io.to(`user_${userId}`).emit('coins_charged', { amount, byName: req.user.name });
   res.json({ message: '🪙 تم شحن ' + amount + ' كوينز إلى ' + target.name, wallet });
 });
 
@@ -2116,6 +2148,7 @@ async function bootstrap() {
       const w = await db.getWallet(fares.id);
       if ((w.coins || 0) < 500000) {
         await db.addCoins(fares.id, 500000 - (w.coins || 0));
+        await db.runRaw("INSERT INTO coin_transactions (id, user_id, type, coins, detail, created_at) VALUES ($1,$2,'trial_credit',$3,$4,$5)", [require('crypto').randomUUID(), fares.id, 500000 - (w.coins || 0), 'شحن تجريبي (500 ألف)', new Date().toISOString()]);
         console.log('🪙 Added 500K trial coins to فارس');
       }
     }

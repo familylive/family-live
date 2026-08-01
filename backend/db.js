@@ -1,5 +1,11 @@
 const { Pool } = require('pg');
 const { v4: uuidv4 } = require('uuid');
+function makePublicId() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let s = '';
+  for (let i = 0; i < 6; i++) s += chars[Math.floor(Math.random() * chars.length)];
+  return s;
+}
 
 let pool = null;
 function getPool() {
@@ -30,6 +36,17 @@ async function getDb() { return getPool(); }
 async function initDb() {
   await run(`CREATE TABLE IF NOT EXISTS families (id TEXT PRIMARY KEY, name TEXT NOT NULL, subscription_code TEXT NOT NULL UNIQUE, founder_id TEXT, status TEXT DEFAULT 'active', diwaniya_locked_until TEXT, diwaniya_lock_reason TEXT, diwaniya_locked_by TEXT, name_changed_at TEXT, name_changes_count INTEGER DEFAULT 0, diwaniya_capacity INTEGER DEFAULT 15, secret_room_enabled INTEGER DEFAULT 0, secret_room_purchased_at TEXT, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, password TEXT NOT NULL, phone TEXT, whatsapp TEXT, country TEXT, city TEXT, family_id TEXT, role TEXT DEFAULT 'member', avatar TEXT DEFAULT '👤', points INTEGER DEFAULT 0, stars INTEGER DEFAULT 0, moderator_tier TEXT DEFAULT 'none', last_seen TEXT, can_open_diwaniya INTEGER DEFAULT 0, currency TEXT DEFAULT 'sar', recording_attempts INTEGER DEFAULT 0, coins INTEGER DEFAULT 0, wallet INTEGER DEFAULT 0, created_at TEXT DEFAULT now())`);
+  try { await run('ALTER TABLE users ADD COLUMN IF NOT EXISTS public_id TEXT'); } catch(e) {}
+  // Backfill public_id for existing users + ensure unique
+  try {
+    const noId = await query("SELECT id FROM users WHERE public_id IS NULL OR public_id = ''");
+    for (const u of noId) {
+      let pid = makePublicId();
+      let guard = 0;
+      while (guard < 10 && (await queryOne('SELECT 1 FROM users WHERE public_id = $1', [pid]))) { pid = makePublicId(); guard++; }
+      await run('UPDATE users SET public_id = $1 WHERE id = $2', [pid, u.id]);
+    }
+  } catch(e) {}
   try { await run('ALTER TABLE invitations ADD COLUMN IF NOT EXISTS phone TEXT'); } catch(e) {}
   await run(`CREATE TABLE IF NOT EXISTS invitations (id TEXT PRIMARY KEY, family_id TEXT NOT NULL, email TEXT NOT NULL, invited_by TEXT NOT NULL, status TEXT DEFAULT 'pending', token TEXT NOT NULL UNIQUE, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS diwaniya_sessions (id TEXT PRIMARY KEY, family_id TEXT NOT NULL, opened_by TEXT NOT NULL, opened_at TEXT DEFAULT now(), closed_at TEXT, duration_minutes INTEGER DEFAULT 30, status TEXT DEFAULT 'open', topic TEXT, mode TEXT DEFAULT 'text', capacity INTEGER DEFAULT 15, secret_code TEXT, video_limit INTEGER DEFAULT 6)`);
@@ -91,7 +108,8 @@ async function initDb() {
 // =============== USERS & FAMILY ===============
 async function createUser(name, email, password, familyId, role = 'member') {
   const id = uuidv4();
-  await run('INSERT INTO users (id, name, email, password, family_id, role) VALUES ($1,$2,$3,$4,$5,$6)', [id, name, email, password, familyId, role]);
+  const pid = makePublicId();
+  await run('INSERT INTO users (id, name, email, password, family_id, role, public_id) VALUES ($1,$2,$3,$4,$5,$6,$7)', [id, name, email, password, familyId, role, pid]);
   return queryOne('SELECT id, name, email, family_id, role, points, avatar, created_at FROM users WHERE id = $1', [id]);
 }
 async function getUserByEmail(email) { return queryOne('SELECT * FROM users WHERE lower(email) = lower($1)', [email]); }
@@ -355,7 +373,8 @@ async function createUserByRole(email, password, name, role) {
   const existing = await getUserByEmail(email);
   if (existing) return existing;
   const id = uuidv4();
-  await run('INSERT INTO users (id, name, email, password, role) VALUES ($1,$2,$3,$4,$5)', [id, name, email, password, role]);
+  const pid2 = makePublicId();
+  await run('INSERT INTO users (id, name, email, password, role, public_id) VALUES ($1,$2,$3,$4,$5,$6)', [id, name, email, password, role, pid2]);
   return queryOne('SELECT id, name, email, role FROM users WHERE id = $1', [id]);
 }
 async function getAdminStats() {
@@ -718,6 +737,21 @@ async function updateWithdrawal(id, status) {
   await run("UPDATE withdrawals SET status = $1, paid_at = CASE WHEN $1 = 'paid' THEN now() ELSE paid_at END WHERE id = $2", [status, id]);
   return queryOne('SELECT * FROM withdrawals WHERE id = $1', [id]);
 }
+async function getUserByPublicId(publicId) {
+  return queryOne('SELECT * FROM users WHERE UPPER(public_id) = UPPER($1)', [publicId]);
+}
+async function transferCoins(fromId, toId, coins, fromName, toName, fromPublicId, toPublicId) {
+  const w = await deductCoins(fromId, coins);
+  if (!w) return { error: 'رصيدك لا يكفي للتحويل' };
+  await run('UPDATE users SET coins = coins + $1 WHERE id = $2', [coins, toId]);
+  const now = new Date().toISOString();
+  await run("INSERT INTO coin_transactions (id, user_id, type, coins, detail, created_at) VALUES ($1,$2,'transfer_out',$3,$4,$5)",
+    [uuidv4(), fromId, coins, 'تحويل إلى ' + toName + ' (' + toPublicId + ')', now]);
+  await run("INSERT INTO coin_transactions (id, user_id, type, coins, detail, created_at) VALUES ($1,$2,'transfer_in',$3,$4,$5)",
+    [uuidv4(), toId, coins, 'تحويل من ' + fromName + ' (' + fromPublicId + ')', now]);
+  return { ok: true, wallet: w };
+}
+
 async function getMyTransactions(userId) { return query('SELECT * FROM coin_transactions WHERE user_id = $1 ORDER BY created_at DESC LIMIT 100', [userId]); }
 async function getAllTransactions() { return query('SELECT * FROM coin_transactions ORDER BY created_at DESC LIMIT 100'); }
 async function getMyGifts(userId) { return query('SELECT g.*, u.name as from_name FROM gifts g JOIN users u ON g.from_user = u.id WHERE g.to_user = $1 ORDER BY g.created_at DESC', [userId]); }
@@ -867,7 +901,7 @@ module.exports = {
   isDiwaniyaRestricted, restrictFromDiwaniya, unrestrictFromDiwaniya, getDiwaniyaRestrictions,
   seedViolationTemplates, getViolationTemplates, getAllViolationTemplates, addViolationTemplate, deleteViolationTemplate, addFounderViolation,
   getGiftItems, getAllGiftItems, addGiftItem, updateGiftItem, deleteGiftItem,
-  getWallet, addCoins, sendGift, convertCoinsToWallet, getCoinPackages, getAllCoinPackages, addCoinPackage, updateCoinPackage, deleteCoinPackage,
+  getWallet, addCoins, sendGift, convertCoinsToWallet, getUserByPublicId, transferCoins, getCoinPackages, getAllCoinPackages, addCoinPackage, updateCoinPackage, deleteCoinPackage,
   requestWithdrawal, getMyWithdrawals, getAllWithdrawals, updateWithdrawal,
   getMyTransactions, getAllTransactions, getMyGifts, getGiftsByUser,
   getCurrencyRate, setCurrencyRate, getSecretRoomStatus, enableSecretRoom,

@@ -552,6 +552,16 @@ function connectSocket() {
     if (chip) chip.remove();
     showToast('👢 تم طرد عضو بواسطة ' + (data.byName || 'المؤسس'), 'error');
   });
+  socket.on('coins_charged', (data) => {
+    showToast('🎉 تم شحن حسابك بـ ' + data.amount + ' كوينز!', 'success');
+    playNotificationSound();
+    refreshWalletHeader();
+  });
+  socket.on('coins_transferred', (data) => {
+    showToast('🔄 استلمت ' + data.amount + ' كوينز من ' + (data.fromName || 'عضو') + ' (' + (data.fromPublicId || '') + ')', 'success');
+    playNotificationSound();
+    refreshWalletHeader();
+  });
   socket.on('camera_invite', (data) => {
     // I was invited to go on camera
     pendingCameraInvite = data;
