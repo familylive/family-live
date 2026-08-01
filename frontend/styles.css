@@ -1821,3 +1821,22 @@ body {
 #video-grid.call-fullscreen .video-name {
   font-size: 13px;
 }
+
+/* Call watermark (anti-recording) */
+.call-watermark {
+  position: fixed;
+  z-index: 1100;
+  background: rgba(0,0,0,.75);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 6px;
+  pointer-events: none;
+  opacity: .75;
+  max-width: 80vw;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: left .8s ease, top .8s ease;
+}

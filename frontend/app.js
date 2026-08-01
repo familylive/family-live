@@ -1177,6 +1177,7 @@ async function joinLiveAudio() {
     });
     
     updateAudioCallUI(true);
+    startCallWatermark();
     if (isModeratorVisit) {
       showToast('🕵️ أنت مراقب - تسمع فقط، كاميرا ومايك مقفلان', 'success');
       // Force UI state
@@ -1205,6 +1206,7 @@ function leaveLiveAudio() {
     localStream.getTracks().forEach(t => t.stop());
     localStream = null;
   }
+  stopCallWatermark();
   // Reset state
   micMuted = false; camOff = false;
   const micBtn = document.getElementById('mic-toggle-btn');
