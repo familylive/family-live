@@ -1896,6 +1896,9 @@ app.post('/api/validate-code', async (req, res) => {
 
 // =============== SOCKET.IO ===============
 
+// Shared audio rooms state (MUST be module-scope so all sockets share participants)
+const audioRooms = {};
+
 io.on('connection', (socket) => {
   console.log('Socket connected:', socket.id);
 
@@ -1992,7 +1995,6 @@ io.on('connection', (socket) => {
   });
 
   // WebRTC Audio Call Signaling
-  const audioRooms = {};
   
   socket.on('join_audio_call', async (data) => {
     const { sessionId, userId, userName, isObserver } = data;
