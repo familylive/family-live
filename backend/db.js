@@ -217,7 +217,7 @@ async function createAuction(code, startingPrice, entryFee, durationMinutes, min
   return queryOne('SELECT * FROM auctions WHERE id = $1', [id]);
 }
 async function getActiveAuctions() {
-  await run("UPDATE auctions SET status = 'ended' WHERE status = 'active' AND end_time < now()", []);
+  await run("UPDATE auctions SET status = 'ended' WHERE status = 'active' AND end_time::timestamptz < now()", []);
   return query('SELECT a.*, u.name as winner_name FROM auctions a LEFT JOIN users u ON a.winner_id = u.id WHERE a.status = \'active\' ORDER BY a.created_at DESC');
 }
 async function getAllAuctions() { return query('SELECT a.*, u.name as winner_name FROM auctions a LEFT JOIN users u ON a.winner_id = u.id ORDER BY a.created_at DESC LIMIT 30'); }
@@ -316,7 +316,7 @@ async function getAdminStats() {
 }
 
 // =============== ADS ===============
-async function getActiveAds() { return query("SELECT * FROM ads WHERE status = 'active' AND (start_time IS NULL OR start_time <= now()) AND (end_time IS NULL OR end_time >= now()) ORDER BY created_at DESC"); }
+async function getActiveAds() { return query("SELECT * FROM ads WHERE status = 'active' AND (start_time IS NULL OR start_time::timestamptz <= now()) AND (end_time IS NULL OR end_time::timestamptz >= now()) ORDER BY created_at DESC"); }
 async function getAllAds() { return query('SELECT * FROM ads ORDER BY created_at DESC'); }
 async function addAd(title, imageUrl, linkUrl, position = 'banner', startTime = null, endTime = null) {
   const id = uuidv4();
