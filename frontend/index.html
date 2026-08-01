@@ -2973,13 +2973,16 @@ async function openGiftBox() {
   // Load gift items grid
   const grid = document.getElementById('gift-items-list');
   if (giftItems.length) {
-    grid.innerHTML = giftItems.map(g =>
-      '<div class="gift-item" onclick="sendGiftItem(\'' + g.id + '\')">' +
-        '<div style="font-size:34px">' + g.emoji + '</div>' +
+    grid.innerHTML = giftItems.map(g => {
+      const media = g.gift_image
+        ? '<img src="' + g.gift_image + '" style="width:56px;height:56px;object-fit:contain;margin:0 auto">'
+        : '<div style="font-size:34px">' + g.emoji + '</div>';
+      return '<div class="gift-item" onclick="sendGiftItem(\'' + g.id + '\')">' +
+        media +
         '<div style="font-size:11px;font-weight:700">' + g.name + '</div>' +
         '<div style="font-size:11px;color:var(--gold)">🪙 ' + g.coins + '</div>' +
-      '</div>'
-    ).join('');
+      '</div>';
+    }).join('');
   } else {
     grid.innerHTML = '<div class="empty-text" style="grid-column:span 2">لا توجد هدايا</div>';
   }

@@ -2083,6 +2083,20 @@ async function bootstrap() {
   // Seed violation templates
   try { await db.seedViolationTemplates(); } catch(e) { console.log('Template seed error:', e.message); }
   
+  // Attach animated GIFs to default gifts (if none uploaded yet)
+  try {
+    const giftGifs = {
+      'ورد': '/gifts/rose.gif', 'قلب': '/gifts/heart.gif', 'دبدوب': '/gifts/teddy.gif',
+      'شوكولاتة': '/gifts/chocolate.gif', 'تاج': '/gifts/crown.gif', 'ميدالية': '/gifts/medal.gif',
+      'ماسة': '/gifts/diamond.gif', 'سيارة': '/gifts/car.gif', 'شلال': '/gifts/fireworks.gif',
+      'قلعة': '/gifts/castle.gif'
+    };
+    for (const [gname, gurl] of Object.entries(giftGifs)) {
+      await db.execQuery("UPDATE gift_items SET gift_image = $1 WHERE name = $2 AND (gift_image IS NULL OR gift_image = '')", [gurl, gname]);
+    }
+    console.log('🎬 Animated gift GIFs attached');
+  } catch(e) { console.log('Gift GIF attach error:', e.message); }
+  
   // Trial: give family account 1M coins
   try {
     const famUser = await db.getUserByEmail('abdm@live.com');
