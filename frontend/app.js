@@ -263,6 +263,7 @@ async function refreshData() {
 }
 
 function updateAllUI() {
+  if (typeof updateChatGiftBtn === 'function') updateChatGiftBtn();
   try {
   document.getElementById('menu-user-name').textContent = state.user?.name || '';
   document.getElementById('menu-user-role').textContent = state.isFounder ? 'المؤسس 👑' : 'عضو';
