@@ -1495,6 +1495,26 @@ app.post('/api/family/invite', authMiddleware, async (req, res) => {
   res.json({ invitations: results });
 });
 
+// Invite by phone -> WhatsApp (founder sends via their own WhatsApp)
+app.post('/api/family/invite-phone', authMiddleware, async (req, res) => {
+  if (req.user.role !== 'founder') {
+    return res.status(403).json({ error: 'فقط مؤسس العائلة يمكنه إرسال الدعوات' });
+  }
+  let { phone } = req.body;
+  phone = String(phone || '').replace(/[^0-9]/g, '');
+  if (phone.length < 9) return res.status(400).json({ error: 'رقم الجوال غير صحيح' });
+  // Normalize Saudi numbers: 05XXXXXXXX -> 9665XXXXXXXX
+  if (phone.startsWith('05') && phone.length === 10) phone = '966' + phone.slice(1);
+  if (phone.startsWith('5') && phone.length === 9) phone = '966' + phone;
+  if (!phone.startsWith('966')) phone = '966' + phone;
+  
+  const inv = await db.createInvitationByPhone(req.user.familyId, phone, req.user.id);
+  const inviteUrl = `${req.protocol}://${req.get('host')}/invite?token=${inv.token}`;
+  const waText = encodeURIComponent('👋 انضم لعائلتنا عبر تطبيق «العائلة»!\n📲 افتح الرابط وسجل حسابك:\n' + inviteUrl);
+  const waLink = 'https://wa.me/' + phone + '?text=' + waText;
+  res.json({ message: '📱 تم تجهيز الدعوة - أرسلها عبر واتساب', inviteUrl, waLink, phone });
+});
+
 // Get family invitations
 app.get('/api/family/invitations', authMiddleware, async (req, res) => {
   if (!req.user.familyId) return res.status(400).json({ error: 'لا يوجد عائلة' });

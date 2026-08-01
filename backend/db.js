@@ -30,6 +30,7 @@ async function getDb() { return getPool(); }
 async function initDb() {
   await run(`CREATE TABLE IF NOT EXISTS families (id TEXT PRIMARY KEY, name TEXT NOT NULL, subscription_code TEXT NOT NULL UNIQUE, founder_id TEXT, status TEXT DEFAULT 'active', diwaniya_locked_until TEXT, diwaniya_lock_reason TEXT, diwaniya_locked_by TEXT, name_changed_at TEXT, name_changes_count INTEGER DEFAULT 0, diwaniya_capacity INTEGER DEFAULT 15, secret_room_enabled INTEGER DEFAULT 0, secret_room_purchased_at TEXT, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, password TEXT NOT NULL, phone TEXT, whatsapp TEXT, country TEXT, city TEXT, family_id TEXT, role TEXT DEFAULT 'member', avatar TEXT DEFAULT '👤', points INTEGER DEFAULT 0, stars INTEGER DEFAULT 0, moderator_tier TEXT DEFAULT 'none', last_seen TEXT, can_open_diwaniya INTEGER DEFAULT 0, currency TEXT DEFAULT 'sar', recording_attempts INTEGER DEFAULT 0, coins INTEGER DEFAULT 0, wallet INTEGER DEFAULT 0, created_at TEXT DEFAULT now())`);
+  try { await run('ALTER TABLE invitations ADD COLUMN IF NOT EXISTS phone TEXT'); } catch(e) {}
   await run(`CREATE TABLE IF NOT EXISTS invitations (id TEXT PRIMARY KEY, family_id TEXT NOT NULL, email TEXT NOT NULL, invited_by TEXT NOT NULL, status TEXT DEFAULT 'pending', token TEXT NOT NULL UNIQUE, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS diwaniya_sessions (id TEXT PRIMARY KEY, family_id TEXT NOT NULL, opened_by TEXT NOT NULL, opened_at TEXT DEFAULT now(), closed_at TEXT, duration_minutes INTEGER DEFAULT 30, status TEXT DEFAULT 'open', topic TEXT, mode TEXT DEFAULT 'text', capacity INTEGER DEFAULT 15, secret_code TEXT, video_limit INTEGER DEFAULT 6)`);
   await run(`CREATE TABLE IF NOT EXISTS diwaniya_messages (id TEXT PRIMARY KEY, session_id TEXT NOT NULL, user_id TEXT NOT NULL, message TEXT NOT NULL, created_at TEXT DEFAULT now())`);
@@ -171,6 +172,13 @@ async function createInvitation(familyId, email, invitedBy) {
   const existing = await queryOne("SELECT * FROM invitations WHERE family_id = $1 AND email = $2 AND status = 'pending'", [familyId, email]);
   if (existing) return null;
   await run('INSERT INTO invitations (id, family_id, email, invited_by, token) VALUES ($1,$2,$3,$4,$5)', [id, familyId, email, invitedBy, token]);
+  return queryOne('SELECT * FROM invitations WHERE id = $1', [id]);
+}
+async function createInvitationByPhone(familyId, phone, invitedBy) {
+  const id = uuidv4(); const token = uuidv4();
+  const existing = await queryOne("SELECT * FROM invitations WHERE family_id = $1 AND phone = $2 AND status = 'pending'", [familyId, phone]);
+  if (existing) return existing;
+  await run('INSERT INTO invitations (id, family_id, email, phone, invited_by, token) VALUES ($1,$2,$3,$4,$5,$6)', [id, familyId, '', phone, invitedBy, token]);
   return queryOne('SELECT * FROM invitations WHERE id = $1', [id]);
 }
 async function getInvitationsByFamily(familyId) { return query('SELECT i.*, u.name as invited_by_name FROM invitations i JOIN users u ON i.invited_by = u.id WHERE i.family_id = $1 ORDER BY i.created_at DESC', [familyId]); }
@@ -840,7 +848,7 @@ module.exports = {
   createUser, getUserByEmail, getUserById, getFamilyMembers, updateProfile, updateLastSeen, updatePassword, userHasFamily,
   createFamily, getFamily, validateSubscriptionCode, updateFamilyFounder, leaveFamily,
   generateSubscriptionCodes, generatePremiumCode, getAvailablePremiumCodes, purchaseCode, getUserCodes, getFirstAvailablePremiumCode, updatePrice,
-  createInvitation, getInvitationsByFamily, getInvitationByToken, acceptInvitation,
+  createInvitation, createInvitationByPhone, getInvitationsByFamily, getInvitationByToken, acceptInvitation,
   openDiwaniya, closeDiwaniya, getActiveDiwaniya, verifyDiwaniyaCode, getDiwaniyaHistory, addDiwaniyaMessage, getDiwaniyaMessages,
   createChallenge, respondToChallenge, completeChallenge, getFamilyChallenges, getPendingChallenges, getFamilyLeaderboard,
   createAuction, getActiveAuctions, getAllAuctions, getAuctionById, joinAuction, placeBid, endAuction, confirmAuctionPayment, cancelAuction, getAuctionBids, isAuctionParticipant, getAvailableAuctionCodes,

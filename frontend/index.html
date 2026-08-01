@@ -472,6 +472,14 @@
         <div id="invite-inputs"><div class="invite-input-group"><input class="form-input" type="text" inputmode="email" placeholder="example@email.com" dir="ltr"></div></div>
         <button class="btn btn-secondary btn-sm" onclick="addInviteInput()" style="margin-bottom:10px">+ إضافة بريد آخر</button>
         <button class="btn btn-primary btn-full" onclick="sendInvites()">إرسال الدعوات</button>
+        <div style="border-top:1px dashed var(--border);margin:12px 0;padding-top:12px">
+          <div class="card-title" style="font-size:13px;margin-bottom:8px">📱 أو دعوة عبر واتساب (برقم جوال)</div>
+          <div style="display:flex;gap:8px">
+            <input class="form-input" id="invite-phone" type="tel" placeholder="05XXXXXXXX" dir="ltr" style="flex:1" onkeydown="if(event.key==='Enter')inviteByWhatsApp()">
+            <button class="btn btn-accent" onclick="inviteByWhatsApp()">📱 إرسال واتساب</button>
+          </div>
+          <div id="invite-wa-result" style="margin-top:8px"></div>
+        </div>
       </div>
       <div class="card" id="announcement-card" style="display:none">
         <div class="card-title">📢 إعلانات العائلة <button class="btn btn-sm" style="float:left" onclick="toggleAnnouncementForm()">➕ إعلان جديد</button></div>
