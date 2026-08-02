@@ -29,6 +29,9 @@ const asyncHandler = (fn) => (req, res, next) => {
 
 // No-cache headers for frontend files
 app.use(async (req, res, next) => {
+  if (req.path.includes('/levels/') || req.path.includes('/assets/')) {
+    res.setHeader('Cache-Control', 'no-store, max-age=0');
+  }
   if (req.path.endsWith('.html') || req.path.endsWith('.js') || req.path.endsWith('.css')) {
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.setHeader('Pragma', 'no-cache');
