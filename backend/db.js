@@ -362,6 +362,27 @@ async function addAuctionLog(auctionId, code, event, userId, userName, amount, d
   await run('INSERT INTO auction_logs (id, auction_id, code, event, user_id, user_name, amount, detail) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
     [uuidv4(), auctionId || null, code || '', event, userId || null, userName || '', amount || 0, detail || '']);
 }
+async function getReportsData() {
+  const rate = await getSarToCoinsRate();
+  // Site total balance
+  const site = await queryOne("SELECT value FROM settings WHERE key = 'site_total_coins'");
+  const siteBalance = parseInt(site?.value) || 0;
+  // Top 10 families by coin movement
+  const topFamilies = await query("SELECT f.id, f.name, COALESCE(SUM(ct.coins),0) as total_coins, COUNT(ct.id) as tx_count FROM families f LEFT JOIN users u ON u.family_id = f.id LEFT JOIN coin_transactions ct ON ct.user_id = u.id GROUP BY f.id ORDER BY total_coins DESC LIMIT 10");
+  // Top 10 users by charging (incoming coins)
+  const topChargers = await query("SELECT u.id, u.name, u.family_id, COALESCE(SUM(ct.coins),0) as charged FROM users u LEFT JOIN coin_transactions ct ON ct.user_id = u.id AND ct.coins > 0 GROUP BY u.id ORDER BY charged DESC LIMIT 10");
+  // Withdrawals in the last 30 days
+  const withdrawals = await query("SELECT w.* FROM withdrawals w WHERE w.created_at >= now() - interval '30 days' ORDER BY w.created_at DESC");
+  return {
+    rate,
+    site_balance: siteBalance,
+    site_balance_sar: Math.round((siteBalance / rate) * 100) / 100,
+    top_families: topFamilies.map(f => ({ ...f, total_sar: Math.round((parseInt(f.total_coins) / rate) * 100) / 100 })),
+    top_chargers: topChargers.map(u => ({ ...u, charged_sar: Math.round((parseInt(u.charged) / rate) * 100) / 100 })),
+    withdrawals
+  };
+}
+
 async function getAuctionLogs() {
   return query('SELECT * FROM auction_logs ORDER BY created_at DESC LIMIT 200');
 }
@@ -1105,7 +1126,7 @@ module.exports = {
   getActivePackages, getAllPackages, addPackage, updatePackage, deletePackage, getPaymentSettings, savePaymentSettings, createPayment, getAllPayments, getMyPayments, confirmPayment, rejectPayment, getFamilyEditInfo, recordFamilyNameChange, getFamilyCapacity, purchaseCapacity, setDiwaniyaCapacity, getCapacityPackages,
   createAnnouncement, getFamilyAnnouncements, getAnnouncementsForUser, deleteAnnouncement,
   createBattle, getBattleById, getActiveBattle, acceptBattle, rejectBattle, supportBattle, endBattle, finalizeBattle, addFamilySupportPoints, getOnlineFounders,
-  addAuctionLog, getAuctionLogs,
+  addAuctionLog, getAuctionLogs, getReportsData,
   getEffects, getEffectById, addEffect, getUserEffects, buyEffect, selectEffect, addFamilyBattleWin,
   getPricing, getPricingByFeature, setPricing, deletePricing, getSarToCoinsRate, setSarToCoinsRate, payWithCoins, settleAuction, getSiteTotalCoins,
   isDiwaniyaRestricted, restrictFromDiwaniya, unrestrictFromDiwaniya, getDiwaniyaRestrictions,

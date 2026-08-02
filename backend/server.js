@@ -1262,6 +1262,11 @@ app.get('/api/admin/auctions/available-codes', authMiddleware, adminMiddleware, 
   res.json({ codes });
 });
 
+// Admin: full reports (balance, top families, top chargers, withdrawals)
+app.get('/api/admin/reports', authMiddleware, adminMiddleware, asyncHandler(async (req, res) => {
+  res.json(await db.getReportsData());
+}));
+
 // Admin: auction reports (sales/returns/bids)
 app.get('/api/admin/auction-logs', authMiddleware, adminMiddleware, asyncHandler(async (req, res) => {
   res.json({ logs: await db.getAuctionLogs() });
