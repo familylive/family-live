@@ -2504,7 +2504,11 @@ async function bootstrap() {
   // Test BOT (single-player testing): bot family + founder, always online, auto-accepts battles
   try {
     let botFam = (await db.execQuery("SELECT * FROM families WHERE name = 'عائلة الاختبار'"))[0];
-    if (!botFam) botFam = await db.createFamily('عائلة الاختبار', 'BOTTEST1');
+    if (!botFam) {
+      const fid = require('crypto').randomUUID();
+      await db.runRaw('INSERT INTO families (id, name, subscription_code) VALUES ($1,$2,$3)', [fid, 'عائلة الاختبار', 'BOTTEST1']);
+      botFam = await db.getFamily(fid);
+    }
     let botUser = await db.getUserByEmail('bot@test.com');
     if (!botUser) {
       botUser = await db.createUser('بوت التحدي', 'bot@test.com', bcrypt.hashSync('Bot@123456', 10), botFam.id, 'founder');
