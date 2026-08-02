@@ -2326,6 +2326,17 @@ io.on('connection', (socket) => {
     me.wantsVideo = on;
   });
 
+  // Member left the diwaniya -> chat message for everyone
+  socket.on('diwaniya_leave', async (data) => {
+    const { sessionId, userId } = data;
+    try {
+      const u = await db.getUserById(userId);
+      let famName = '';
+      if (u?.family_id) { const ff = await db.getFamily(u.family_id); famName = ff?.name || ''; }
+      socket.to(`session_${sessionId}`).emit('session_member_left', { name: u?.name || 'عضو', familyName: famName, avatar: u?.avatar });
+    } catch(e) {}
+  });
+
   // Camera invite: founder invites a present member to join on camera
   socket.on('camera_invite', (data) => {
     const { to, sessionId, founderId, founderName } = data;

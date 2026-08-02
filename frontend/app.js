@@ -651,6 +651,33 @@ function connectSocket() {
     if (data.accept) showToast('🎥 ' + (data.inviteeName || 'العضو') + ' وافق على المشاركة بالكاميرا!', 'success');
     else showToast('❌ ' + (data.inviteeName || 'العضو') + ' رفض المشاركة بالكاميرا', 'error');
   });
+  socket.on('session_member_left', (data) => {
+    const msg = '👋 ' + (data.name || 'عضو') + (data.familyName ? ' (👪 ' + data.familyName + ')' : '') + ' غادر الديوانية';
+    const room = document.getElementById('chat-room');
+    if (room) {
+      const empty = room.querySelector('.empty-state');
+      if (empty) room.innerHTML = '';
+      const sys = document.createElement('div');
+      sys.className = 'system-msg';
+      sys.style.cssText = 'text-align:center;font-size:12px;color:var(--text-muted);margin:6px 0;font-weight:700;background:rgba(255,255,255,.06);padding:7px;border-radius:8px';
+      sys.textContent = msg;
+      room.appendChild(sys);
+      room.scrollTop = room.scrollHeight;
+    }
+    const tk = document.getElementById('tiktok-chat');
+    if (tk && tk.style.display !== 'none') {
+      const list = document.getElementById('tiktok-chat-list');
+      if (list) {
+        const m = document.createElement('div');
+        m.className = 'tiktok-chat-msg system';
+        m.style.cssText = 'background:rgba(255,255,255,.12);text-align:center;margin-left:auto;margin-right:auto;width:fit-content';
+        m.textContent = msg;
+        list.appendChild(m);
+        while (list.children.length > 30) list.removeChild(list.firstChild);
+        list.scrollTop = list.scrollHeight;
+      }
+    }
+  });
   socket.on('session_member_joined', (data) => {
     const msg = '🎉 ' + (data.name || 'عضو') + (data.familyName ? ' (👪 ' + data.familyName + ')' : '') + ' انضم للبث';
     // System message in the main chat box
@@ -2143,9 +2170,25 @@ function askExitCall() {
 function confirmExitCall(go) {
   document.getElementById('exit-call-modal').style.display = 'none';
   if (go) {
+    const leftSession = state.activeSession?.id;
+    const leftUser = state.user?.id;
+    // Tell everyone in the chat that I left
+    if (socket?.connected && leftSession && leftUser) {
+      socket.emit('diwaniya_leave', { sessionId: leftSession, userId: leftUser });
+    }
     leaveLiveAudio();
+    // Close the diwaniya FOR ME (others keep theirs)
+    state.diwaniyaOpen = false;
+    state.activeSession = null;
+    stopDiwaniyaTimer();
+    enableChat(false);
+    stopMessagePolling();
+    const btn = document.getElementById('diwaniya-toggle-btn');
+    if (btn) btn.textContent = '🔓 فتح الديوانية';
+    const stat = document.getElementById('stat-diwaniya');
+    if (stat) stat.textContent = '🔴 متوقفة';
     setTimeout(() => navigateTo('dashboard'), 300);
-    showToast('🚪 خرجت من المكالمة - أهلاً بك في الرئيسية', 'success');
+    showToast('🚪 خرجت من الديوانية - أهلاً بك في الرئيسية', 'success');
   }
 }
 
