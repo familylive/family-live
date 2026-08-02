@@ -1690,14 +1690,14 @@ app.get('/api/admin/coin-packages', authMiddleware, adminMiddleware, async (req,
   res.json({ packages: await db.getAllCoinPackages() });
 });
 app.post('/api/admin/coin-packages/add', authMiddleware, adminMiddleware, async (req, res) => {
-  const { coins, price, title, badge } = req.body;
+  const { coins, price, title, badge, package_image } = req.body;
   if (!coins || !price) return res.status(400).json({ error: 'البيانات مطلوبة' });
-  const pkg = await db.addCoinPackage(parseInt(coins), parseInt(price), title, badge);
+  const pkg = await db.addCoinPackage(parseInt(coins), parseInt(price), title, badge, package_image);
   res.json({ message: '✅ تمت إضافة الباقة', package: pkg });
 });
 app.post('/api/admin/coin-packages/update', authMiddleware, adminMiddleware, async (req, res) => {
-  const { id, coins, price, status, title, badge } = req.body;
-  const pkg = await db.updateCoinPackageFull(id, title, coins, price, badge, status);
+  const { id, coins, price, status, title, badge, package_image } = req.body;
+  const pkg = await db.updateCoinPackageFull(id, title, coins, price, badge, status, package_image);
   res.json({ message: '✅ تم التحديث', package: pkg });
 });
 app.post('/api/admin/coin-packages/delete', authMiddleware, adminMiddleware, async (req, res) => {

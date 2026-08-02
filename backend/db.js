@@ -88,6 +88,7 @@ async function initDb() {
   await run(`CREATE TABLE IF NOT EXISTS coin_packages (id TEXT PRIMARY KEY, coins INTEGER NOT NULL, price INTEGER NOT NULL, title TEXT, badge TEXT, status TEXT DEFAULT 'active', created_at TEXT DEFAULT now())`);
   try { await run("ALTER TABLE coin_packages ADD COLUMN IF NOT EXISTS title TEXT"); } catch(e) {}
   try { await run("ALTER TABLE coin_packages ADD COLUMN IF NOT EXISTS badge TEXT"); } catch(e) {}
+  try { await run("ALTER TABLE coin_packages ADD COLUMN IF NOT EXISTS package_image TEXT"); } catch(e) {}
   await run(`CREATE TABLE IF NOT EXISTS gifts (id TEXT PRIMARY KEY, from_user TEXT NOT NULL, to_user TEXT NOT NULL, coins INTEGER NOT NULL, message TEXT, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS coin_transactions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, type TEXT NOT NULL, coins INTEGER DEFAULT 0, amount INTEGER DEFAULT 0, detail TEXT, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS withdrawals (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, user_name TEXT, amount INTEGER NOT NULL, method TEXT DEFAULT 'stcpay', phone TEXT, status TEXT DEFAULT 'pending', created_at TEXT DEFAULT now(), paid_at TEXT)`);
@@ -897,9 +898,9 @@ async function deleteGiftItem(id) { await run('DELETE FROM gift_items WHERE id =
 
 async function getCoinPackages() { return query("SELECT * FROM coin_packages WHERE status = 'active' ORDER BY price"); }
 async function getAllCoinPackages() { return query('SELECT * FROM coin_packages ORDER BY price'); }
-async function addCoinPackage(coins, price, title, badge) {
+async function addCoinPackage(coins, price, title, badge, image) {
   const id = uuidv4();
-  await run('INSERT INTO coin_packages (id, coins, price, title, badge) VALUES ($1,$2,$3,$4,$5)', [id, coins, price, title || null, badge || null]);
+  await run('INSERT INTO coin_packages (id, coins, price, title, badge, package_image) VALUES ($1,$2,$3,$4,$5,$6)', [id, coins, price, title || null, badge || null, image || null]);
   return queryOne('SELECT * FROM coin_packages WHERE id = $1', [id]);
 }
 async function addCoinPackageLegacy(coins, price) {
@@ -907,8 +908,9 @@ async function addCoinPackageLegacy(coins, price) {
   await run('INSERT INTO coin_packages (id, coins, price) VALUES ($1,$2,$3)', [id, coins, price]);
   return queryOne('SELECT * FROM coin_packages WHERE id = $1', [id]);
 }
-async function updateCoinPackageFull(id, title, coins, price, badge, status) {
-  await run('UPDATE coin_packages SET title = $1, coins = $2, price = $3, badge = $4, status = $5 WHERE id = $6', [title, coins, price, badge, status, id]);
+async function updateCoinPackageFull(id, title, coins, price, badge, status, image) {
+  await run('UPDATE coin_packages SET title = $1, coins = $2, price = $3, badge = $4, status = $5' + (image !== undefined ? ', package_image = $7' : '') + ' WHERE id = $6',
+    image !== undefined ? [title, coins, price, badge, status, id, image] : [title, coins, price, badge, status, id]);
   return queryOne('SELECT * FROM coin_packages WHERE id = $1', [id]);
 }
 async function updateCoinPackage(id, data) {
