@@ -519,22 +519,14 @@ app.get('/api/family/online', authMiddleware, async (req, res) => {
 // Get all online users (admin)
 app.get('/api/admin/online', authMiddleware, adminMiddleware, async (req, res) => {
   const allUsers = await db.execQuery('SELECT id, name, family_id FROM users');
-  let users = [];
-  if (allUsers && allUsers.length > 0) {
-    const cols = allUsers[0].columns;
-    users = allUsers[0].values.map(row => {
-      const o = {};
-      cols.forEach((c, i) => o[c] = row[i]);
-      return o;
-    });
-  }
+  let users = (allUsers || []).map(u => ({ id: u.id, name: u.name, family_id: u.family_id }));
   const result = users.map(u => ({ ...u, online: onlineUsers.has(u.id) }));
   // Group by family
   let families = [];
   try {
     families = await db.execQuery('SELECT * FROM families');
   } catch(e) {}
-  const famData = families.map(f => {
+  const famData = (families || []).map(f => {
     const members = result.filter(u => u.family_id === f.id);
     const onlineCount = members.filter(m => m.online).length;
     return { ...f, members, onlineCount };
