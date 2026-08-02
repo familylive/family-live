@@ -1669,6 +1669,8 @@ async function joinLiveAudio() {
     if (famBtn) famBtn.style.display = (state.isFounder || state.user?.role === 'admin') ? 'block' : 'none';
     const mmBtn = document.getElementById('mic-manage-btn');
     if (mmBtn) mmBtn.style.display = (state.isFounder || state.user?.role === 'admin') ? 'block' : 'none';
+    const beautyBtn = document.getElementById('beauty-filter-btn');
+    if (beautyBtn) beautyBtn.style.display = 'block';
     const bsb = document.getElementById('battle-start-box');
     if (bsb) bsb.style.display = (state.isFounder || state.user?.role === 'admin') ? 'block' : 'none';
     updateAudioCallUI(true);
@@ -2012,7 +2014,19 @@ async function supportSelfBattle() {
   } catch(e) { showToast(e.message, 'error'); }
 }
 
-// ==================== MIC MANAGER (founder) ====================
+// ==================== BEAUTY FILTER ====================
+let beautyOn = false;
+function toggleBeautyFilter() {
+  beautyOn = !beautyOn;
+  const myVideo = document.getElementById('my-video');
+  if (myVideo) myVideo.classList.toggle('beauty', beautyOn);
+  const myTile = document.getElementById('my-video-tile');
+  if (myTile) myTile.classList.toggle('beauty-tile', beautyOn);
+  // Also apply to the tile soft-glow overlay
+  const btn = document.getElementById('beauty-filter-btn');
+  if (btn) btn.classList.toggle('zoom', beautyOn);
+  showToast(beautyOn ? '✨ فلتر التجميل مفعّل' : 'فلتر التجميل متوقف', 'success');
+}
 function openMicManager() {
   const list = document.getElementById('mic-manager-list');
   list.innerHTML = '';

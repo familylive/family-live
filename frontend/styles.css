@@ -2859,3 +2859,24 @@ body {
   0%,100% { transform: scale(1); }
   50% { transform: scale(1.08); }
 }
+
+/* ===== Beauty filter (soft glam) ===== */
+#my-video.beauty {
+  filter: blur(.35px) brightness(1.08) contrast(.9) saturate(1.15);
+  transform: scale(1.02);
+}
+.beauty-tile::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 50% 35%, rgba(255,255,255,.10), transparent 60%),
+    radial-gradient(ellipse at 50% 120%, rgba(255,215,0,.10), transparent 55%);
+  z-index: 5;
+}
+#beauty-filter-btn.zoom {
+  border-color: rgba(255,215,0,.95);
+  box-shadow: 0 0 16px rgba(255,215,0,.6);
+  color: #ffd75e;
+}
