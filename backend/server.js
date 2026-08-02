@@ -2224,6 +2224,16 @@ io.on('connection', (socket) => {
       avatar = urow?.avatar || null;
     } catch(e) {}
     
+    // Fetch family name for the join chat notification
+    let famName = '';
+    try {
+      const u2 = await db.getUserById(userId);
+      if (u2?.family_id) { const ff = await db.getFamily(u2.family_id); famName = ff?.name || ''; }
+    } catch(e) {}
+    
+    // Notify everyone in the session CHAT: "X انضم للبث"
+    socket.to(`session_${sessionId}`).emit('session_member_joined', { name: userName, familyName: famName, avatar });
+    
     // Tell existing participants about new user (observers included so they receive audio)
     participants.forEach(p => {
       io.to(p.socketId).emit('user_joined_call', { userId, userName, avatar, isObserver: !!isObserver || forcedAudioOnly });
