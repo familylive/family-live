@@ -425,8 +425,9 @@ async function deleteLevelAdmin(level) {
 function levelBadge(level) {
   const lv = parseInt(level) || 0;
   if (lv >= 1 && lv <= 40) {
-    // Use the designed level image
-    return '<img src="/assets/levels/level_' + lv + '.png" class="level-img" title="المستوى ' + lv + ' (' + levelTierName(lv) + ')">';
+    // 1-10: animated colored GIF icon (sparkling) - 11+: static image
+    const file = lv <= 10 ? 'gif' : 'png';
+    return '<img src="/assets/levels/level_' + lv + '.' + file + '" class="level-img" title="المستوى ' + lv + ' (' + levelTierName(lv) + ')">';
   }
   const tier = lv >= 40 ? 'lv-diamond' : lv >= 30 ? 'lv-purple' : lv >= 20 ? 'lv-gold' : lv >= 10 ? 'lv-silver' : 'lv-bronze';
   return '<span class="level-badge ' + tier + '" title="المستوى ' + lv + '">Lv ' + lv + '</span>';
@@ -458,7 +459,7 @@ async function showLevelProgress() {
   try {
     const { level, charged, next, config } = await api('GET', '/api/levels');
     const currentCfg = (config || []).find(c => c.level === level);
-    const lvImg = (lv) => (lv >= 1 && lv <= 40) ? '<img src="/assets/levels/level_' + lv + '.png" style="width:34px;height:34px;vertical-align:middle">' : ('Lv ' + lv);
+    const lvImg = (lv) => (lv >= 1 && lv <= 40) ? '<img src="/assets/levels/level_' + lv + '.' + (lv <= 10 ? 'gif' : 'png') + '" style="width:34px;height:34px;vertical-align:middle">' : ('Lv ' + lv);
     let html = '<div style="font-weight:800;color:var(--gold);margin-bottom:6px">🎯 تقدم المستوى</div>' +
       '<div style="display:flex;justify-content:space-between;align-items:center"><span>مستواك الحالي</span><b>' + lvImg(level) + '</b></div>' +
       '<div style="display:flex;justify-content:space-between"><span>إجمالي الكونزات المشحونة</span><b>' + (charged||0).toLocaleString('en') + '</b></div>';
