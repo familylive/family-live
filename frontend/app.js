@@ -1586,6 +1586,13 @@ async function loadSecretRoomStatus() {
   if (!state.family?.id || !state.isFounder) return;
   try {
     const status = await api('GET', '/api/diwaniya/secret-room');
+    // Show the coin price from the admin pricing
+    try {
+      const { pricing } = await api('GET', '/api/pricing');
+      const p = (pricing || []).find(x => x.feature === 'secret_room');
+      const priceEl = document.getElementById('secret-room-price');
+      if (priceEl) priceEl.textContent = p?.coins || 5000;
+    } catch(e) {}
     const input = document.getElementById('diwaniya-secret-code');
     const btn = document.getElementById('secret-room-btn');
     const banner = document.getElementById('secret-room-banner');
