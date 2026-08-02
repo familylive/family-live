@@ -345,6 +345,14 @@
       <div class="page-title">الرئيسية</div>
       <div class="page-subtitle">نشاط عائلتك اليوم</div>
 
+      <!-- Active Auctions (top - under header) -->
+      <div class="card">
+        <div class="card-title">🏷️ مزادات الرموز <button class="btn btn-sm" style="float:left" onclick="navigateTo('auctions')">الكل ←</button></div>
+        <div id="dash-auctions-list" class="dash-auctions-grid">
+          <div class="empty-state"><div class="empty-text">لا توجد مزادات نشطة</div></div>
+        </div>
+      </div>
+
       <!-- Ads Slider -->
       <div class="landing-section">
         <h3 class="landing-section-title">📢 إعلانات</h3>
@@ -366,14 +374,6 @@
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
           <span style="font-size:14px;color:var(--text-secondary)">⭐ نقاطك</span>
           <span style="font-size:32px;font-weight:900;color:var(--gold)" id="dashboard-points">0</span>
-        </div>
-      </div>
-
-      <!-- Active Auctions (top) -->
-      <div class="card">
-        <div class="card-title">🏷️ مزادات الرموز <button class="btn btn-sm" style="float:left" onclick="navigateTo('auctions')">الكل ←</button></div>
-        <div id="dash-auctions-list" class="dash-auctions-grid">
-          <div class="empty-state"><div class="empty-text">لا توجد مزادات نشطة</div></div>
         </div>
       </div>
 
