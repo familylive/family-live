@@ -3135,3 +3135,11 @@ async function buyCustomCoins() {
     }
   } catch(e) { showToast(e.message, 'error'); }
 }
+
+// Coin display helper: image + number + riyal below
+function coinVal(coins) {
+  const c = parseInt(coins) || 0;
+  const sar = Math.round((c / (state.sarRate || 50)) * 100) / 100;
+  return '<span class="coin-val"><img src="/assets/coin.png" class="coin-ico" alt="كونزه"> <b>' + c.toLocaleString('en') + '</b>' +
+    '<span class="coin-sar">= ' + sar + ' ريال</span></span>';
+}
