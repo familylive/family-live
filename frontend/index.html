@@ -583,6 +583,7 @@
             <span class="speaking-wave"><span></span><span></span><span></span><span></span></span>
             <span id="speaking-name">يتكلم...</span>
           </div>
+          <button id="call-exit-btn" class="call-exit-btn" onclick="askExitCall()" title="خروج من المكالمة">✕</button>
           <div id="call-watermark" class="call-watermark" style="display:none"></div>
           <div id="entry-banner" class="entry-banner" style="display:none">
             <div class="entry-avatar" id="entry-avatar">👤</div>
@@ -1512,6 +1513,18 @@
         <div style="display:flex;gap:8px;margin-top:10px">
           <button class="btn btn-accent" style="flex:1" onclick="startBattle()">⚔️ ابدأ التحدي</button>
           <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('battle-modal').style.display='none'">إلغاء</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Exit Call Confirm Modal -->
+    <div id="exit-call-modal" class="modal-overlay" style="display:none">
+      <div class="modal-box" style="max-width:300px;text-align:center">
+        <h3 style="color:var(--gold);margin-bottom:12px">🚪 الخروج من المكالمة</h3>
+        <p style="font-size:14px;margin-bottom:16px">هل ترغب في الاستمرار في الخروج؟</p>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-danger" style="flex:1" onclick="confirmExitCall(true)">✅ موافق</button>
+          <button class="btn btn-secondary" style="flex:1" onclick="confirmExitCall(false)">لا</button>
         </div>
       </div>
     </div>

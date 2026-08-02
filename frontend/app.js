@@ -1677,6 +1677,8 @@ async function joinLiveAudio() {
     updateAudioCallUI(true);
     startCallWatermark();
     setTikTokMode(true); // TikTok layout by default with chat below
+    const exitBtn = document.getElementById('call-exit-btn');
+    if (exitBtn) exitBtn.style.display = 'flex';
     if (isModeratorVisit) {
       showToast('🕵️ أنت مراقب - تسمع فقط، كاميرا ومايك مقفلان', 'success');
       // Force UI state
@@ -1724,6 +1726,8 @@ function leaveLiveAudio() {
   state.callMembers = {};
   const presenceEl2 = document.getElementById('call-presence');
   if (presenceEl2) presenceEl2.style.display = 'none';
+  const exitBtn2 = document.getElementById('call-exit-btn');
+  if (exitBtn2) exitBtn2.style.display = 'none';
   setTikTokMode(false);
   // Remove local video tile content + close overlays (gifts/zoom)
   const myTile = document.getElementById('my-video-tile');

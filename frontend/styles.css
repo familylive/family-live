@@ -2969,3 +2969,26 @@ body {
   gap: 6px;
   overflow-x: auto;
 }
+
+/* Exit X button (top-left of the broadcast) */
+.call-exit-btn {
+  position: fixed;
+  top: 14px;
+  left: 14px;
+  z-index: 1390;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255,95,109,.7);
+  background: rgba(0,0,0,.7);
+  color: #ff5f6d;
+  font-size: 18px;
+  font-weight: 900;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0,0,0,.5);
+  transition: transform .15s;
+}
+.call-exit-btn:active { transform: scale(.9); }
