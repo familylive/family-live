@@ -943,14 +943,19 @@ async function sendGift(fromId, toId, coins, message) {
   await run("INSERT INTO coin_transactions (id, user_id, type, coins, detail) VALUES ($1,$2,'gift_in',$3,$4)", [uuidv4(), toId, coins, 'هدية من ' + fromId]);
   return { ok: true, wallet: w };
 }
+async function getWithdrawFee() { return parseFloat(await getSetting('withdraw_fee', '20')); }
+async function setWithdrawFee(fee) { await setSetting('withdraw_fee', fee); return parseFloat(fee); }
 async function convertCoinsToWallet(userId, coins) {
   const w = await getWallet(userId);
   if (w.coins < coins) return { error: 'رصيد الكوينزات لا يكفي' };
   const rate = parseFloat(await getSetting('coin_to_sar', '1'));
-  const amount = Math.floor(coins * rate);
+  const fee = await getWithdrawFee();
+  const gross = Math.floor(coins * rate);
+  const feeAmount = Math.floor(gross * fee / 100);
+  const amount = gross - feeAmount;
   await run('UPDATE users SET coins = coins - $1, wallet = wallet + $2 WHERE id = $3', [coins, amount, userId]);
-  await run("INSERT INTO coin_transactions (id, user_id, type, coins, amount, detail) VALUES ($1,$2,'convert',$3,$4,$5)", [uuidv4(), userId, coins, amount, 'تحويل كوينزات إلى مبلغ']);
-  return getWallet(userId);
+  await run("INSERT INTO coin_transactions (id, user_id, type, coins, amount, detail) VALUES ($1,$2,'convert',$3,$4,$5)", [uuidv4(), userId, coins, amount, 'تحويل كونزات إلى مبلغ (خصم ' + fee + '%)']);
+  return { wallet: await getWallet(userId), gross, feeAmount, amount, fee };
 }
 async function requestWithdrawal(userId, userName, amount, phone) {
   const w = await getWallet(userId);
@@ -1132,6 +1137,7 @@ module.exports = {
   addAuctionLog, getAuctionLogs, getReportsData,
   getEffects, getEffectById, addEffect, getUserEffects, buyEffect, selectEffect, addFamilyBattleWin,
   getPricing, getPricingByFeature, setPricing, deletePricing, getSarToCoinsRate, setSarToCoinsRate, payWithCoins, settleAuction, getSiteTotalCoins,
+  getWithdrawFee, setWithdrawFee,
   isDiwaniyaRestricted, restrictFromDiwaniya, unrestrictFromDiwaniya, getDiwaniyaRestrictions,
   seedViolationTemplates, getViolationTemplates, getAllViolationTemplates, addViolationTemplate, deleteViolationTemplate, addFounderViolation,
   getGiftItems, getAllGiftItems, addGiftItem, updateGiftItem, deleteGiftItem,

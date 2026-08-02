@@ -1603,6 +1603,13 @@ app.post('/api/admin/pricing/delete', authMiddleware, adminMiddleware, asyncHand
   res.json({ message: '🗑️ تم حذف الخدمة' });
 }));
 
+// Admin: set the withdrawal fee percentage
+app.post('/api/admin/withdraw-fee', authMiddleware, adminMiddleware, asyncHandler(async (req, res) => {
+  const { fee } = req.body;
+  const f = await db.setWithdrawFee(fee);
+  res.json({ message: '✅ نسبة خصم السحب: ' + f + '%', fee: f });
+}));
+
 // Admin: set the SAR->coins conversion rate (main settings)
 app.post('/api/admin/sar-rate', authMiddleware, adminMiddleware, asyncHandler(async (req, res) => {
   const { rate } = req.body;
@@ -1663,7 +1670,10 @@ app.post('/api/wallet/convert', authMiddleware, async (req, res) => {
   if (!coins || coins < 1) return res.status(400).json({ error: 'عدد الكوينزات مطلوب' });
   const result = await db.convertCoinsToWallet(req.user.id, parseInt(coins));
   if (result.error) return res.status(400).json(result);
-  res.json({ message: '💰 تم تحويل ' + coins + ' كوينز إلى المحفظة', wallet: result });
+  res.json({
+    message: '💰 تم التحويل: ' + result.amount + ' ريال (خصم ' + result.fee + '% = ' + result.feeAmount + ' ريال)',
+    wallet: result.wallet, gross: result.gross, feeAmount: result.feeAmount, amount: result.amount, fee: result.fee
+  });
 });
 
 // Request withdrawal
