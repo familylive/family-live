@@ -932,8 +932,12 @@
       <div class="card" style="border:1.5px solid rgba(232,184,48,.4)">
         <div class="card-title">✏️ تخصيص</div>
         <p style="font-size:12px;color:var(--text-muted);margin-bottom:8px">حدد عدد الكونزات اللي تبيها — السعر والضريبة يظهرون تلقائياً</p>
+        <div style="display:flex;gap:6px;margin-bottom:8px">
+          <button class="btn btn-sm btn-accent" id="custom-mode-coins" onclick="setCustomMode('coins')">🪙 بالكونزه</button>
+          <button class="btn btn-sm btn-secondary" id="custom-mode-sar" onclick="setCustomMode('sar')">💵 بالريال</button>
+        </div>
         <div style="display:flex;gap:8px;align-items:center">
-          <img src="/assets/coin.png" class="coin-ico-lg" alt="كونزه">
+          <img src="/assets/coin.png" class="coin-ico-lg" alt="كونزه" id="custom-mode-icon">
           <input class="form-input" id="custom-coins-input" type="number" placeholder="عدد الكونزات (مثال: 1000)" style="flex:1" oninput="calcCustomPackage()" onkeydown="if(event.key==='Enter')buyCustomCoins()">
         </div>
         <div id="custom-details" style="display:none;margin-top:12px;background:var(--bg-hover);border-radius:10px;padding:12px;font-size:13px">
