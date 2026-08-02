@@ -1094,12 +1094,12 @@
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <div class="form-group" style="flex:1;min-width:100px">
-            <label>سعر البداية (ريال)</label>
-            <input class="form-input" id="auction-starting-2" type="number" value="100" min="10">
+            <label>سعر البداية (ريال) = <span id="auction-start-coin-2" style="color:var(--gold)">🪙 0</span></label>
+            <input class="form-input" id="auction-starting-2" type="number" value="100" min="10" oninput="adminCoinPreview('auction-starting-2','auction-start-coin-2')">
           </div>
           <div class="form-group" style="flex:1;min-width:100px">
-            <label>رسوم الدخول (ريال)</label>
-            <input class="form-input" id="auction-entry-2" type="number" value="50" min="10">
+            <label>رسوم الدخول (ريال) = <span id="auction-entry-coin-2" style="color:var(--gold)">🪙 0</span></label>
+            <input class="form-input" id="auction-entry-2" type="number" value="50" min="10" oninput="adminCoinPreview('auction-entry-2','auction-entry-coin-2')">
           </div>
           <div class="form-group" style="flex:1;min-width:100px">
             <label>المدة (دقائق)</label>
@@ -2093,7 +2093,7 @@ async function loadCodesPage() {
       availList.innerHTML = avail.codes.map(c =>
         '<div class="premium-code-card">' +
           '<div class="premium-code-value">' + c.code + '</div>' +
-          '<div class="premium-code-price">' + (c.price || 200) + ' ريال</div>' +
+          '<div class="premium-code-price"><img src="/assets/coin.png" class="coin-ico" alt="كونزه"> ' + ((c.price || 200) * (state.sarRate || 50)) + '</div>' +
           '<button class="btn btn-sm btn-accent" onclick="purchaseCode(\'' + c.code + '\')">شراء</button>' +
         '</div>'
       ).join('');
@@ -2341,6 +2341,12 @@ function showToast(message, type) {
 <script>
 // ==================== AUCTIONS ====================
 let auctionTimers = {};
+
+function adminCoinPreview(inputId, spanId) {
+  const v = parseInt(document.getElementById(inputId)?.value) || 0;
+  const el = document.getElementById(spanId);
+  if (el) el.textContent = '🪙 ' + (v * (state.sarRate || 50));
+}
 
 async function loadDashboardAuctions() {
   try {
@@ -4345,7 +4351,7 @@ async function loadBidHistory(auctionId) {
     }
     container.innerHTML = '<div class="bids-title">📊 المزايدات:</div>' +
       bids.map(b =>
-        '<div class="bid-item"><span class="bid-user">👤 ' + b.user_name + '</span><span class="bid-amount">💰 ' + b.amount + ' ريال</span></div>'
+        '<div class="bid-item"><span class="bid-user">👤 ' + b.user_name + '</span><span class="bid-amount"><img src="/assets/coin.png" class="coin-ico" alt="كونزه"> ' + (b.amount * (state.sarRate || 50)) + '</span></div>'
       ).join('');
   } catch(e) { console.error('Bids:', e); }
 }
