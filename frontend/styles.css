@@ -3159,3 +3159,12 @@ body {
 .lv-purple { background: rgba(160,80,255,.22); color: #c89aff; border: 1px solid rgba(200,154,255,.7); text-shadow: 0 0 8px rgba(200,154,255,.5); }
 .lv-diamond { background: linear-gradient(135deg, rgba(255,0,80,.3), rgba(160,80,255,.3)); color: #ff8fb0; border: 1px solid rgba(255,143,176,.8); text-shadow: 0 0 10px rgba(255,143,176,.7); animation: lvGlow 1.5s ease-in-out infinite; }
 @keyframes lvGlow { 0%,100% { box-shadow: 0 0 4px rgba(255,143,176,.4); } 50% { box-shadow: 0 0 14px rgba(255,143,176,.9); } }
+
+/* Level image badge */
+.level-img {
+  width: 42px;
+  height: 42px;
+  vertical-align: middle;
+  margin-right: 4px;
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,.4));
+}

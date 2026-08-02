@@ -424,8 +424,15 @@ async function deleteLevelAdmin(level) {
 // ==================== LEVELS ====================
 function levelBadge(level) {
   const lv = parseInt(level) || 0;
+  if (lv >= 1 && lv <= 40) {
+    // Use the designed level image
+    return '<img src="/assets/levels/level_' + lv + '.png" class="level-img" title="المستوى ' + lv + ' (' + levelTierName(lv) + ')">';
+  }
   const tier = lv >= 40 ? 'lv-diamond' : lv >= 30 ? 'lv-purple' : lv >= 20 ? 'lv-gold' : lv >= 10 ? 'lv-silver' : 'lv-bronze';
   return '<span class="level-badge ' + tier + '" title="المستوى ' + lv + '">Lv ' + lv + '</span>';
+}
+function levelImg(lv) {
+  return '/assets/levels/level_' + lv + '.png';
 }
 function levelTierName(level) {
   const lv = parseInt(level) || 0;
@@ -451,13 +458,14 @@ async function showLevelProgress() {
   try {
     const { level, charged, next, config } = await api('GET', '/api/levels');
     const currentCfg = (config || []).find(c => c.level === level);
+    const lvImg = (lv) => (lv >= 1 && lv <= 40) ? '<img src="/assets/levels/level_' + lv + '.png" style="width:34px;height:34px;vertical-align:middle">' : ('Lv ' + lv);
     let html = '<div style="font-weight:800;color:var(--gold);margin-bottom:6px">🎯 تقدم المستوى</div>' +
-      '<div style="display:flex;justify-content:space-between"><span>مستواك الحالي</span><b>Lv ' + level + '</b></div>' +
+      '<div style="display:flex;justify-content:space-between;align-items:center"><span>مستواك الحالي</span><b>' + lvImg(level) + '</b></div>' +
       '<div style="display:flex;justify-content:space-between"><span>إجمالي الكونزات المشحونة</span><b>' + (charged||0).toLocaleString('en') + '</b></div>';
     if (next) {
       const remaining = Math.max(0, next.coins_needed - charged);
       const pct = Math.min(100, Math.round(charged / next.coins_needed * 100));
-      html += '<div style="display:flex;justify-content:space-between;margin-top:6px"><span>المستوى التالي ' + next.level + '</span><b>' + next.coins_needed.toLocaleString('en') + ' كونزه</b></div>' +
+      html += '<div style="display:flex;justify-content:space-between;margin-top:6px;align-items:center"><span>المستوى التالي</span><b>' + lvImg(next.level) + ' — ' + next.coins_needed.toLocaleString('en') + ' كونزه</b></div>' +
         '<div style="height:8px;background:rgba(255,255,255,.12);border-radius:6px;margin-top:6px;overflow:hidden"><div style="height:100%;width:' + pct + '%;background:linear-gradient(90deg,#e8b830,#ffd75e);transition:width .5s"></div></div>' +
         '<div style="color:var(--danger);font-weight:800;margin-top:6px">⏳ تبقى لك: ' + remaining.toLocaleString('en') + ' كونزه للمستوى ' + next.level + '</div>';
     } else {
