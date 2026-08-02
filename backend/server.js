@@ -2606,11 +2606,13 @@ io.on('connection', (socket) => {
       if (lv) io.to(`user_${userId}`).emit('level_up', { level: lv.level || 0 });
     } catch(e) {}
     
-    // Fetch family name for the join chat notification
+    // Fetch family name + level for the join chat notification
     let famName = '';
+    let userLevel = 0;
     try {
       const u2 = await db.getUserById(userId);
       if (u2?.family_id) { const ff = await db.getFamily(u2.family_id); famName = ff?.name || ''; }
+      userLevel = u2?.level || 0;
     } catch(e) {}
     
     // Notify everyone in the session CHAT: "X انضم للبث"
@@ -2618,10 +2620,10 @@ io.on('connection', (socket) => {
     
     // Tell existing participants about new user (observers included so they receive audio)
     participants.forEach(p => {
-      io.to(p.socketId).emit('user_joined_call', { userId, userName, avatar, effect: u2?.selected_effect || null, isObserver: !!isObserver || forcedAudioOnly });
+      io.to(p.socketId).emit('user_joined_call', { userId, userName, avatar, level: userLevel, effect: u2?.selected_effect || null, isObserver: !!isObserver || forcedAudioOnly });
     });
     
-    participants.push({ socketId: socket.id, userId, userName, avatar, isObserver: !!isObserver || forcedAudioOnly, wantsVideo });
+    participants.push({ socketId: socket.id, userId, userName, avatar, level: userLevel, isObserver: !!isObserver || forcedAudioOnly, wantsVideo });
     
     // Send current participants to the new user
     socket.emit('call_participants', { 

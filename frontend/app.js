@@ -582,9 +582,9 @@ function connectSocket() {
     showFamilyNotification(data.title, data.message);
   });
   socket.on('diwaniya_message', (msg) => {
-    addChatMessage(msg.user_name, msg.message, msg.user_id === state.user?.id);
+    addChatMessage(msg.user_name, msg.message, msg.user_id === state.user?.id, msg.avatar, msg.user_level);
     const tk = document.getElementById('tiktok-chat');
-    if (tk && tk.style.display !== 'none') addTikTokChatMessage(msg.user_name, msg.message, msg.user_id === state.user?.id);
+    if (tk && tk.style.display !== 'none') addTikTokChatMessage(msg.user_name, msg.message, msg.user_id === state.user?.id, msg.user_level);
   });
   socket.on('diwaniya_audio', (msg) => addAudioMessage(msg.user_name, msg.audio, msg.audioType, msg.user_id === state.user?.id));
   socket.on('new_challenge', () => { showToast('⚔️ تحدٍ جديد!', 'success'); refreshData(); });
@@ -600,6 +600,7 @@ function connectSocket() {
   });
   socket.on('user_joined_call', (data) => {
     if (data.avatar) peerAvatars[data.userId] = data.avatar;
+    if (data.level !== undefined) peerLevels[data.userId] = data.level;
     if (inLiveCall && data.userId !== state.user?.id) {
       showEntryBanner(data.userName, data.avatar, 'انضم للديوانية 🎉');
       if (!state.callMembers) state.callMembers = {};
@@ -890,6 +891,7 @@ function connectSocket() {
     if (!state.callMembers) state.callMembers = {};
     data.participants.forEach(p => {
       if (p.avatar) peerAvatars[p.userId] = p.avatar;
+      if (p.level !== undefined) peerLevels[p.userId] = p.level;
       if (p.userId !== state.user?.id) {
         state.callMembers[p.userId] = p.userName;
         setTimeout(() => createOffer(p.userId, p.userName), 500);
@@ -1067,7 +1069,7 @@ async function loadDiwaniyaMessages(sessionId, isPoll = false) {
     const { messages } = await api('GET', `/api/diwaniya/messages/${sessionId}`);
     const room = document.getElementById('chat-room'); if (!room) return;
     room.innerHTML = '';
-    messages.forEach(msg => addChatMessage(msg.user_name, msg.message, msg.user_id === state.user?.id, msg.avatar));
+    messages.forEach(msg => addChatMessage(msg.user_name, msg.message, msg.user_id === state.user?.id, msg.avatar, msg.user_level));
     // Sync TikTok overlay chat if visible
     const tk = document.getElementById('tiktok-chat');
     if (tk && tk.style.display !== 'none') syncTikTokChat();
@@ -1569,6 +1571,7 @@ let localStream = null;
 let peerConnections = {};
 let inLiveCall = false;
 let peerAvatars = {};
+let peerLevels = {};
 
 // TikTok-style entry banner (shows for ~5s when a member enters)
 let entryBannerTimer = null;
@@ -1604,7 +1607,10 @@ function updateCallPresence() {
   if (!list) return;
   let html = '<div class="call-participant"><span class="call-dot"></span> أنت</div>';
   Object.entries(state.callMembers || {}).forEach(([id, name]) => {
-    html += '<div class="call-participant" id="participant-' + id + '"><span class="call-dot"></span> ' + name +
+    const lv = (peerLevels || {})[id] || 0;
+    const lvHtml = (parseInt(lv) >= 0 && parseInt(lv) <= 100)
+      ? '<img src="/assets/levels/level_' + lv + '.' + (lv >= 1 && lv <= 10 ? 'gif' : 'png') + '?v=3" style="width:34px;height:13px;vertical-align:middle;margin-right:3px">' : '';
+    html += '<div class="call-participant" id="participant-' + id + '"><span class="call-dot"></span> ' + name + ' ' + lvHtml +
       (state.isFounder || state.user?.role === 'admin' ?
         ' <button class="member-action-btn" title="طرد من الديوانية" onclick="kickFromDiwaniya(\'' + id + '\')">⛔</button>' +
         '<button class="member-action-btn" title="تقييد (يستمع فقط)" onclick="restrictMember(\'' + id + '\')">🙊</button>' : '') +
@@ -2542,12 +2548,14 @@ function sendTikTokChat() {
   }
 }
 
-function addTikTokChatMessage(name, text, isSent) {
+function addTikTokChatMessage(name, text, isSent, level) {
   const list = document.getElementById('tiktok-chat-list');
   if (!list) return;
   const msg = document.createElement('div');
   msg.className = 'tiktok-chat-msg' + (isSent ? ' mine' : '');
-  msg.innerHTML = '<span class="tiktok-chat-name">' + (name || '') + '</span> ' + escapeHtml(text);
+  const lvBadge = (parseInt(level) >= 0 && parseInt(level) <= 100 && level !== undefined && level !== null)
+    ? '<img src="/assets/levels/level_' + level + '.' + (level >= 1 && level <= 10 ? 'gif' : 'png') + '?v=3" style="width:34px;height:13px;vertical-align:middle;margin-right:3px">' : '';
+  msg.innerHTML = '<span class="tiktok-chat-name">' + (name || '') + '</span> ' + lvBadge + escapeHtml(text);
   list.appendChild(msg);
   // Keep max 30 messages
   while (list.children.length > 30) list.removeChild(list.firstChild);
