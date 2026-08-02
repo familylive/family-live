@@ -1660,9 +1660,8 @@ function toggleCamera() {
   }
   // Mark tile state so audio-mode CSS shows the video when ON
   const myTile = document.getElementById('my-video-tile');
-  if (myTile) myTile.classList.toggle('has-video', !camOff);
-  const myTile = document.getElementById('my-video-tile');
   if (myTile) {
+    myTile.classList.toggle('has-video', !camOff);
     let overlay = myTile.querySelector('.cam-off-overlay');
     if (!overlay) {
       overlay = document.createElement('div');
