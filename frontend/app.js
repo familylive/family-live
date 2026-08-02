@@ -611,6 +611,8 @@ function connectSocket() {
   socket.on('camera_invite', (data) => {
     // I was invited to go on camera
     pendingCameraInvite = data;
+    selectedInviteMode = 'both';
+    document.querySelectorAll('.invite-mode').forEach(m => m.classList.toggle('selected', m.dataset.mode === 'both'));
     document.getElementById('camera-invite-text').textContent = 'تمت دعوتك للمشاركة بكاميرا الديوانية من قبل ' + (data.founderName || 'المؤسس');
     document.getElementById('camera-invite-modal').style.display = 'flex';
     playNotificationSound();
@@ -2194,18 +2196,45 @@ async function enableMyCamera() {
 }
 
 let pendingCameraInvite = null;
+let selectedInviteMode = 'both';
+
+function selectInviteMode(el) {
+  document.querySelectorAll('.invite-mode').forEach(m => m.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedInviteMode = el.dataset.mode;
+}
+
 function respondCameraInvite(accept) {
   const modal = document.getElementById('camera-invite-modal');
   if (accept && !pendingCameraInvite) return;
   if (accept) {
-    enableMyCamera().then(ok => {
-      socket.emit('camera_invite_response', {
-        to: pendingCameraInvite.founderId,
-        accept: ok,
-        inviteeName: state.user?.name
+    const wantCam = selectedInviteMode === 'both' || selectedInviteMode === 'cam_mute';
+    const wantMic = selectedInviteMode === 'both' || selectedInviteMode === 'audio_only';
+    // Apply mic state
+    if (localStream) {
+      localStream.getAudioTracks().forEach(t => t.enabled = wantMic);
+      micMuted = !wantMic;
+      const micBtn = document.getElementById('mic-toggle-btn');
+      if (micBtn) micBtn.classList.toggle('muted', !wantMic);
+    }
+    if (wantCam) {
+      enableMyCamera().then(ok => {
+        socket.emit('camera_invite_response', { to: pendingCameraInvite.founderId, accept: ok, inviteeName: state.user?.name });
+        showToast(ok ? '🎥 تم تشغيل كاميرتك - أنت الآن بالمشاركة!' : 'تعذر تشغيل الكاميرا', ok ? 'success' : 'error');
       });
-      showToast(ok ? '🎥 تم تشغيل كاميرتك - أنت الآن بالمشاركة!' : 'تعذر تشغيل الكاميرا - ارفض أو جرب مرة أخرى', ok ? 'success' : 'error');
-    });
+    } else {
+      // Camera stays off
+      if (localStream) {
+        camOff = true;
+        localStream.getVideoTracks().forEach(t => t.enabled = false);
+        const camBtn = document.getElementById('cam-toggle-btn');
+        if (camBtn) camBtn.classList.add('off');
+        const myVideo = document.getElementById('my-video');
+        if (myVideo) myVideo.style.display = 'none';
+      }
+      socket.emit('camera_invite_response', { to: pendingCameraInvite.founderId, accept: true, inviteeName: state.user?.name });
+      showToast('✅ وافقت على المشاركة' + (wantMic ? '' : ' بدون صوت'), 'success');
+    }
   } else {
     socket.emit('camera_invite_response', { to: pendingCameraInvite?.founderId, accept: false, inviteeName: state.user?.name });
     showToast('❌ رفضت الدعوة', 'error');

@@ -2753,3 +2753,27 @@ body {
 }
 .gift-bar-label { font-size: 12px; color: var(--text-muted); }
 .gift-bar-send-btn { border-radius: 20px; }
+
+/* Invite join-mode options */
+.invite-mode-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.invite-mode {
+  background: rgba(255,255,255,.06);
+  border: 1.5px solid rgba(255,255,255,.14);
+  border-radius: 12px;
+  padding: 10px 6px;
+  cursor: pointer;
+  transition: all .15s;
+  text-align: center;
+}
+.invite-mode:hover { border-color: var(--gold); }
+.invite-mode.selected {
+  border-color: var(--gold);
+  background: rgba(232,184,48,.16);
+  box-shadow: 0 0 12px rgba(232,184,48,.35);
+}
+.invite-mode-icon { font-size: 22px; }
+.invite-mode-label { font-size: 11px; color: #fff; font-weight: 700; margin-top: 4px; }

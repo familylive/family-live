@@ -1431,14 +1431,33 @@
       </div>
     </div>
 
-    <!-- Camera Invite Accept Modal (member) -->
+    <!-- Camera Invite Accept Modal (member) with join-mode options -->
     <div id="camera-invite-modal" class="modal-overlay" style="display:none">
-      <div class="modal-box" style="max-width:320px;text-align:center">
-        <h3 style="color:var(--gold);margin-bottom:12px">📹 دعوة كاميرا</h3>
-        <p id="camera-invite-text" style="font-size:14px;margin-bottom:16px"></p>
-        <div style="display:flex;gap:8px">
+      <div class="modal-box" style="max-width:340px;text-align:center">
+        <h3 style="color:var(--gold);margin-bottom:10px">📹 دعوة كاميرا</h3>
+        <p id="camera-invite-text" style="font-size:13px;margin-bottom:14px"></p>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">اختر طريقة المشاركة:</div>
+        <div class="invite-mode-grid">
+          <div class="invite-mode" data-mode="both" onclick="selectInviteMode(this)">
+            <div class="invite-mode-icon">🎥🎤</div>
+            <div class="invite-mode-label">الكاميرا والصوت</div>
+          </div>
+          <div class="invite-mode" data-mode="cam_mute" onclick="selectInviteMode(this)">
+            <div class="invite-mode-icon">🎥🔇</div>
+            <div class="invite-mode-label">كاميرا بدون صوت</div>
+          </div>
+          <div class="invite-mode" data-mode="audio_only" onclick="selectInviteMode(this)">
+            <div class="invite-mode-icon">🚫🎤</div>
+            <div class="invite-mode-label">بدون كاميرا (صوت)</div>
+          </div>
+          <div class="invite-mode" data-mode="none" onclick="selectInviteMode(this)">
+            <div class="invite-mode-icon">🚫🔇</div>
+            <div class="invite-mode-label">بدون الاثنين</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:14px">
           <button class="btn btn-success" style="flex:1" onclick="respondCameraInvite(true)">✅ موافق</button>
-          <button class="btn btn-danger" style="flex:1" onclick="respondCameraInvite(false)">❌ غير موافق</button>
+          <button class="btn btn-danger" style="flex:1" onclick="respondCameraInvite(false)">❌ إلغاء</button>
         </div>
       </div>
     </div>
