@@ -374,6 +374,7 @@ function updateMenuVisibility() {
   const supportItem = document.querySelector('.menu-nav-item[data-page="support"]');
   const joinMenu = document.getElementById('menu-join-family');
   const adminMenu = document.getElementById('menu-admin');
+  const reportsMenu = document.getElementById('menu-reports-item');
   const modMenu = document.getElementById('menu-moderator');
   const onlineFam = document.getElementById('menu-online-families');
   // App pages
@@ -388,6 +389,7 @@ function updateMenuVisibility() {
   if (supportItem) supportItem.style.display = isLogged ? 'flex' : 'none';
   if (joinMenu) joinMenu.style.display = (isLogged && !state.family && state.user?.role !== 'moderator') ? 'flex' : 'none';
   if (adminMenu) adminMenu.style.display = (state.user?.role === 'admin') ? 'flex' : 'none';
+  if (reportsMenu) reportsMenu.style.display = (state.user?.role === 'admin') ? 'flex' : 'none';
   if (modMenu) modMenu.style.display = (state.user?.role === 'moderator' || state.user?.role === 'admin') ? 'flex' : 'none';
   if (onlineFam) onlineFam.style.display = (state.user?.role === 'moderator') ? 'flex' : 'none';
   
