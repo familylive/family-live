@@ -2184,6 +2184,7 @@ let editingFamilyId = null;
 async function loadAdminPage() {
   loadAdminAds();
   loadAdminOnline();
+  loadAvailableCodesDropdowns();
   try {
     // Load stats
     const { stats } = await api('GET', '/api/admin/stats');
