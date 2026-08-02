@@ -1550,7 +1550,9 @@ app.post('/api/admin/sar-rate', authMiddleware, adminMiddleware, asyncHandler(as
 app.get('/api/wallet', authMiddleware, async (req, res) => {
   const wallet = await db.getWallet(req.user.id);
   const rate = await db.getSetting('coin_to_sar', '1');
-  res.json({ wallet, rate, packages: await db.getCoinPackages() });
+  const usdRate = await db.getCurrencyRate().catch(() => 3.75);
+  const packages = (await db.getCoinPackages()).map(p => ({ ...p, usd: Math.round((parseInt(p.price) / (usdRate || 3.75)) * 100) / 100 }));
+  res.json({ wallet, rate, packages });
 });
 
 // Buy coins (creates payment)
@@ -2784,9 +2786,13 @@ async function bootstrap() {
   try {
     const cp = await db.execQuery('SELECT COUNT(*) c FROM coin_packages');
     if (!cp.length || cp[0].c === 0) {
-      await db.addCoinPackage(100, 100);
-      await db.addCoinPackage(500, 450);
-      await db.addCoinPackage(1000, 800);
+      // Affordable packages
+      await db.addCoinPackage(500, 10, 'الحزمة الصغيرة', null);
+      await db.addCoinPackage(1000, 18, 'حزمة التألق', '10% خصم');
+      await db.addCoinPackage(2500, 45, 'الحزمة الحصرية', null);
+      await db.addCoinPackage(5000, 90, 'البطاقة الفضية', null);
+      await db.addCoinPackage(10000, 180, 'بطاقة المميز', null);
+      await db.addCoinPackage(25000, 450, 'البطاقة الذهبية', 'الأفضل قيمة');
       console.log('✅ Seeded coin packages');
     }
   } catch(e) { console.log('Coin seed error:', e.message); }
