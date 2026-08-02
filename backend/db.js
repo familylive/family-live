@@ -268,7 +268,7 @@ async function addDiwaniyaMessage(sessionId, userId, message) {
   await run('INSERT INTO diwaniya_messages (id, session_id, user_id, message) VALUES ($1,$2,$3,$4)', [id, sessionId, userId, message]);
   return queryOne('SELECT dm.*, u.name as user_name, u.avatar, u.level as user_level FROM diwaniya_messages dm JOIN users u ON dm.user_id = u.id WHERE dm.id = $1', [id]);
 }
-async function getDiwaniyaMessages(sessionId) { return query('SELECT dm.*, u.name as user_name, u.avatar FROM diwaniya_messages dm JOIN users u ON dm.user_id = u.id WHERE dm.session_id = $1 ORDER BY dm.created_at ASC', [sessionId]); }
+async function getDiwaniyaMessages(sessionId) { return query('SELECT dm.*, u.name as user_name, u.avatar, u.level as user_level FROM diwaniya_messages dm JOIN users u ON dm.user_id = u.id WHERE dm.session_id = $1 ORDER BY dm.created_at ASC', [sessionId]); }
 
 // =============== CHALLENGES ===============
 async function createChallenge(familyId, gameType, challengerId, opponentId, points = 10) {
