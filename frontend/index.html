@@ -114,6 +114,9 @@
       <div class="menu-nav-item" data-page="buy" onclick="navigateTo('buy');toggleMenu()">
         <span class="nav-icon">💳</span> شراء الرصيد
       </div>
+      <div class="menu-nav-item" data-page="reports" id="menu-reports-item" onclick="navigateTo('reports');toggleMenu()" style="display:none">
+        <span class="nav-icon">📊</span> التقارير
+      </div>
       <div class="menu-nav-item" id="menu-login-item" onclick="showAuth('login');toggleMenu()" style="display:none">
         <span class="nav-icon">🔐</span> تسجيل الدخول
       </div>
@@ -889,6 +892,30 @@
     </div>
 
     <!-- Wallet Page -->
+    <div id="page-reports" class="page-content">
+      <div class="page-title">📊 التقارير</div>
+      <div class="page-subtitle">رصيد الموقع · أفضل العوائل · أفضل الشاحنين · السحوبات · المزادات</div>
+      <div class="card">
+        <div class="card-title">🏦 رصيد الموقع الكلي</div>
+        <div style="font-size:24px;font-weight:900;color:var(--gold)"><img src="/assets/coin.png" class="coin-ico-lg" alt="كونزه"> <span id="rpt-site-coins">0</span> <span style="font-size:12px;color:var(--text-muted)" id="rpt-site-sar"></span></div>
+      </div>
+      <div class="card">
+        <div class="card-title">🏆 أفضل 10 عائلات (تحرك الرصيد)</div>
+        <div id="rpt-top-families"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">💎 أفضل 10 أشخاص يشحنون</div>
+        <div id="rpt-top-chargers"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">📤 طلبات السحب (آخر 30 يوم)</div>
+        <div id="rpt-withdrawals"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">🏷️ تقارير المزادات (بيع / إرجاع / مزايدات)</div>
+        <div id="rpt-auction-logs" style="max-height:320px;overflow-y:auto"><div class="empty-text">لا توجد تقارير</div></div>
+      </div>
+    </div>
     <div id="page-buy" class="page-content">
       <div class="page-title">💳 شراء الرصيد</div>
       <div class="page-subtitle">اشحن كونزات بالريال (STC Pay / تحويل بنكي)</div>
@@ -1785,7 +1812,7 @@ function navigateTo(pageName) {
   const navItem = document.querySelector('.menu-nav-item[data-page="' + pageName + '"]');
   if (page) page.classList.add('active');
   if (navItem) navItem.classList.add('active');
-  const titles = { dashboard:'الرئيسية', family:'العائلة', diwaniya:'الديوانية', games:'الألعاب', challenges:'التحديات', leaderboard:'قادة النقاط', codes:'رموزي', profile:'ملفي الشخصي', moderator:'زيارات المودريتر', myviolations:'نظام المخالفات', wallet:'محفظتي', buy:'شراء الرصيد', login:'تسجيل الدخول', register:'إنشاء حساب' };
+  const titles = { dashboard:'الرئيسية', family:'العائلة', diwaniya:'الديوانية', games:'الألعاب', challenges:'التحديات', leaderboard:'قادة النقاط', codes:'رموزي', profile:'ملفي الشخصي', moderator:'زيارات المودريتر', myviolations:'نظام المخالفات', wallet:'محفظتي', buy:'شراء الرصيد', reports:'التقارير', login:'تسجيل الدخول', register:'إنشاء حساب' };
   const titleEl = document.getElementById('header-title-text');
   if (titleEl && titles[pageName]) titleEl.textContent = titles[pageName];
   toggleHeaderVisibility(pageName);
@@ -1798,6 +1825,7 @@ function navigateTo(pageName) {
   if (pageName === 'myviolations' && state.isLoggedIn) loadMyViolations();
   if (pageName === 'wallet' && state.isLoggedIn) loadWallet();
   if (pageName === 'buy' && state.isLoggedIn) loadBuyPage();
+  if (pageName === 'reports' && state.user?.role === 'admin') loadReportsPage();
   if (pageName === 'admin' && state.user?.role === 'admin') loadAdminSupport();
   if (pageName === 'family' && state.isLoggedIn) { loadAnnouncements(); populateAnnTarget(); populateManagerSelect(); loadFamilyPageData(); }
   if (pageName === 'admin' && state.user?.role === 'admin') { loadBannedWords(); loadAdminBans(); loadAIUsers(); loadViolations(); loadAdminAgreements(); loadAdminUsers(); loadModeratorVisitsAdmin(); }
