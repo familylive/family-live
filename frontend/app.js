@@ -793,6 +793,15 @@ async function toggleDiwaniya() {
     // Show video limit control for founder
     const vlc = document.getElementById('video-limit-control');
     if (vlc) vlc.style.display = state.isFounder ? 'flex' : 'none';
+    // Show the call section + join button immediately for audio/video modes
+    const audioSection = document.getElementById('live-audio-section');
+    if (audioSection && ['audio','video','both','all'].includes(mode)) audioSection.style.display = 'block';
+    const joinBtn = document.getElementById('join-audio-btn');
+    if (joinBtn && ['audio','video','both','all'].includes(mode)) {
+      joinBtn.style.display = 'block';
+      joinBtn.textContent = '🎥 انضم لمكالمة الفيديو';
+      joinBtn.className = 'btn btn-accent btn-full';
+    }
     if (socket?.connected) socket.emit('join_session', session.id);
     showToast('🕌 فتحت الديوانية!', 'success');
   } catch (e) { showToast(e.message || 'فشل فتح الديوانية', 'error'); }
@@ -806,6 +815,9 @@ async function closeDiwaniya() {
     stopDiwaniyaTimer(); enableChat(false);
     document.getElementById('diwaniya-toggle-btn').textContent = '🔓 فتح الديوانية';
     document.getElementById('stat-diwaniya').textContent = '🔴 متوقفة';
+    const audioSection = document.getElementById('live-audio-section');
+    if (audioSection) audioSection.style.display = 'none';
+    if (inLiveCall) leaveLiveAudio();
   } catch(e) { showToast(e.message || 'فشل الإغلاق', 'error'); }
 }
 
