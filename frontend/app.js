@@ -599,18 +599,18 @@ function connectSocket() {
     loadMyCodes();
   });
   socket.on('hold_released', (data) => {
-    showToast('🪙 عادت لك ' + (data.coins || 0) + ' كونزه محجوزة من مزايدة الرمز (' + (data.code || '') + ')', 'success');
+    showToast('🪙 عادت لك ' + (data.coins || 0) + ' 🪙 محجوزة من مزايدة الرمز (' + (data.code || '') + ')', 'success');
     playNotificationSound();
     refreshWalletHeader();
     loadWallet();
   });
   socket.on('coins_charged', (data) => {
-    showToast('🎉 تم شحن حسابك بـ ' + data.amount + ' كونزه!', 'success');
+    showToast('🎉 تم شحن حسابك بـ ' + data.amount + ' 🪙!', 'success');
     playNotificationSound();
     refreshWalletHeader();
   });
   socket.on('coins_transferred', (data) => {
-    showToast('🔄 استلمت ' + data.amount + ' كونزه من ' + (data.fromName || 'عضو') + ' (' + (data.fromPublicId || '') + ')', 'success');
+    showToast('🔄 استلمت ' + data.amount + ' 🪙 من ' + (data.fromName || 'عضو') + ' (' + (data.fromPublicId || '') + ')', 'success');
     playNotificationSound();
     refreshWalletHeader();
   });
@@ -1638,7 +1638,7 @@ async function purchaseSecretRoom() {
     const { pricing } = await api('GET', '/api/pricing');
     const p = (pricing || []).find(x => x.feature === 'secret_room');
     const price = p?.coins || 10000;
-    if (!confirm('🔒 تفعيل الغرفة المغلقة (شهرياً) - سعر الخدمة: 🪙 ' + price + ' كونزه. سيتم خصمها من رصيدك بعد التأكيد. متابعة؟')) return;
+    if (!confirm('🔒 تفعيل الغرفة المغلقة (شهرياً) - سعر الخدمة: 🪙 ' + price + ' 🪙. سيتم خصمها من رصيدك بعد التأكيد. متابعة؟')) return;
     const result = await api('POST', '/api/diwaniya/secret-room/purchase');
     showToast(result.message, 'success');
     refreshWalletHeader();
@@ -1686,8 +1686,8 @@ async function loadDiwaniyaCapacity() {
       const p40 = (pricing || []).find(x => x.feature === 'capacity_40');
       const el20 = document.getElementById('cap20-price');
       const el40 = document.getElementById('cap40-price');
-      if (el20) el20.textContent = '<img src="/assets/coin.png" class="coin-ico" alt="كونزه"> ' + (p20?.coins ?? 5000) + ' كونزه';
-      if (el40) el40.textContent = '<img src="/assets/coin.png" class="coin-ico" alt="كونزه"> ' + (p40?.coins ?? 10000) + ' كونزه';
+      if (el20) el20.textContent = '<img src="/assets/coin.png" class="coin-ico" alt="🪙"> ' + (p20?.coins ?? 5000) + ' 🪙';
+      if (el40) el40.textContent = '<img src="/assets/coin.png" class="coin-ico" alt="🪙"> ' + (p40?.coins ?? 10000) + ' 🪙';
     } catch(e) {}
     const info = document.getElementById('capacity-info');
     const sel = document.getElementById('diwaniya-capacity-select');
@@ -1709,7 +1709,7 @@ async function purchaseCapacity(cap) {
     const { pricing } = await api('GET', '/api/pricing');
     const p = (pricing || []).find(x => x.feature === 'capacity_' + cap);
     const price = p?.coins || (cap === 20 ? 5000 : 10000);
-    if (!confirm('👥 توسعة الديوانية إلى ' + cap + ' عضو - سعر الخدمة: 🪙 ' + price + ' كونزه\nسيتم خصمها من رصيدك بعد التأكيد. متابعة؟')) return;
+    if (!confirm('👥 توسعة الديوانية إلى ' + cap + ' عضو - سعر الخدمة: 🪙 ' + price + ' 🪙\nسيتم خصمها من رصيدك بعد التأكيد. متابعة؟')) return;
     const result = await api('POST', '/api/diwaniya/capacity/purchase', { capacity: cap });
     showToast(result.message, 'success');
     refreshWalletHeader();
@@ -2051,8 +2051,8 @@ function renderBattle(b) {
   const na = b.player_a_name || 'لاعب أ', nb = b.player_b_name || 'لاعب ب';
   document.getElementById('battle-name-a').textContent = na;
   document.getElementById('battle-name-b').textContent = nb;
-  document.getElementById('battle-coins-a').textContent = '<img src="/assets/coin.png" class="coin-ico" alt="كونزه"> ' + (b.coins_a || 0);
-  document.getElementById('battle-coins-b').textContent = '<img src="/assets/coin.png" class="coin-ico" alt="كونزه"> ' + (b.coins_b || 0);
+  document.getElementById('battle-coins-a').textContent = '<img src="/assets/coin.png" class="coin-ico" alt="🪙"> ' + (b.coins_a || 0);
+  document.getElementById('battle-coins-b').textContent = '<img src="/assets/coin.png" class="coin-ico" alt="🪙"> ' + (b.coins_b || 0);
   // Self-support button: show if I am one of the players
   const sself = document.getElementById('self-support-btn');
   if (sself) {
@@ -2094,9 +2094,9 @@ function renderBattle(b) {
 
 async function supportBattle(side) {
   if (!currentBattle) return showToast('لا يوجد تحدٍّ نشط', 'error');
-  const coins = prompt('🎁 كم كونزه تدعم به؟', '100');
+  const coins = prompt('🎁 كم <img src="/assets/coin.png" class="coin-ico" alt=""> تدعم به؟', '100');
   if (!coins || parseInt(coins) <= 0) return;
-  if (!confirm('⚔️ دعم اللاعب بـ ' + coins + ' كونزه؟')) return;
+  if (!confirm('⚔️ دعم اللاعب بـ ' + coins + ' 🪙؟')) return;
   try {
     const r = await api('POST', '/api/battles/support', { battleId: currentBattle.id, side, coins });
     showToast(r.message, 'success');
@@ -2118,9 +2118,9 @@ async function supportSelfBattle() {
   if (currentBattle.player_a_id === meId) side = 'a';
   else if (currentBattle.player_b_id === meId) side = 'b';
   if (!side) return showToast('أنت لست طرفاً في هذا التحدي', 'error');
-  const coins = prompt('🙋 كم كونزه تدعم نفسك به؟', '100');
+  const coins = prompt('🙋 كم <img src="/assets/coin.png" class="coin-ico" alt=""> تدعم نفسك به؟', '100');
   if (!coins || parseInt(coins) <= 0) return;
-  if (!confirm('🙋 دعم نفسك بـ ' + coins + ' كونزه؟ (يرفع ترتيب عائلتك أيضاً)')) return;
+  if (!confirm('🙋 دعم نفسك بـ ' + coins + ' 🪙؟ (يرفع ترتيب عائلتك أيضاً)')) return;
   try {
     const r = await api('POST', '/api/battles/support', { battleId: currentBattle.id, side, coins });
     showToast(r.message, 'success');
@@ -3045,7 +3045,7 @@ async function loadBuyPage() {
         const hot = p.badge && String(p.badge).includes('خصم');
         return '<div class="coin-package-card ' + tier + (hot ? ' hot' : '') + '" onclick="buyCoinsPackage(\'' + p.id + '\', ' + p.price + ', ' + p.coins + ')">' +
           (p.badge ? '<span class="pkg-badge">' + p.badge + '</span>' : '') +
-          '<div class="pkg-coins"><img src="/assets/coin.png" alt="كونزه"> <b>' + p.coins.toLocaleString('en') + '</b></div>' +
+          '<div class="pkg-coins"><img src="/assets/coin.png" alt="<img src="/assets/coin.png" class="coin-ico" alt="">"> <b>' + p.coins.toLocaleString('en') + '</b></div>' +
           '<div class="pkg-title">' + (p.title || 'باقة') + '</div>' +
           '<div class="pkg-price">' + p.price + ' ريال</div>' +
           '<div class="pkg-usd">≈ $' + (p.usd || (p.price/3.75).toFixed(2)) + '</div>' +
@@ -3102,7 +3102,7 @@ async function calcCustomPackage() {
     const e5 = document.getElementById('custom-usd');
     const e6 = document.getElementById('custom-total');
     if (e1) e1.textContent = coins;
-    if (e2) e2.textContent = coins + ' كونزه';
+    if (e2) e2.textContent = coins + ' 🪙';
     if (e3) e3.textContent = price + ' ريال';
     if (e4) e4.textContent = vat + ' ريال';
     if (e5) e5.textContent = '$' + usd;
@@ -3149,7 +3149,7 @@ async function buyCustomCoins() {
     const result = await api('POST', '/api/wallet/buy-custom', { coins });
     if (result.requiresPayment) {
       showPaymentModal(result.total, 'شراء كونزات مخصص (' + coins + ')');
-      showToast('📋 تفاصيل العملية: ' + coins + ' كونزه · السعر ' + result.price + ' ريال · ضريبة ' + result.vat + ' ريال · الإجمالي ' + result.total + ' ريال', 'success');
+      showToast('📋 تفاصيل العملية: ' + coins + ' 🪙 · السعر ' + result.price + ' ريال · ضريبة ' + result.vat + ' ريال · الإجمالي ' + result.total + ' ريال', 'success');
     }
   } catch(e) { showToast(e.message, 'error'); }
 }
@@ -3158,6 +3158,6 @@ async function buyCustomCoins() {
 function coinVal(coins) {
   const c = parseInt(coins) || 0;
   const sar = Math.round((c / (state.sarRate || 50)) * 100) / 100;
-  return '<span class="coin-val"><img src="/assets/coin.png" class="coin-ico" alt="كونزه"> <b>' + c.toLocaleString('en') + '</b>' +
+  return '<span class="coin-val"><img src="/assets/coin.png" class="coin-ico" alt="<img src="/assets/coin.png" class="coin-ico" alt="">"> <b>' + c.toLocaleString('en') + '</b>' +
     '<span class="coin-sar">= ' + sar + ' ريال</span></span>';
 }
