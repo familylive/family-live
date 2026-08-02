@@ -1306,6 +1306,29 @@ app.post('/api/admin/restore', authMiddleware, adminMiddleware, asyncHandler(asy
   res.json({ message: '✅ تمت استعادة النسخة (' + sorted.length + ' جداول، ' + restored + ' سجل)' });
 }));
 
+// Levels: config + my progress
+app.get('/api/levels', authMiddleware, asyncHandler(async (req, res) => {
+  const cfg = await db.getLevelConfig();
+  const info = await db.computeUserLevel(req.user.id);
+  res.json({ config: cfg, level: info.level, charged: info.charged, next: info.next });
+}));
+
+// Admin: levels CRUD
+app.get('/api/admin/levels', authMiddleware, adminMiddleware, asyncHandler(async (req, res) => {
+  res.json({ config: await db.getLevelConfig() });
+}));
+app.post('/api/admin/levels/save', authMiddleware, adminMiddleware, asyncHandler(async (req, res) => {
+  const { level, coins_needed, image } = req.body;
+  if (!level || !coins_needed) return res.status(400).json({ error: 'المستوى والكونزات مطلوبان' });
+  const row = await db.setLevelConfig(parseInt(level), parseInt(coins_needed), image);
+  res.json({ message: '✅ تم حفظ المستوى ' + row.level + ' (' + row.coins_needed + ' كونزه)', level: row });
+}));
+app.post('/api/admin/levels/delete', authMiddleware, adminMiddleware, asyncHandler(async (req, res) => {
+  const { level } = req.body;
+  await db.deleteLevelConfig(parseInt(level));
+  res.json({ message: '🗑️ تم حذف المستوى' });
+}));
+
 // Admin: full reports (balance, top families, top chargers, withdrawals)
 app.get('/api/admin/reports', authMiddleware, adminMiddleware, asyncHandler(async (req, res) => {
   res.json(await db.getReportsData());
@@ -1576,8 +1599,11 @@ app.post('/api/admin/wallet/add-coins', authMiddleware, adminMiddleware, async (
   if (!target) return res.status(404).json({ error: 'العضو غير موجود' });
   const wallet = await db.addCoins(userId, amount);
   await db.runRaw("INSERT INTO coin_transactions (id, user_id, type, coins, detail, created_at) VALUES ($1,$2,'admin_credit',$3,$4,$5)", [require('crypto').randomUUID(), userId, amount, 'شحن من الإدارة بواسطة ' + req.user.name, new Date().toISOString()]);
-  // Level up: +3 points per charge
-  try { await db.addLevelPoints(userId, 3, 'charge'); io.to(`user_${userId}`).emit('level_up', { level: (await db.getUserLevel(userId))?.level || 0 }); } catch(e) {}
+  // Level up: based on total coins charged
+  try {
+    const info = await db.addUserCharged(userId, amount);
+    if (info && info.level > 0) io.to(`user_${userId}`).emit('level_up', { level: info.level, remaining: info.next ? Math.max(0, info.next.coins_needed - info.charged) : 0 });
+  } catch(e) {}
   // Live notification to the charged member
   io.to(`user_${userId}`).emit('coins_charged', { amount, byName: req.user.name });
   res.json({ message: '🪙 تم شحن ' + amount + ' كوينز إلى ' + target.name, wallet });
@@ -2795,6 +2821,9 @@ async function bootstrap() {
     onlineUsers.add(botUser.id); // bot is always "online"
     console.log('🤖 Test bot ready:', botUser.name, '|', botUser.id.slice(0,8));
   } catch(e) { console.log('Bot seed error:', e.message); }
+  
+  // Seed levels 1-10 (20-30 left for the admin to fill)
+  try { await db.seedLevels(); } catch(e) { console.log('Levels seed error:', e.message); }
   
   // Seed pricing (all services priced in COINS - admin adjustable)
   try {

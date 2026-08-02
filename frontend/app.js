@@ -363,6 +363,64 @@ function updateAllUI() {
   } catch(e) { console.error('updateAllUI error:', e.message); }
 }
 
+// ==================== LEVELS CONFIG (admin) ====================
+let lvImageBase64 = '';
+
+function previewLvImage(input) {
+  const file = input.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    lvImageBase64 = e.target.result;
+    const prev = document.getElementById('lv-image-preview');
+    if (prev) { prev.src = lvImageBase64; prev.style.display = 'block'; }
+  };
+  reader.readAsDataURL(file);
+}
+
+async function loadAdminLevels() {
+  try {
+    const { config } = await api('GET', '/api/admin/levels');
+    const list = document.getElementById('admin-levels-list');
+    if (!config?.length) { list.innerHTML = '<div class="empty-text">لا توجد مستويات</div>'; return; }
+    list.innerHTML = config.map(c =>
+      '<div class="admin-family-item">' +
+        '<div class="admin-family-name">' + (c.image ? '<img src="' + c.image + '" style="width:28px;height:28px;object-fit:contain;vertical-align:middle;margin-left:6px">' : '') + 'المستوى ' + c.level + ' — ' + c.coins_needed.toLocaleString('en') + ' كونزه</div>' +
+        '<div class="admin-family-actions">' +
+          '<button class="btn btn-sm" onclick="editLevelAdmin(' + c.level + ', ' + c.coins_needed + ')">✏️ تعديل</button>' +
+          '<button class="btn btn-sm btn-danger" onclick="deleteLevelAdmin(' + c.level + ')">🗑️ حذف</button>' +
+        '</div>' +
+      '</div>'
+    ).join('');
+  } catch(e) {}
+}
+
+function editLevelAdmin(level, coins) {
+  document.getElementById('lv-num').value = level;
+  document.getElementById('lv-coins').value = coins;
+  showToast('✏️ عدّل ثم اضغط حفظ المستوى', 'success');
+}
+
+async function saveLevelAdmin() {
+  const level = document.getElementById('lv-num').value;
+  const coins = document.getElementById('lv-coins').value;
+  if (!level || !coins) return showToast('المستوى والكونزات مطلوبان', 'error');
+  try {
+    const r = await api('POST', '/api/admin/levels/save', { level, coins_needed: coins, image: lvImageBase64 || undefined });
+    showToast(r.message, 'success');
+    lvImageBase64 = '';
+    document.getElementById('lv-image-file').value = '';
+    const prev = document.getElementById('lv-image-preview');
+    if (prev) { prev.style.display = 'none'; prev.src = ''; }
+    loadAdminLevels();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function deleteLevelAdmin(level) {
+  if (!confirm('🗑️ حذف المستوى ' + level + '؟')) return;
+  try { await api('POST', '/api/admin/levels/delete', { level }); loadAdminLevels(); } catch(e) {}
+}
+
 // ==================== LEVELS ====================
 function levelBadge(level) {
   const lv = parseInt(level) || 0;
@@ -382,7 +440,32 @@ function updateLevelUI() {
   const profLv = document.getElementById('profile-level');
   if (profLv) profLv.innerHTML = levelBadge(lv) + ' <span style="font-size:11px;color:var(--text-muted)">' + levelTierName(lv) + '</span>';
   const profPoints = document.getElementById('profile-level-points');
-  if (profPoints) profPoints.textContent = 'نقاط المستوى: ' + (parseInt(state.user?.level_points) || 0);
+  if (profPoints) profPoints.textContent = 'إجمالي الكونزات المشحونة: ' + ((state.user?.total_charged || 0)).toLocaleString('en');
+}
+
+// العميل يضغط على مستواه → كم باقي للمستوى التالي
+async function showLevelProgress() {
+  const box = document.getElementById('level-progress-box');
+  if (!box) return;
+  if (box.style.display !== 'none') { box.style.display = 'none'; return; }
+  try {
+    const { level, charged, next, config } = await api('GET', '/api/levels');
+    const currentCfg = (config || []).find(c => c.level === level);
+    let html = '<div style="font-weight:800;color:var(--gold);margin-bottom:6px">🎯 تقدم المستوى</div>' +
+      '<div style="display:flex;justify-content:space-between"><span>مستواك الحالي</span><b>Lv ' + level + '</b></div>' +
+      '<div style="display:flex;justify-content:space-between"><span>إجمالي الكونزات المشحونة</span><b>' + (charged||0).toLocaleString('en') + '</b></div>';
+    if (next) {
+      const remaining = Math.max(0, next.coins_needed - charged);
+      const pct = Math.min(100, Math.round(charged / next.coins_needed * 100));
+      html += '<div style="display:flex;justify-content:space-between;margin-top:6px"><span>المستوى التالي ' + next.level + '</span><b>' + next.coins_needed.toLocaleString('en') + ' كونزه</b></div>' +
+        '<div style="height:8px;background:rgba(255,255,255,.12);border-radius:6px;margin-top:6px;overflow:hidden"><div style="height:100%;width:' + pct + '%;background:linear-gradient(90deg,#e8b830,#ffd75e);transition:width .5s"></div></div>' +
+        '<div style="color:var(--danger);font-weight:800;margin-top:6px">⏳ تبقى لك: ' + remaining.toLocaleString('en') + ' كونزه للمستوى ' + next.level + '</div>';
+    } else {
+      html += '<div style="color:var(--gold);font-weight:800;margin-top:6px">👑 أنت في أعلى مستوى!</div>';
+    }
+    box.innerHTML = html;
+    box.style.display = 'block';
+  } catch(e) {}
 }
 
 // ==================== MENU VISIBILITY ====================

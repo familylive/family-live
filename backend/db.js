@@ -74,6 +74,8 @@ async function initDb() {
   await run(`CREATE TABLE IF NOT EXISTS violation_templates (id TEXT PRIMARY KEY, name TEXT NOT NULL, icon TEXT DEFAULT '🚫', status TEXT DEFAULT 'active', created_at TEXT DEFAULT now())`);
   try { await run("ALTER TABLE violations ADD COLUMN IF NOT EXISTS action TEXT"); } catch(e) {}
   try { await run("ALTER TABLE violations ADD COLUMN IF NOT EXISTS by_user_name TEXT"); } catch(e) {}
+  await run(`CREATE TABLE IF NOT EXISTS level_config (level INTEGER PRIMARY KEY, coins_needed INTEGER NOT NULL, image TEXT, created_at TEXT DEFAULT now())`);
+  try { await run("ALTER TABLE users ADD COLUMN IF NOT EXISTS total_charged INTEGER DEFAULT 0"); } catch(e) {}
   await run(`CREATE TABLE IF NOT EXISTS pricing (feature TEXT PRIMARY KEY, name TEXT NOT NULL, price_sar INTEGER DEFAULT 0, status TEXT DEFAULT 'active', updated_at TEXT DEFAULT now())`);
   try { await run("ALTER TABLE pricing ADD COLUMN IF NOT EXISTS price_sar INTEGER DEFAULT 0"); } catch(e) {}
   try { await run("ALTER TABLE pricing ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active'"); } catch(e) {}
@@ -368,6 +370,39 @@ async function addAuctionLog(auctionId, code, event, userId, userName, amount, d
   await run('INSERT INTO auction_logs (id, auction_id, code, event, user_id, user_name, amount, detail) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
     [uuidv4(), auctionId || null, code || '', event, userId || null, userName || '', amount || 0, detail || '']);
 }
+async function getLevelConfig() { return query('SELECT * FROM level_config ORDER BY level'); }
+async function getLevelByNum(level) { return queryOne('SELECT * FROM level_config WHERE level = $1', [level]); }
+async function setLevelConfig(level, coinsNeeded, image) {
+  await run('INSERT INTO level_config (level, coins_needed, image) VALUES ($1,$2,$3) ON CONFLICT (level) DO UPDATE SET coins_needed = $2, image = $3, created_at = now()', [level, parseInt(coinsNeeded) || 0, image || null]);
+  return getLevelByNum(level);
+}
+async function deleteLevelConfig(level) { await run('DELETE FROM level_config WHERE level = $1', [level]); return true; }
+async function seedLevels() {
+  const c = await queryOne('SELECT COUNT(*) as c FROM level_config');
+  if (c && c.c > 0) return;
+  // Levels 1-10: each +25,000 charged (level 10 = 250,000) - 20-30 left for the admin
+  for (let lv = 1; lv <= 10; lv++) {
+    await run('INSERT INTO level_config (level, coins_needed) VALUES ($1,$2)', [lv, lv * 25000]);
+  }
+}
+async function computeUserLevel(userId) {
+  const u = await queryOne('SELECT total_charged FROM users WHERE id = $1', [userId]);
+  const charged = parseInt(u?.total_charged) || 0;
+  const cfg = await getLevelConfig();
+  let level = 0, next = null;
+  for (const c of cfg) {
+    if (charged >= parseInt(c.coins_needed)) level = c.level;
+    else { next = c; break; }
+  }
+  return { level, charged, next };
+}
+async function addUserCharged(userId, coins) {
+  await run('UPDATE users SET total_charged = total_charged + $1 WHERE id = $2', [coins, userId]);
+  const info = await computeUserLevel(userId);
+  await run('UPDATE users SET level = $1 WHERE id = $2', [info.level, userId]);
+  return info;
+}
+
 async function getReportsData() {
   const rate = await getSarToCoinsRate();
   // Site total balance
@@ -1152,7 +1187,7 @@ module.exports = {
   addAuctionLog, getAuctionLogs, getReportsData,
   getEffects, getEffectById, addEffect, getUserEffects, buyEffect, selectEffect, addFamilyBattleWin,
   getPricing, getPricingByFeature, setPricing, deletePricing, getSarToCoinsRate, setSarToCoinsRate, payWithCoins, settleAuction, getSiteTotalCoins,
-  addLevelPoints, getUserLevel,
+  addLevelPoints, getUserLevel, getLevelConfig, getLevelByNum, setLevelConfig, deleteLevelConfig, seedLevels, computeUserLevel, addUserCharged,
   getWithdrawFee, setWithdrawFee,
   isDiwaniyaRestricted, restrictFromDiwaniya, unrestrictFromDiwaniya, getDiwaniyaRestrictions,
   seedViolationTemplates, getViolationTemplates, getAllViolationTemplates, addViolationTemplate, deleteViolationTemplate, addFounderViolation,
