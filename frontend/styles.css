@@ -3056,3 +3056,37 @@ body {
 
 /* Family victory cups */
 .cup-badge { color: var(--gold); font-weight: 900; }
+
+/* Dash auctions: two columns */
+.dash-auctions-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.dash-auctions-grid .dash-auction-item {
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+}
+.dash-auction-code { font-size: 12px; letter-spacing: 2px; }
+
+/* Premium code: BLUE + blinking (replaces rainbow) */
+.rainbow-text {
+  background: linear-gradient(90deg, #2a7fff, #00c6ff, #4d9fff, #2a7fff);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: premiumBlink 1.1s ease-in-out infinite;
+  font-weight: 900;
+}
+@keyframes premiumBlink {
+  0%, 100% { opacity: 1; filter: drop-shadow(0 0 3px rgba(42,127,255,.5)); }
+  50% { opacity: .5; filter: drop-shadow(0 0 12px rgba(42,127,255,1)); }
+}
