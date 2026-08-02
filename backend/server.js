@@ -1254,6 +1254,25 @@ app.get('/api/admin/auctions/available-codes', authMiddleware, adminMiddleware, 
   res.json({ codes });
 });
 
+// Admin: full database backup (JSON export)
+app.get('/api/admin/backup', authMiddleware, adminMiddleware, asyncHandler(async (req, res) => {
+  const backup = {};
+  try {
+    const tables = await db.execQuery("SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename");
+    for (const t of tables) {
+      try { backup[t.tablename] = await db.execQuery('SELECT * FROM ' + t.tablename); } catch(e) { backup[t.tablename] = []; }
+    }
+  } catch(e) {
+    // Fallback: query the known tables
+    const known = ['users','families','subscription_codes','user_codes','coin_transactions','gifts','auctions','auction_bids','auction_participants','payments','withdrawals','diwaniya_sessions','diwaniya_messages','invitations','coin_packages','effects','gift_items','battles','violations','banned_words','ads','announcements','pricing','settings'];
+    for (const t of known) {
+      try { backup[t] = await db.execQuery('SELECT * FROM ' + t); } catch(e) {}
+    }
+  }
+  res.setHeader('Content-Disposition', 'attachment; filename=family_live_backup.json');
+  res.json({ backup });
+}));
+
 // Admin: full reports (balance, top families, top chargers, withdrawals)
 app.get('/api/admin/reports', authMiddleware, adminMiddleware, asyncHandler(async (req, res) => {
   res.json(await db.getReportsData());
