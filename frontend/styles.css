@@ -2934,3 +2934,38 @@ body {
 .demo-vivid { filter: saturate(1.6) contrast(1.08); }
 .demo-classic { filter: sepia(.45) contrast(1.02); }
 .demo-bw { filter: grayscale(1) contrast(1.1); }
+
+/* Tile filter button + bar (live switching while on camera) */
+.tile-filter-btn {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 60;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(232,184,48,.7);
+  background: rgba(0,0,0,.65);
+  color: #ffd75e;
+  font-size: 16px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.video-tile.local:hover .tile-filter-btn,
+.tile-filter-btn.show { display: flex; }
+.tile-filter-bar {
+  position: absolute;
+  bottom: 34px;
+  left: 6px;
+  right: 6px;
+  z-index: 61;
+  background: rgba(8,10,18,.92);
+  border: 1px solid rgba(232,184,48,.5);
+  border-radius: 12px;
+  padding: 8px;
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+}

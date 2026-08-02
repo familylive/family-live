@@ -1716,6 +1716,11 @@ function leaveLiveAudio() {
   if (tileState) { tileState.textContent = ''; tileState.classList.remove('muted-state'); }
   
   inLiveCall = false;
+  if (filterPipeline) {
+    clearInterval(filterPipeline.timer);
+    if (filterPipeline.srcVideo) filterPipeline.srcVideo.remove();
+    filterPipeline = null;
+  }
   state.callMembers = {};
   const presenceEl2 = document.getElementById('call-presence');
   if (presenceEl2) presenceEl2.style.display = 'none';
@@ -2527,12 +2532,8 @@ function respondCameraInvite(accept) {
     }
     if (wantCam) {
       enableMyCamera().then(ok => {
-        // Apply the chosen beauty filter to my camera feed
-        const myVideo = document.getElementById('my-video');
-        if (myVideo && ok) {
-          myVideo.classList.remove('filter-soft','filter-gold','filter-pink','filter-vivid','filter-classic','filter-bw','beauty');
-          if (selectedInviteFilter) myVideo.classList.add(selectedInviteFilter);
-        }
+        // Apply the chosen filter to the SENT feed (everyone sees it)
+        if (ok) applyFilterToFeed(selectedInviteFilter);
         socket.emit('camera_invite_response', { to: pendingCameraInvite.founderId, accept: ok, inviteeName: state.user?.name });
         showToast(ok ? '🎥 تم تشغيل كاميرتك - أنت الآن بالمشاركة!' : 'تعذر تشغيل الكاميرا', ok ? 'success' : 'error');
       });

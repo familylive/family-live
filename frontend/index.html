@@ -595,6 +595,16 @@
           <div class="video-grid" id="video-grid" style="display:none">
             <div class="video-tile local" id="my-video-tile">
               <video id="my-video" autoplay playsinline muted style="display:none"></video>
+              <button class="tile-filter-btn" id="tile-filter-btn" onclick="toggleTileFilterBar()" title="الفلاتر">✨</button>
+              <div class="tile-filter-bar" id="tile-filter-bar" style="display:none">
+                <div class="filter-opt" data-filter="" onclick="tileSelectFilter(this)"><span class="filter-demo demo-none">أ</span><span class="filter-name">بدون</span></div>
+                <div class="filter-opt" data-filter="filter-soft" onclick="tileSelectFilter(this)"><span class="filter-demo demo-soft">أ</span><span class="filter-name">✨ ناعم</span></div>
+                <div class="filter-opt" data-filter="filter-gold" onclick="tileSelectFilter(this)"><span class="filter-demo demo-gold">أ</span><span class="filter-name">🌅 ذهبي</span></div>
+                <div class="filter-opt" data-filter="filter-pink" onclick="tileSelectFilter(this)"><span class="filter-demo demo-pink">أ</span><span class="filter-name">🌸 وردي</span></div>
+                <div class="filter-opt" data-filter="filter-vivid" onclick="tileSelectFilter(this)"><span class="filter-demo demo-vivid">أ</span><span class="filter-name">🌈 حيوي</span></div>
+                <div class="filter-opt" data-filter="filter-classic" onclick="tileSelectFilter(this)"><span class="filter-demo demo-classic">أ</span><span class="filter-name">🎞️ كلاسيك</span></div>
+                <div class="filter-opt" data-filter="filter-bw" onclick="tileSelectFilter(this)"><span class="filter-demo demo-bw">أ</span><span class="filter-name">🖤 أبيض وأسود</span></div>
+              </div>
               <div class="video-name">أنت</div>
               <div class="tile-state" id="my-tile-state"></div>
             </div>
