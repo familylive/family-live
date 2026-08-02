@@ -2181,7 +2181,38 @@ async function updateCodePrice(code) {
 // ==================== ADMIN: FAMILIES MANAGEMENT ====================
 let editingFamilyId = null;
 
+// Collapsible admin panel sections (accordion)
+function initAdminAccordion() {
+  const page = document.getElementById('page-admin');
+  if (!page || page.dataset.acc) return;
+  page.dataset.acc = '1';
+  const cards = Array.from(page.children).filter(c => c.classList && c.classList.contains('card'));
+  cards.forEach((card, i) => {
+    const title = Array.from(card.children).find(c => c.classList && c.classList.contains('card-title'));
+    if (!title) return;
+    title.classList.add('acc-title');
+    const arrow = document.createElement('span');
+    arrow.className = 'acc-arrow';
+    arrow.textContent = '▸';
+    title.appendChild(arrow);
+    if (i > 0) {
+      Array.from(card.children).forEach(c => { if (c !== title) c.style.display = 'none'; });
+      card.classList.add('closed');
+    } else {
+      arrow.textContent = '▾';
+    }
+    title.addEventListener('click', (e) => {
+      if (e.target.closest('button,a,input,select')) return;
+      const isOpen = !card.classList.contains('closed');
+      Array.from(card.children).forEach(c => { if (c !== title) c.style.display = isOpen ? 'none' : ''; });
+      card.classList.toggle('closed', isOpen);
+      arrow.textContent = isOpen ? '▸' : '▾';
+    });
+  });
+}
+
 async function loadAdminPage() {
+  initAdminAccordion();
   loadAdminAds();
   loadAdminOnline();
   loadAvailableCodesDropdowns();
