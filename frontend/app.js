@@ -585,6 +585,13 @@ function connectSocket() {
     if (socket) socket.disconnect();
     location.reload();
   });
+  socket.on('auction_won', (data) => {
+    showToast('🏆 مبروك! فزت بمزاد الرمز (' + (data.code || '') + ') - خُصمت عملاتك المحجوزة 🪙 ' + (data.coins || 0) + ' والرمز أصبح ملكك!', 'success');
+    playNotificationSound();
+    refreshWalletHeader();
+    loadWallet();
+    loadMyCodes();
+  });
   socket.on('hold_released', (data) => {
     showToast('🪙 عادت لك ' + (data.coins || 0) + ' عملة محجوزة من مزايدة الرمز (' + (data.code || '') + ')', 'success');
     playNotificationSound();

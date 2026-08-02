@@ -1262,22 +1262,29 @@ app.get('/api/admin/auctions', authMiddleware, adminMiddleware, async (req, res)
   res.json({ auctions });
 });
 
-// Release all holds after an auction ends (returns coins + notifies bidders)
-async function releaseAuctionHolds(auctionId) {
+// Settle an auction: winner's held coins go to the SITE balance (he owns the code),
+// losers get their holds returned
+async function settleAuctionHolds(auctionId) {
   try {
     const auction = await db.getAuctionById(auctionId);
     if (!auction) return;
+    const winnerId = auction.winner_id;
+    const result = await db.settleAuction(auctionId, winnerId);
+    if (!result || result.error) return;
+    // Notify bidders
     const bids = await db.getAuctionBids(auctionId);
     const totals = {};
     bids.forEach(b => { totals[b.user_id] = (totals[b.user_id] || 0) + (parseInt(b.amount) || 0); });
-    for (const [uid, amt] of Object.entries(totals)) {
-      const rate = await db.getSarToCoinsRate();
-      const released = await db.releaseHold(uid, amt * rate, auction.code);
-      if (released > 0) {
-        io.to(`user_${uid}`).emit('hold_released', { coins: released, code: auction.code });
+    const rate = await db.getSarToCoinsRate();
+    for (const uid of Object.keys(totals)) {
+      const amt = totals[uid] * rate;
+      if (uid === winnerId) {
+        io.to(`user_${uid}`).emit('auction_won', { code: auction.code, coins: amt });
+      } else {
+        io.to(`user_${uid}`).emit('hold_released', { coins: amt, code: auction.code });
       }
     }
-  } catch(e) { console.log('Hold release error:', e.message); }
+  } catch(e) { console.log('Auction settle error:', e.message); }
 }
 
 // Admin: end auction (releases all holds)
@@ -1285,8 +1292,8 @@ app.post('/api/admin/auctions/end', authMiddleware, adminMiddleware, async (req,
   const { auctionId } = req.body;
   const auction = await db.endAuction(auctionId);
   if (!auction) return res.status(400).json({ error: 'المزاد غير متاح' });
-  await releaseAuctionHolds(auctionId);
-  res.json({ message: '🏁 تم إنهاء المزاد - عادت الحجوزات لأصحابها', auction });
+  await settleAuctionHolds(auctionId);
+  res.json({ message: '🏁 تم إنهاء المزاد - الفائز دفع بعملاته المحجوزة وحصل على الرمز، وعادت حجوزات البقية', auction });
 });
 
 // Winner pays the final bid coins to own the code
@@ -1326,8 +1333,8 @@ app.post('/api/admin/auctions/cancel', authMiddleware, adminMiddleware, async (r
   const { auctionId } = req.body;
   const auction = await db.cancelAuction(auctionId);
   if (!auction) return res.status(400).json({ error: 'المزاد غير موجود' });
-  await releaseAuctionHolds(auctionId);
-  res.json({ message: '❌ تم إلغاء المزاد - عادت الحجوزات لأصحابها', auction });
+  await settleAuctionHolds(auctionId);
+  res.json({ message: '❌ تم إلغاء المزاد - تسوية الحجوزات', auction });
 });
 
 // =============== CURRENCY ===============

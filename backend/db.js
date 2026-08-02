@@ -682,6 +682,50 @@ async function releaseHold(userId, amount, code) {
   await run("INSERT INTO coin_transactions (id, user_id, type, coins, detail) VALUES ($1,$2,'hold_return',$3,$4)", [uuidv4(), userId, rel, 'عودة رصيد محجوز من مزايدة الرمز (' + (code || '') + ')']);
   return rel;
 }
+async function settleAuction(auctionId, winnerId) {
+  // Returns: { winnerHeld, released } - winner's held coins go to the SITE balance, losers get theirs back
+  const auction = await getAuctionById(auctionId);
+  if (!auction) return { error: 'المزاد غير موجود' };
+  const bids = await query('SELECT user_id, SUM(amount) as total FROM auction_bids WHERE auction_id = $1 GROUP BY user_id', [auctionId]);
+  const rate = await getSarToCoinsRate();
+  let winnerHeld = 0, released = 0;
+  for (const b of bids) {
+    const total = (parseInt(b.total) || 0) * rate;
+    const r = await queryOne('SELECT hold_balance FROM users WHERE id = $1', [b.user_id]);
+    const hold = Math.min(parseInt(r?.hold_balance) || 0, total);
+    if (b.user_id === winnerId) {
+      // Winner: coins stay with the site (he already paid via his hold)
+      if (hold > 0) {
+        await run('UPDATE users SET hold_balance = hold_balance - $1 WHERE id = $2', [hold, b.user_id]);
+        await run("INSERT INTO coin_transactions (id, user_id, type, coins, detail) VALUES ($1,$2,'auction_win',$3,$4)", [uuidv4(), b.user_id, hold, 'فوز بمزاد الرمز (' + (auction.code || '') + ') - خصمت عملاتك المحجوزة']);
+        winnerHeld += hold;
+        // Site total balance
+        const cur = await queryOne("SELECT value FROM settings WHERE key = 'site_total_coins'");
+        const curV = parseInt(cur?.value) || 0;
+        await run("INSERT INTO settings (key, value) VALUES ('site_total_coins', $1) ON CONFLICT (key) DO UPDATE SET value = $1", [String(curV + hold)]);
+      }
+    } else {
+      // Loser: return the hold
+      if (hold > 0) {
+        await run('UPDATE users SET hold_balance = hold_balance - $1, coins = coins + $1 WHERE id = $2', [hold, b.user_id]);
+        await run("INSERT INTO coin_transactions (id, user_id, type, coins, detail) VALUES ($1,$2,'hold_return',$3,$4)", [uuidv4(), b.user_id, hold, 'عودة رصيد محجوز من مزايدة الرمز (' + (auction.code || '') + ')']);
+        released += hold;
+      }
+    }
+  }
+  // Grant the code to the winner
+  if (winnerId && winnerHeld > 0) {
+    await run("UPDATE auctions SET paid = 1, winner_id = $1 WHERE id = $2", [winnerId, auctionId]);
+    await run('INSERT INTO user_codes (id, user_id, code, type) VALUES ($1,$2,$3,$4)', [uuidv4(), winnerId, auction.code, 'premium']);
+    await run("UPDATE subscription_codes SET used = 1 WHERE code = $1", [auction.code]);
+  }
+  return { winnerHeld, released, code: auction.code };
+}
+async function getSiteTotalCoins() {
+  const r = await queryOne("SELECT value FROM settings WHERE key = 'site_total_coins'");
+  return parseInt(r?.value) || 0;
+}
+
 async function getWallet(userId) {
   const u = await queryOne('SELECT coins, wallet, hold_balance FROM users WHERE id = $1', [userId]);
   return u ? { coins: parseInt(u.coins) || 0, wallet: parseInt(u.wallet) || 0, hold: parseInt(u.hold_balance) || 0 } : { coins: 0, wallet: 0, hold: 0 };
@@ -1036,7 +1080,7 @@ module.exports = {
   createAnnouncement, getFamilyAnnouncements, getAnnouncementsForUser, deleteAnnouncement,
   createBattle, getBattleById, getActiveBattle, acceptBattle, rejectBattle, supportBattle, endBattle, finalizeBattle, addFamilySupportPoints, getOnlineFounders,
   getEffects, getEffectById, addEffect, getUserEffects, buyEffect, selectEffect, addFamilyBattleWin,
-  getPricing, getPricingByFeature, setPricing, deletePricing, getSarToCoinsRate, setSarToCoinsRate, payWithCoins,
+  getPricing, getPricingByFeature, setPricing, deletePricing, getSarToCoinsRate, setSarToCoinsRate, payWithCoins, settleAuction, getSiteTotalCoins,
   isDiwaniyaRestricted, restrictFromDiwaniya, unrestrictFromDiwaniya, getDiwaniyaRestrictions,
   seedViolationTemplates, getViolationTemplates, getAllViolationTemplates, addViolationTemplate, deleteViolationTemplate, addFounderViolation,
   getGiftItems, getAllGiftItems, addGiftItem, updateGiftItem, deleteGiftItem,
