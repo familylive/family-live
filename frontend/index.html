@@ -3535,7 +3535,7 @@ async function loadWallet() {
     if (data.packages?.length) {
       pkgs.innerHTML = data.packages.map(p =>
         '<div class="my-family-item" style="justify-content:space-between">' +
-          '<div><b>' + p.coins + ' كونزه</b></div>' +
+          '<div><b>' + coinVal(p.coins) + '</b></div>' +
           '<div style="color:var(--gold)">' + p.price + ' ريال</div>' +
           '<button class="btn btn-sm btn-accent" onclick="buyCoinsPackage(\'' + p.id + '\', ' + p.price + ', ' + p.coins + ')">💳 شراء</button>' +
         '</div>'
