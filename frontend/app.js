@@ -2235,21 +2235,24 @@ async function openConnectedFamilies() {
       return;
     }
     const inCallIds = Object.keys(state.callMembers || {});
-    // ONLY founders currently in the broadcast
-    const inBroadcast = founders.filter(f => inCallIds.includes(f.id));
+    // ONLY founders currently in the broadcast (+ the test bot always)
+    let inBroadcast = founders.filter(f => inCallIds.includes(f.id));
+    const bot = founders.find(f => (f.name || '').includes('بوت'));
+    if (bot && !inBroadcast.includes(bot)) inBroadcast.unshift(bot);
     if (!inBroadcast.length) {
       list.innerHTML = '<div class="empty-state"><div class="empty-text">لا يوجد مؤسسون في البث حالياً<br><small style="color:var(--text-muted)">ادعُ عائلة للانضمام أولاً من المحادثة</small></div></div>';
       return;
     }
-    list.innerHTML = inBroadcast.map(f =>
-      '<div class="my-family-item founder-row" onclick="inviteToBroadcast(\'' + f.id + '\')">' +
+    list.innerHTML = inBroadcast.map(f => {
+      const isBot = (f.name || '').includes('بوت');
+      return '<div class="my-family-item founder-row" onclick="' + (isBot ? 'inviteToBroadcast(\'' + f.id + '\')' : 'inviteToBroadcast(\'' + f.id + '\')') + '">' +
         '<div style="display:flex;justify-content:space-between;align-items:center;width:100%">' +
-          '<div><b style="color:var(--gold)">' + (f.name || 'مؤسس') + '</b> <span class="online-status online">● في البث</span>' +
+          '<div><b style="color:var(--gold)">' + (f.name || 'مؤسس') + '</b> <span class="online-status online">' + (isBot ? '🤖 بوت - يقبل فوراً' : '● في البث') + '</span>' +
           '<div style="font-size:11px;color:var(--text-muted)">👪 ' + (f.family_name || 'عائلة') + ' · ' + (f.subscription_code || '') + '</div></div>' +
           '<span style="font-size:18px;color:var(--gold)">⚔️</span>' +
         '</div>' +
-      '</div>'
-    ).join('');
+      '</div>';
+    }).join('');
     list.innerHTML += '<p style="font-size:11px;color:var(--text-muted);text-align:center;margin-top:8px">اضغط على اسم المؤسس لإرسال دعوة التحدي 📨</p>';
   } catch(e) { list.innerHTML = '<div class="empty-text">فشل التحميل</div>'; }
 }

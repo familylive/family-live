@@ -1882,6 +1882,17 @@ app.post('/api/battles/join-invite', authMiddleware, asyncHandler(async (req, re
   const me = await db.getUserById(req.user.id);
   const sess = await db.getDiwaniyaSessionById(sessionId);
   if (!sess) return res.status(404).json({ error: 'الديوانية غير موجودة' });
+  // BOT: auto-joins the broadcast
+  if (globalThis.BOT_USER && toUserId === globalThis.BOT_USER.id) {
+    try {
+      if (!audioRooms[sessionId]) audioRooms[sessionId] = [];
+      const botEntry = { socketId: 'bot-socket-' + Date.now(), userId: globalThis.BOT_USER.id, userName: globalThis.BOT_USER.name, avatar: '🤖', isObserver: true, wantsVideo: false };
+      audioRooms[sessionId].push(botEntry);
+      io.to(`session_${sessionId}`).emit('user_joined_call', { userId: globalThis.BOT_USER.id, userName: globalThis.BOT_USER.name, avatar: '🤖', effect: null, isObserver: true });
+    } catch(e) {}
+    io.to(`user_${req.user.id}`).emit('join_invite_accepted', { founderName: globalThis.BOT_USER.name, familyName: globalThis.BOT_FAMILY?.name || 'عائلة الاختبار' });
+    return res.json({ message: '🤖 بوت التحدي انضم للبث - تحدَّه الآن!' });
+  }
   io.to(`user_${toUserId}`).emit('family_join_invite', {
     sessionId, fromId: req.user.id, fromName: me.name,
     familyName: (await db.getFamily(sess.family_id)?.name) || 'العائلة',
@@ -1955,6 +1966,23 @@ app.post('/api/battles/start', authMiddleware, asyncHandler(async (req, res) => 
     famB = opp.family_id;
   }
   const battle = await db.createBattle(sessionId, req.user.id, opponentId, durationMinutes, famA, famB);
+  
+  // BOT: auto-join the broadcast + auto-accept the challenge instantly
+  if (globalThis.BOT_USER && opponentId === globalThis.BOT_USER.id && sessionId) {
+    try {
+      // Bot joins the audio room (appears in the broadcast)
+      if (!audioRooms[sessionId]) audioRooms[sessionId] = [];
+      const botEntry = { socketId: 'bot-socket', userId: globalThis.BOT_USER.id, userName: globalThis.BOT_USER.name, avatar: '🤖', isObserver: true, wantsVideo: false };
+      audioRooms[sessionId].push(botEntry);
+      io.to(`session_${sessionId}`).emit('user_joined_call', { userId: globalThis.BOT_USER.id, userName: globalThis.BOT_USER.name, avatar: '🤖', effect: null, isObserver: true });
+    } catch(e) {}
+    const started = await db.acceptBattle(battle.id, new Date().toISOString());
+    if (battle.session_id) io.to(`session_${battle.session_id}`).emit('battle_started', started);
+    if (battle.family_a_id) io.to(`family_${battle.family_a_id}`).emit('battle_started', started);
+    if (battle.family_b_id) io.to(`family_${battle.family_b_id}`).emit('battle_started', started);
+    return res.json({ message: '🤖 بوت التحدي قبل التحدي فوراً! ابدأ الدعم ⚔️', battle: started });
+  }
+  
   io.to(`user_${opponentId}`).emit('battle_invite', {
     battleId: battle.id, sessionId, fromId: req.user.id, fromName: me.name,
     fromAvatar: me.avatar, duration: battle.duration_minutes, crossFamily: !!famB
@@ -2472,6 +2500,21 @@ async function bootstrap() {
   
   // Seed violation templates
   try { await db.seedViolationTemplates(); } catch(e) { console.log('Template seed error:', e.message); }
+  
+  // Test BOT (single-player testing): bot family + founder, always online, auto-accepts battles
+  try {
+    let botFam = (await db.execQuery("SELECT * FROM families WHERE name = 'عائلة الاختبار'"))[0];
+    if (!botFam) botFam = await db.createFamily('عائلة الاختبار', 'BOTTEST1');
+    let botUser = await db.getUserByEmail('bot@test.com');
+    if (!botUser) {
+      botUser = await db.createUser('بوت التحدي', 'bot@test.com', bcrypt.hashSync('Bot@123456', 10), botFam.id, 'founder');
+      await db.updateFamilyFounder(botFam.id, botUser.id);
+    }
+    globalThis.BOT_USER = botUser;
+    globalThis.BOT_FAMILY = botFam;
+    onlineUsers.add(botUser.id); // bot is always "online"
+    console.log('🤖 Test bot ready:', botUser.name, '|', botUser.id.slice(0,8));
+  } catch(e) { console.log('Bot seed error:', e.message); }
   
   // Seed effects (3 free + paid, bought with coins)
   try {
