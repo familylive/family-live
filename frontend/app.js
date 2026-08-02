@@ -1667,7 +1667,7 @@ async function joinLiveAudio() {
   try {
     // Normal users: request camera (server limits to 6). Moderator: audio only.
     const wantVideo = !isModeratorVisit;
-    localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: wantVideo });
+    localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: wantVideo ? { facingMode: state.cameraFacing || 'user' } : false });
     
     if (isModeratorVisit) {
       // Forced observer: mute mic immediately, no camera at all
