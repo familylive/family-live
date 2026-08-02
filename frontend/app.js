@@ -592,6 +592,14 @@ function connectSocket() {
     playNotificationSound();
     refreshWalletHeader();
   });
+  socket.on('join_invite_rejected', (data) => {
+    showToast('❌ مؤسس عائلة «' + (data.familyName || '') + '» (' + (data.founderName || '') + ') رفض التحدي', 'error');
+    playNotificationSound();
+  });
+  socket.on('join_invite_accepted', (data) => {
+    showToast('✅ ' + (data.founderName || '') + ' قبل الانضمام - سولفوا ثم أرسل التحدي ⚔️', 'success');
+    playNotificationSound();
+  });
   socket.on('family_join_invite', (data) => {
     pendingFamilyJoin = data;
     document.getElementById('family-join-text').textContent = data.fromName + ' (عائلة ' + (data.familyName || '') + ') يدعوك للانضمام لبثهم وسولفوا قبل التحدي ⚔️';
@@ -1975,21 +1983,22 @@ async function openConnectedFamilies() {
       return;
     }
     const inCallIds = Object.keys(state.callMembers || {});
-    list.innerHTML = founders.map(f => {
-      const joined = inCallIds.includes(f.id);
-      return '<div class="my-family-item" style="flex-direction:column;align-items:stretch;gap:6px">' +
-        '<div style="display:flex;justify-content:space-between;align-items:center">' +
-          '<div><b>' + (f.name || 'مؤسس') + '</b> <span class="online-status online">● متصل</span>' +
+    // ONLY founders currently in the broadcast
+    const inBroadcast = founders.filter(f => inCallIds.includes(f.id));
+    if (!inBroadcast.length) {
+      list.innerHTML = '<div class="empty-state"><div class="empty-text">لا يوجد مؤسسون في البث حالياً<br><small style="color:var(--text-muted)">ادعُ عائلة للانضمام أولاً من المحادثة</small></div></div>';
+      return;
+    }
+    list.innerHTML = inBroadcast.map(f =>
+      '<div class="my-family-item founder-row" onclick="inviteToBroadcast(\'' + f.id + '\')">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;width:100%">' +
+          '<div><b style="color:var(--gold)">' + (f.name || 'مؤسس') + '</b> <span class="online-status online">● في البث</span>' +
           '<div style="font-size:11px;color:var(--text-muted)">👪 ' + (f.family_name || 'عائلة') + ' · ' + (f.subscription_code || '') + '</div></div>' +
-          (joined ? '<span style="font-size:10px;color:var(--success);font-weight:800">في البث ✓</span>' : '') +
+          '<span style="font-size:18px;color:var(--gold)">⚔️</span>' +
         '</div>' +
-        '<div style="display:flex;gap:6px">' +
-          (joined
-            ? '<button class="btn btn-sm btn-accent" style="flex:1" onclick="challengeFromFamilies(\'' + f.id + '\')">⚔️ تحدي</button>'
-            : '<button class="btn btn-sm btn-primary" style="flex:1" onclick="inviteToBroadcast(\'' + f.id + '\')">📨 دعوة للانضمام</button>') +
-        '</div>' +
-      '</div>';
-    }).join('');
+      '</div>'
+    ).join('');
+    list.innerHTML += '<p style="font-size:11px;color:var(--text-muted);text-align:center;margin-top:8px">اضغط على اسم المؤسس لإرسال دعوة التحدي 📨</p>';
   } catch(e) { list.innerHTML = '<div class="empty-text">فشل التحميل</div>'; }
 }
 
@@ -2014,11 +2023,14 @@ async function challengeFromFamilies(founderId) {
 let pendingFamilyJoin = null;
 function respondFamilyJoin(accept) {
   if (accept && pendingFamilyJoin) {
-    // Join the broadcast as a guest (audio+video optional) - chat first, battle later
+    // Join the broadcast as a guest - chat first, battle later
     state._guestSessionId = pendingFamilyJoin.sessionId;
     joinAsGuest();
-  } else {
-    showToast(accept ? '' : 'رفضت الدعوة', accept ? 'success' : 'error');
+    api('POST', '/api/battles/join-invite-response', { toUserId: pendingFamilyJoin.fromId, accept: true }).catch(() => {});
+  } else if (pendingFamilyJoin) {
+    // Reject: notify the challenger with the family name
+    api('POST', '/api/battles/join-invite-response', { toUserId: pendingFamilyJoin.fromId, accept: false }).catch(() => {});
+    showToast('رفضت الدعوة', 'error');
   }
   document.getElementById('family-join-modal').style.display = 'none';
   pendingFamilyJoin = null;

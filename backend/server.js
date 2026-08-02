@@ -1848,6 +1848,23 @@ app.post('/api/diwaniya/message', authMiddleware, async (req, res) => {
   res.json(result);
 });
 
+// Response to a join invitation (notify the challenger about rejection)
+app.post('/api/battles/join-invite-response', authMiddleware, asyncHandler(async (req, res) => {
+  const { toUserId, accept } = req.body;
+  const me = await db.getUserById(req.user.id);
+  const fam = me?.family_id ? await db.getFamily(me.family_id) : null;
+  if (!accept) {
+    io.to(`user_${toUserId}`).emit('join_invite_rejected', {
+      founderName: me?.name || 'مؤسس',
+      familyName: fam?.name || 'العائلة'
+    });
+    res.json({ message: 'تم إشعار المرسل بالرفض' });
+  } else {
+    io.to(`user_${toUserId}`).emit('join_invite_accepted', { founderName: me?.name, familyName: fam?.name });
+    res.json({ message: 'تم إشعار المرسل بالقبول' });
+  }
+}));
+
 // Invite another family's founder to JOIN the broadcast (chat first, battle after)
 app.post('/api/battles/join-invite', authMiddleware, asyncHandler(async (req, res) => {
   const { toUserId, sessionId } = req.body;

@@ -2824,3 +2824,7 @@ body {
 #battle-bar.victory-glow .battle-vs { border-color: rgba(232,184,48,.8); }
 /* Coins bigger for battle clarity */
 .battle-coins { font-size: 14px; }
+
+/* Clickable founder row in connected families */
+.founder-row { cursor: pointer; transition: all .15s; }
+.founder-row:hover { border-color: var(--gold); background: rgba(232,184,48,.08); }
