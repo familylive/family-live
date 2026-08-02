@@ -3118,3 +3118,24 @@ body {
   font-weight: 600;
   line-height: 1;
 }
+
+/* Admin accordion */
+.acc-title {
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  user-select: none;
+}
+.acc-arrow {
+  font-size: 13px;
+  color: var(--gold);
+  background: rgba(232,184,48,.12);
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform .2s;
+}
