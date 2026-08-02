@@ -950,7 +950,7 @@ module.exports = {
   isDiwaniyaRestricted, restrictFromDiwaniya, unrestrictFromDiwaniya, getDiwaniyaRestrictions,
   seedViolationTemplates, getViolationTemplates, getAllViolationTemplates, addViolationTemplate, deleteViolationTemplate, addFounderViolation,
   getGiftItems, getAllGiftItems, addGiftItem, updateGiftItem, deleteGiftItem,
-  getWallet, addCoins, sendGift, convertCoinsToWallet, getUserByPublicId, transferCoins, getCoinPackages, getAllCoinPackages, addCoinPackage, updateCoinPackage, deleteCoinPackage,
+  getWallet, addCoins, deductCoins, sendGift, convertCoinsToWallet, getUserByPublicId, transferCoins, getCoinPackages, getAllCoinPackages, addCoinPackage, updateCoinPackage, deleteCoinPackage,
   requestWithdrawal, getMyWithdrawals, getAllWithdrawals, updateWithdrawal,
   getMyTransactions, getAllTransactions, getMyGifts, getGiftsByUser,
   getCurrencyRate, setCurrencyRate, getSecretRoomStatus, enableSecretRoom,
