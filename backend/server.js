@@ -1358,8 +1358,22 @@ app.post('/api/admin/currency/rate', authMiddleware, adminMiddleware, async (req
 // Public: get active packages for home page
 app.get('/api/packages', async (req, res) => {
   const packages = await db.getActivePackages();
-  res.json({ packages });
+  const rate = await db.getSarToCoinsRate();
+  res.json({ packages: packages.map(p => ({ ...p, coins: (parseInt(p.price) || 0) * rate, rate })) });
 });
+
+// Buy a shop package with coins
+app.post('/api/packages/buy', authMiddleware, asyncHandler(async (req, res) => {
+  const { packageId } = req.body;
+  const pkg = (await db.getActivePackages()).find(p => p.id === packageId);
+  if (!pkg) return res.status(404).json({ error: 'الباقة غير موجودة' });
+  const rate = await db.getSarToCoinsRate();
+  const coins = (parseInt(pkg.price) || 0) * rate;
+  if (coins <= 0) return res.json({ message: '✅ الباقة المجانية متاحة', free: true });
+  const pay = await db.payWithCoins(req.user.id, coins, 'شراء باقة: ' + pkg.title);
+  if (pay.error) return res.status(400).json(pay);
+  res.json({ message: '✅ اشتريت باقة «' + pkg.title + '» مقابل 🪙 ' + coins + ' عملة', wallet: pay.wallet });
+}));
 
 // Admin: all packages
 app.get('/api/admin/packages', authMiddleware, adminMiddleware, async (req, res) => {

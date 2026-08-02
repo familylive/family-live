@@ -3066,9 +3066,9 @@ async function loadLandingPackages() {
       '<div class="pricing-card' + (p.title.includes('مميز') || p.title.includes('مخصص') ? ' premium' : '') + '">' +
         '<div class="pricing-type">' + (p.title || '') + '</div>' +
         (p.code_example ? '<div class="pricing-code-example' + (p.title.includes('مميز') || p.title.includes('مخصص') ? ' rainbow-text' : '') + '">' + p.code_example + '</div>' : '') +
-        '<div class="pricing-price">' + fmtPrice(p.price) + '</div>' +
+        '<div class="pricing-price">🪙 ' + (p.coins || 0) + ' عملة</div>' +
         featureList(p.features) +
-        '<button class="btn btn-accent btn-full" onclick="packageBuyClick()">💳 شراء</button>' +
+        '<button class="btn btn-accent btn-full" onclick="packageBuyClick(\'' + p.id + '\', ' + (p.coins || 0) + ')">💳 شراء</button>' +
       '</div>'
     ).join('') +
     '<div class="pricing-card" style="grid-column:span 2;background:linear-gradient(135deg,rgba(59,130,196,.08),var(--bg-card))">' +
@@ -3079,13 +3079,19 @@ async function loadLandingPackages() {
   } catch(e) { console.error('Packages:', e); }
 }
 
-function packageBuyClick() {
-  if (state.isLoggedIn) {
-    navigateTo('codes');
-  } else {
+async function packageBuyClick(packageId, coins) {
+  if (!state.isLoggedIn) {
     showToast('📝 سجل دخول أولاً', 'success');
     setTimeout(() => showAuth('login'), 600);
+    return;
   }
+  if (coins <= 0) { showToast('✅ الباقة المجانية متاحة لك', 'success'); return; }
+  if (!confirm('🛍️ شراء الباقة مقابل 🪙 ' + coins + ' عملة؟\nستخصم من رصيدك بعد التأكيد. متابعة؟')) return;
+  try {
+    const r = await api('POST', '/api/packages/buy', { packageId });
+    showToast(r.message, 'success');
+    refreshWalletHeader();
+  } catch(e) { showToast(e.message, 'error'); }
 }
 
 async function loadAdminPackages() {
