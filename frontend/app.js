@@ -183,6 +183,7 @@ function logout() {
   // Hide logged-in-only menu items
   const joinMenu = document.getElementById('menu-join-family');
   const adminMenu = document.getElementById('menu-admin');
+  const reportsMenu = document.getElementById('menu-reports-item');
   const modMenu = document.getElementById('menu-moderator');
   if (joinMenu) joinMenu.style.display = 'none';
   if (adminMenu) adminMenu.style.display = 'none';
