@@ -1989,9 +1989,18 @@ function renderBattle(b) {
   currentBattle = b;
   const bar = document.getElementById('battle-bar');
   const startBox = document.getElementById('battle-start-box');
-  if (!bar || !b || (b.status !== 'active' && b.status !== 'pending' && b.status !== 'victory')) { if (bar) bar.style.display = 'none'; if (startBox) startBox.style.display = 'block'; return; }
+  if (!bar || !b || (b.status !== 'active' && b.status !== 'pending' && b.status !== 'victory')) {
+    if (bar) bar.style.display = 'none';
+    if (startBox) startBox.style.display = 'block';
+    const supRow = document.getElementById('battle-support-row');
+    if (supRow) supRow.style.display = 'none';
+    return;
+  }
   if (startBox) startBox.style.display = 'none';
   bar.style.display = 'block';
+  // Show the fixed support row when a battle is active
+  const supRow = document.getElementById('battle-support-row');
+  if (supRow) supRow.style.display = (b.status === 'active' || b.status === 'victory') ? 'flex' : 'none';
   // Players names/avatars
   const na = b.player_a_name || 'لاعب أ', nb = b.player_b_name || 'لاعب ب';
   document.getElementById('battle-name-a').textContent = na;
@@ -2038,7 +2047,7 @@ function renderBattle(b) {
 }
 
 async function supportBattle(side) {
-  if (!currentBattle) return;
+  if (!currentBattle) return showToast('لا يوجد تحدٍّ نشط', 'error');
   const coins = prompt('🎁 كم كوينز تدعم به؟', '100');
   if (!coins || parseInt(coins) <= 0) return;
   if (!confirm('⚔️ دعم اللاعب بـ ' + coins + ' كوينز؟')) return;
