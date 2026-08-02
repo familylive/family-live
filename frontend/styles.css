@@ -2803,3 +2803,24 @@ body {
   color: #1a1408;
   box-shadow: 0 0 8px rgba(232,184,48,.6);
 }
+
+/* Battle bar floats at the TOP of the screen during TikTok mode */
+.video-grid.tiktok-mode + .call-controls #battle-bar {
+  position: fixed;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1350;
+  width: min(94vw, 430px);
+  background: rgba(8,10,18,.92);
+  border: 1.5px solid rgba(232,184,48,.6);
+  border-radius: 16px;
+  padding: 10px;
+  box-shadow: 0 8px 34px rgba(0,0,0,.7), 0 0 20px rgba(232,184,48,.2);
+  backdrop-filter: blur(8px);
+}
+/* Winner glow in victory round */
+.battle-bar.victory-glow { border-color: #ffd75e; box-shadow: 0 0 30px rgba(232,184,48,.5); }
+#battle-bar.victory-glow .battle-vs { border-color: rgba(232,184,48,.8); }
+/* Coins bigger for battle clarity */
+.battle-coins { font-size: 14px; }

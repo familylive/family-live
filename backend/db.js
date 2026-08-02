@@ -100,6 +100,7 @@ async function initDb() {
   try { await run("ALTER TABLE battles ADD COLUMN IF NOT EXISTS family_a_id TEXT"); } catch(e) {}
   try { await run("ALTER TABLE battles ADD COLUMN IF NOT EXISTS family_b_id TEXT"); } catch(e) {}
   try { await run("ALTER TABLE battles ADD COLUMN IF NOT EXISTS cross_family INTEGER DEFAULT 0"); } catch(e) {}
+  try { await run("ALTER TABLE battles ADD COLUMN IF NOT EXISTS victory_at TEXT"); } catch(e) {}
   try { await run("ALTER TABLE families ADD COLUMN IF NOT EXISTS description TEXT"); } catch(e) {}
   try { await run("ALTER TABLE diwaniya_sessions ADD COLUMN IF NOT EXISTS secret_code TEXT"); } catch(e) {}
   try { await run("ALTER TABLE diwaniya_sessions ADD COLUMN IF NOT EXISTS capacity INTEGER DEFAULT 15"); } catch(e) {}
@@ -674,7 +675,12 @@ async function supportBattle(id, side, coins) {
   return queryOne('SELECT * FROM battles WHERE id = $1', [id]);
 }
 async function endBattle(id, winnerId) {
-  await run("UPDATE battles SET status = 'done', winner_id = $1 WHERE id = $2", [winnerId, id]);
+  // Victory round: status 'victory' for 2 minutes (loser executes the penalty), then 'done'
+  await run("UPDATE battles SET status = 'victory', winner_id = $1, victory_at = $2 WHERE id = $3", [winnerId, new Date().toISOString(), id]);
+  return queryOne('SELECT * FROM battles WHERE id = $1', [id]);
+}
+async function finalizeBattle(id) {
+  await run("UPDATE battles SET status = 'done' WHERE id = $1", [id]);
   return queryOne('SELECT * FROM battles WHERE id = $1', [id]);
 }
 async function isDiwaniyaRestricted(sessionId, userId) {
@@ -940,7 +946,7 @@ module.exports = {
   addModeratorStars, getModeratorProfile, rateModerator, getModeratorTier, updateModeratorTier, getTierSettings,
   getActivePackages, getAllPackages, addPackage, updatePackage, deletePackage, getPaymentSettings, savePaymentSettings, createPayment, getAllPayments, getMyPayments, confirmPayment, rejectPayment, getFamilyEditInfo, recordFamilyNameChange, getFamilyCapacity, purchaseCapacity, setDiwaniyaCapacity, getCapacityPackages,
   createAnnouncement, getFamilyAnnouncements, getAnnouncementsForUser, deleteAnnouncement,
-  createBattle, getBattleById, getActiveBattle, acceptBattle, rejectBattle, supportBattle, endBattle, addFamilySupportPoints, getOnlineFounders,
+  createBattle, getBattleById, getActiveBattle, acceptBattle, rejectBattle, supportBattle, endBattle, finalizeBattle, addFamilySupportPoints, getOnlineFounders,
   isDiwaniyaRestricted, restrictFromDiwaniya, unrestrictFromDiwaniya, getDiwaniyaRestrictions,
   seedViolationTemplates, getViolationTemplates, getAllViolationTemplates, addViolationTemplate, deleteViolationTemplate, addFounderViolation,
   getGiftItems, getAllGiftItems, addGiftItem, updateGiftItem, deleteGiftItem,

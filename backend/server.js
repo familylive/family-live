@@ -1848,6 +1848,21 @@ app.post('/api/diwaniya/message', authMiddleware, async (req, res) => {
   res.json(result);
 });
 
+// Invite another family's founder to JOIN the broadcast (chat first, battle after)
+app.post('/api/battles/join-invite', authMiddleware, asyncHandler(async (req, res) => {
+  const { toUserId, sessionId } = req.body;
+  if (!toUserId || !sessionId) return res.status(400).json({ error: 'بيانات ناقصة' });
+  const me = await db.getUserById(req.user.id);
+  const sess = await db.getDiwaniyaSessionById(sessionId);
+  if (!sess) return res.status(404).json({ error: 'الديوانية غير موجودة' });
+  io.to(`user_${toUserId}`).emit('family_join_invite', {
+    sessionId, fromId: req.user.id, fromName: me.name,
+    familyName: (await db.getFamily(sess.family_id)?.name) || 'العائلة',
+    topic: sess.topic || ''
+  });
+  res.json({ message: '📨 أرسلت دعوة انضمام للبث' });
+}));
+
 // Online founders (for cross-family challenges)
 app.get('/api/founders/online', authMiddleware, asyncHandler(async (req, res) => {
   const founders = await db.getOnlineFounders();
@@ -1939,13 +1954,24 @@ app.post('/api/battles/end', authMiddleware, asyncHandler(async (req, res) => {
   const b = await db.getUserById(battle.player_b_id);
   const winnerId = battle.coins_a >= battle.coins_b ? battle.player_a_id : battle.player_b_id;
   const winnerName = winnerId === battle.player_a_id ? a.name : b.name;
+  const loserId = winnerId === battle.player_a_id ? battle.player_b_id : battle.player_a_id;
+  const loser = await db.getUserById(loserId);
   const final = await db.endBattle(battleId, winnerId);
   // Reward winner: +500 coins
   await db.addCoins(winnerId, 500);
-  if (battle.session_id) io.to(`session_${battle.session_id}`).emit('battle_ended', { ...final, winnerName, reward: 500 });
-  if (battle.family_a_id) io.to(`family_${battle.family_a_id}`).emit('battle_ended', { ...final, winnerName, reward: 500 });
-  if (battle.family_b_id) io.to(`family_${battle.family_b_id}`).emit('battle_ended', { ...final, winnerName, reward: 500 });
-  res.json({ message: '🏆 فاز ' + winnerName + '!', battle: final });
+  // Broadcast victory round (2 min) - loser executes the penalty
+  const victoryData = { ...final, winnerName, loserName: loser?.name || 'الخصم', reward: 500 };
+  if (battle.session_id) io.to(`session_${battle.session_id}`).emit('battle_victory', victoryData);
+  if (battle.family_a_id) io.to(`family_${battle.family_a_id}`).emit('battle_victory', victoryData);
+  if (battle.family_b_id) io.to(`family_${battle.family_b_id}`).emit('battle_victory', victoryData);
+  // After 2 minutes: finalize (line disappears)
+  setTimeout(async () => {
+    const done = await db.finalizeBattle(battleId).catch(() => null);
+    if (done && battle.session_id) io.to(`session_${battle.session_id}`).emit('battle_finalized', done);
+    if (done && battle.family_a_id) io.to(`family_${battle.family_a_id}`).emit('battle_finalized', done);
+    if (done && battle.family_b_id) io.to(`family_${battle.family_b_id}`).emit('battle_finalized', done);
+  }, 2 * 60 * 1000);
+  res.json({ message: '🏆 فاز ' + winnerName + '! جولة النصر بدأت (دقيقتان)', battle: final });
 }));
 
 // Active battle for a session

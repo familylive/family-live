@@ -592,6 +592,12 @@ function connectSocket() {
     playNotificationSound();
     refreshWalletHeader();
   });
+  socket.on('family_join_invite', (data) => {
+    pendingFamilyJoin = data;
+    document.getElementById('family-join-text').textContent = data.fromName + ' (عائلة ' + (data.familyName || '') + ') يدعوك للانضمام لبثهم وسولفوا قبل التحدي ⚔️';
+    document.getElementById('family-join-modal').style.display = 'flex';
+    playNotificationSound();
+  });
   socket.on('battle_invite', (data) => {
     pendingBattleInvite = data;
     document.getElementById('battle-invite-text').textContent = data.fromName + ' يتحداك في الديوانية! ⚔️ المدة: ' + data.duration + ' دقائق';
@@ -603,9 +609,14 @@ function connectSocket() {
     renderBattle(b);
   });
   socket.on('battle_update', (b) => { if (currentBattle?.id === b.id) renderBattle(b); });
-  socket.on('battle_ended', (b) => {
-    showToast('🏆 فاز ' + (b.winnerName || 'أحد اللاعبين') + ' وحصل على 500 كوينز!', 'success');
+  socket.on('battle_victory', (b) => {
+    // Victory round: 2 minutes - loser executes the penalty, tug-of-war line stays then disappears
+    showToast('🏆 فاز ' + (b.winnerName || '') + '! جولة النصر بدأت - ' + (b.loserName || 'الخصم') + ' ينفذ الحكم', 'success');
     playNotificationSound();
+    renderBattle({ ...b, status: 'victory' });
+    startVictoryTimer();
+  });
+  socket.on('battle_finalized', () => {
     renderBattle(null);
   });
   socket.on('camera_invite', (data) => {
@@ -1607,6 +1618,8 @@ async function joinLiveAudio() {
     if (presenceEl) presenceEl.style.display = 'block';
     const invBtn = document.getElementById('cam-invite-btn');
     if (invBtn) invBtn.style.display = (state.isFounder || state.user?.role === 'admin') ? 'block' : 'none';
+    const famBtn = document.getElementById('families-btn');
+    if (famBtn) famBtn.style.display = (state.isFounder || state.user?.role === 'admin') ? 'block' : 'none';
     const bsb = document.getElementById('battle-start-box');
     if (bsb) bsb.style.display = (state.isFounder || state.user?.role === 'admin') ? 'block' : 'none';
     updateAudioCallUI(true);
@@ -1866,7 +1879,7 @@ function renderBattle(b) {
   currentBattle = b;
   const bar = document.getElementById('battle-bar');
   const startBox = document.getElementById('battle-start-box');
-  if (!bar || !b || (b.status !== 'active' && b.status !== 'pending')) { if (bar) bar.style.display = 'none'; if (startBox) startBox.style.display = 'block'; return; }
+  if (!bar || !b || (b.status !== 'active' && b.status !== 'pending' && b.status !== 'victory')) { if (bar) bar.style.display = 'none'; if (startBox) startBox.style.display = 'block'; return; }
   if (startBox) startBox.style.display = 'none';
   bar.style.display = 'block';
   // Players names/avatars
@@ -1880,6 +1893,11 @@ function renderBattle(b) {
   if (sself) {
     const isPlayer = b.player_a_id === state.user?.id || b.player_b_id === state.user?.id;
     sself.style.display = isPlayer ? 'inline-block' : 'none';
+  }
+  // Victory round label
+  const timerEl2 = document.getElementById('battle-timer');
+  if (b.status === 'victory' && timerEl2 && !b._victoryStarted) {
+    b._victoryStarted = true;
   }
   const total = (b.coins_a || 0) + (b.coins_b || 0);
   // Tug-of-war line: 50% = center, moves toward the leader
@@ -1945,6 +1963,90 @@ async function supportSelfBattle() {
   } catch(e) { showToast(e.message, 'error'); }
 }
 
+// Connected families (in the broadcast) - invite to join & chat, then battle
+async function openConnectedFamilies() {
+  const list = document.getElementById('connected-families-list');
+  list.innerHTML = '<div class="empty-state"><div class="empty-text">جاري التحميل...</div></div>';
+  document.getElementById('families-modal').style.display = 'flex';
+  try {
+    const { founders } = await api('GET', '/api/founders/online');
+    if (!founders?.length) {
+      list.innerHTML = '<div class="empty-state"><div class="empty-text">لا توجد عوائل متصلة حالياً</div></div>';
+      return;
+    }
+    const inCallIds = Object.keys(state.callMembers || {});
+    list.innerHTML = founders.map(f => {
+      const joined = inCallIds.includes(f.id);
+      return '<div class="my-family-item" style="flex-direction:column;align-items:stretch;gap:6px">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center">' +
+          '<div><b>' + (f.name || 'مؤسس') + '</b> <span class="online-status online">● متصل</span>' +
+          '<div style="font-size:11px;color:var(--text-muted)">👪 ' + (f.family_name || 'عائلة') + ' · ' + (f.subscription_code || '') + '</div></div>' +
+          (joined ? '<span style="font-size:10px;color:var(--success);font-weight:800">في البث ✓</span>' : '') +
+        '</div>' +
+        '<div style="display:flex;gap:6px">' +
+          (joined
+            ? '<button class="btn btn-sm btn-accent" style="flex:1" onclick="challengeFromFamilies(\'' + f.id + '\')">⚔️ تحدي</button>'
+            : '<button class="btn btn-sm btn-primary" style="flex:1" onclick="inviteToBroadcast(\'' + f.id + '\')">📨 دعوة للانضمام</button>') +
+        '</div>' +
+      '</div>';
+    }).join('');
+  } catch(e) { list.innerHTML = '<div class="empty-text">فشل التحميل</div>'; }
+}
+
+async function inviteToBroadcast(founderId) {
+  if (!state.activeSession?.id) return showToast('افتح الديوانية أولاً', 'error');
+  try {
+    const r = await api('POST', '/api/battles/join-invite', { toUserId: founderId, sessionId: state.activeSession.id });
+    showToast(r.message, 'success');
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function challengeFromFamilies(founderId) {
+  const duration = prompt('⏱️ مدة التحدي (دقائق)؟', '3');
+  if (!duration) return;
+  try {
+    const r = await api('POST', '/api/battles/start', { opponentId: founderId, sessionId: null, durationMinutes: duration });
+    showToast(r.message, 'success');
+    document.getElementById('families-modal').style.display = 'none';
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+let pendingFamilyJoin = null;
+function respondFamilyJoin(accept) {
+  if (accept && pendingFamilyJoin) {
+    // Join the broadcast as a guest (audio+video optional) - chat first, battle later
+    state._guestSessionId = pendingFamilyJoin.sessionId;
+    joinAsGuest();
+  } else {
+    showToast(accept ? '' : 'رفضت الدعوة', accept ? 'success' : 'error');
+  }
+  document.getElementById('family-join-modal').style.display = 'none';
+  pendingFamilyJoin = null;
+}
+
+async function joinAsGuest() {
+  try {
+    if (!localStream) localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+    inLiveCall = true;
+    const sessId = state._guestSessionId;
+    // Fetch session to know its mode
+    let s = state.activeSession;
+    if (!s?.id || s.id !== sessId) {
+      try { const r = await api('GET', '/api/diwaniya/active?sessionId=' + sessId); s = r.session || null; } catch(e) {}
+      if (!s) { s = { id: sessId, mode: 'video' }; }
+      state.activeSession = s;
+      state.diwaniyaOpen = true;
+    }
+    socket.emit('join_audio_call', { sessionId: sessId, userId: state.user.id, userName: state.user.name, isObserver: false, wantsVideo: true });
+    updateAudioCallUI(true);
+    startCallWatermark();
+    setTikTokMode(true);
+    state.callMembers = {};
+    updateCallPresence();
+    showToast('📨 انضممت لبث عائلة أخرى - سولفوا ثم التحدي ⚔️', 'success');
+  } catch(e) { showToast('فشل الانضمام: ' + (e.message || 'خطأ'), 'error'); }
+}
+
 // Show online founders + challenge one
 async function openFounderBattleModal() {
   const list = document.getElementById('online-founders-list');
@@ -1972,6 +2074,24 @@ async function startFounderBattle(opponentId) {
     showToast(result.message, 'success');
     document.getElementById('founder-battle-modal').style.display = 'none';
   } catch(e) { showToast(e.message, 'error'); }
+}
+
+// Victory round timer (2 minutes) - line shows then disappears
+let victoryTimer = null;
+function startVictoryTimer() {
+  if (victoryTimer) clearInterval(victoryTimer);
+  const bar = document.getElementById('battle-bar');
+  const timerEl = document.getElementById('battle-timer');
+  let left = 120;
+  if (timerEl) timerEl.textContent = '🏆 جولة النصر: ' + Math.floor(left/60) + ':' + String(left%60).padStart(2,'0');
+  victoryTimer = setInterval(() => {
+    left--;
+    if (timerEl) timerEl.textContent = '🏆 جولة النصر: ' + Math.floor(left/60) + ':' + String(left%60).padStart(2,'0');
+    if (left <= 0) {
+      clearInterval(victoryTimer);
+      renderBattle(null);
+    }
+  }, 1000);
 }
 
 // ==================== TIKTOK CHAT (on the black screen) ====================

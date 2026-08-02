@@ -663,6 +663,9 @@
               <button class="call-control-btn" id="cam-invite-btn" onclick="openCameraInvite()" style="display:none" title="دعوة للمشاركة بالكاميرا">
                 <svg viewBox="0 0 24 24"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z" fill="currentColor"/><circle cx="18.5" cy="5.5" r="4.2" fill="currentColor"/><path d="M18.5 3.5v4M16.5 5.5h4" stroke="#0e1830" stroke-width="1.8" stroke-linecap="round"/></svg>
               </button>
+              <button class="call-control-btn" id="families-btn" onclick="openConnectedFamilies()" title="العوائل المتصلة" style="display:none">
+                <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.5 3-6 6.5-6s6.5 2.5 6.5 6"/><circle cx="17" cy="9" r="2.5"/><path d="M15 14.5c2.8.3 5 2.4 5 5.5"/></svg>
+              </button>
               <button class="call-control-btn" id="tiktok-mode-btn" onclick="toggleTikTokMode()" title="وضع تيك توك">
                 <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 5h18v14H3z" opacity=".35"/><circle cx="17.5" cy="15.5" r="3.5" fill="currentColor"/><circle cx="8" cy="8" r="2" fill="currentColor"/></svg>
               </button>
@@ -1486,6 +1489,28 @@
         <div style="display:flex;gap:8px;margin-top:10px">
           <button class="btn btn-accent" style="flex:1" onclick="startBattle()">⚔️ ابدأ التحدي</button>
           <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('battle-modal').style.display='none'">إلغاء</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Connected Families Modal -->
+    <div id="families-modal" class="modal-overlay" style="display:none">
+      <div class="modal-box" style="max-width:340px">
+        <h3 style="color:var(--gold);margin-bottom:12px">🌍 العوائل المتصلة</h3>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:10px">ادعُ مؤسساً للانضمام وسولفوا، ثم تحدّوه ⚔️</p>
+        <div id="connected-families-list" style="max-height:280px;overflow-y:auto"></div>
+        <button class="btn btn-secondary btn-full" style="margin-top:10px" onclick="document.getElementById('families-modal').style.display='none'">إغلاق</button>
+      </div>
+    </div>
+
+    <!-- Family Join Invite Modal (guest founder) -->
+    <div id="family-join-modal" class="modal-overlay" style="display:none">
+      <div class="modal-box" style="max-width:320px;text-align:center">
+        <h3 style="color:var(--gold);margin-bottom:12px">📨 دعوة انضمام للبث</h3>
+        <p id="family-join-text" style="font-size:13px;margin-bottom:16px"></p>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-success" style="flex:1" onclick="respondFamilyJoin(true)">✅ انضم</button>
+          <button class="btn btn-danger" style="flex:1" onclick="respondFamilyJoin(false)">❌ رفض</button>
         </div>
       </div>
     </div>
