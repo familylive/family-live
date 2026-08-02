@@ -3005,3 +3005,133 @@ function initAvatarZoom() {
 }
 document.addEventListener('DOMContentLoaded', initAvatarZoom);
 setTimeout(initAvatarZoom, 1500);
+
+// ==================== BUY PAGE + CUSTOM PACKAGE ====================
+let customRate = 50;
+let customMode = 'coins';
+
+async function loadBuyPage() {
+  try {
+    const { wallet } = await api('GET', '/api/wallet');
+    const el = document.getElementById('buy-coins-display');
+    if (el) el.textContent = wallet.coins || 0;
+  } catch(e) {}
+  try {
+    const data = await api('GET', '/api/wallet');
+    const packages = data.packages || [];
+    const list = document.getElementById('buy-packages-list');
+    if (packages?.length) {
+      list.innerHTML = '<div class="coin-packages-grid">' + packages.map((p, i) => {
+        const tiers = ['tiny','shine','exclusive','silver','premium','gold'];
+        const tier = tiers[i % tiers.length];
+        const hot = p.badge && String(p.badge).includes('خصم');
+        return '<div class="coin-package-card ' + tier + (hot ? ' hot' : '') + '" onclick="buyCoinsPackage(\'' + p.id + '\', ' + p.price + ', ' + p.coins + ')">' +
+          (p.badge ? '<span class="pkg-badge">' + p.badge + '</span>' : '') +
+          '<div class="pkg-coins"><img src="/assets/coin.png" alt="كونزه"> <b>' + p.coins.toLocaleString('en') + '</b></div>' +
+          '<div class="pkg-title">' + (p.title || 'باقة') + '</div>' +
+          '<div class="pkg-price">' + p.price + ' ريال</div>' +
+          '<div class="pkg-usd">≈ $' + (p.usd || (p.price/3.75).toFixed(2)) + '</div>' +
+        '</div>';
+      }).join('') + '</div>';
+    } else {
+      list.innerHTML = '<div class="empty-state"><div class="empty-text">لا توجد باقات</div></div>';
+    }
+  } catch(e) {}
+}
+
+function getCustomInput() {
+  const el = document.getElementById('custom-coins-input') || document.getElementById('custom-coins-input-w');
+  return el ? parseInt(el.value) || 0 : 0;
+}
+
+function setCustomMode(mode) {
+  customMode = mode;
+  const bC = document.getElementById('custom-mode-coins');
+  const bS = document.getElementById('custom-mode-sar');
+  if (bC) bC.className = 'btn btn-sm ' + (mode === 'coins' ? 'btn-accent' : 'btn-secondary');
+  if (bS) bS.className = 'btn btn-sm ' + (mode === 'sar' ? 'btn-accent' : 'btn-secondary');
+  const input = document.getElementById('custom-coins-input') || document.getElementById('custom-coins-input-w');
+  const icon = document.getElementById('custom-mode-icon');
+  if (input) input.placeholder = mode === 'coins' ? 'عدد الكونزات (مثال: 1000)' : 'المبلغ بالريال (مثال: 100)';
+  if (icon) icon.src = mode === 'coins' ? '/assets/coin.png' : 'data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22><text y=%2218%22 font-size=%2214%22>💵</text></svg>';
+  if (input) input.value = '';
+  const box = document.getElementById('custom-details');
+  if (box) box.style.display = 'none';
+}
+
+async function calcCustomPackage() {
+  const val = getCustomInput();
+  const box = document.getElementById('custom-details');
+  if (val <= 0) { if (box) box.style.display = 'none'; return; }
+  try {
+    const { rate } = await api('GET', '/api/pricing');
+    customRate = rate || 50;
+    let coins, price;
+    if (customMode === 'coins') {
+      coins = val;
+      price = Math.round((coins / customRate) * 100) / 100;
+    } else {
+      price = val;
+      coins = Math.round(price * customRate);
+    }
+    const vat = Math.round(price * 0.15 * 100) / 100;
+    const total = Math.round((price + vat) * 100) / 100;
+    const usd = Math.round((total / 3.75) * 100) / 100;
+    const e1 = document.getElementById('custom-coins-total');
+    const e2 = document.getElementById('custom-coins-sum');
+    const e3 = document.getElementById('custom-price');
+    const e4 = document.getElementById('custom-vat');
+    const e5 = document.getElementById('custom-usd');
+    const e6 = document.getElementById('custom-total');
+    if (e1) e1.textContent = coins;
+    if (e2) e2.textContent = coins + ' كونزه';
+    if (e3) e3.textContent = price + ' ريال';
+    if (e4) e4.textContent = vat + ' ريال';
+    if (e5) e5.textContent = '$' + usd;
+    if (e6) e6.textContent = total + ' ريال';
+    if (box) box.style.display = 'block';
+  } catch(e) {}
+}
+
+async function calcCustomPackageW() {
+  const val = getCustomInput();
+  const box = document.getElementById('custom-details-w');
+  if (val <= 0) { if (box) box.style.display = 'none'; return; }
+  try {
+    const { rate } = await api('GET', '/api/pricing');
+    customRate = rate || 50;
+    let coins, price;
+    if (customMode === 'coins') {
+      coins = val;
+      price = Math.round((coins / customRate) * 100) / 100;
+    } else {
+      price = val;
+      coins = Math.round(price * customRate);
+    }
+    const vat = Math.round(price * 0.15 * 100) / 100;
+    const total = Math.round((price + vat) * 100) / 100;
+    const e1 = document.getElementById('custom-price-w');
+    const e2 = document.getElementById('custom-vat-w');
+    const e3 = document.getElementById('custom-total-w');
+    if (e1) e1.textContent = price + ' ريال';
+    if (e2) e2.textContent = vat + ' ريال';
+    if (e3) e3.textContent = total + ' ريال';
+    if (box) box.style.display = 'block';
+  } catch(e) {}
+}
+
+async function buyCustomCoins() {
+  const val = getCustomInput();
+  if (!val || val <= 0) return showToast(customMode === 'coins' ? 'أدخل عدد الكونزات أولاً' : 'أدخل المبلغ بالريال أولاً', 'error');
+  let coins = val;
+  if (customMode === 'sar') {
+    try { const { rate } = await api('GET', '/api/pricing'); coins = Math.round(val * (rate || 50)); } catch(e) {}
+  }
+  try {
+    const result = await api('POST', '/api/wallet/buy-custom', { coins });
+    if (result.requiresPayment) {
+      showPaymentModal(result.total, 'شراء كونزات مخصص (' + coins + ')');
+      showToast('📋 تفاصيل العملية: ' + coins + ' كونزه · السعر ' + result.price + ' ريال · ضريبة ' + result.vat + ' ريال · الإجمالي ' + result.total + ' ريال', 'success');
+    }
+  } catch(e) { showToast(e.message, 'error'); }
+}
