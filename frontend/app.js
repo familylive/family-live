@@ -1654,7 +1654,13 @@ function toggleCamera() {
   if (btn) {
     btn.classList.toggle('off', camOff);
   }
-  if (myVideo) myVideo.style.display = camOff ? 'none' : 'block';
+  if (myVideo) {
+    myVideo.style.display = camOff ? 'none' : 'block';
+    if (!camOff && !myVideo.srcObject) myVideo.srcObject = localStream;
+  }
+  // Mark tile state so audio-mode CSS shows the video when ON
+  const myTile = document.getElementById('my-video-tile');
+  if (myTile) myTile.classList.toggle('has-video', !camOff);
   const myTile = document.getElementById('my-video-tile');
   if (myTile) {
     let overlay = myTile.querySelector('.cam-off-overlay');
@@ -1893,6 +1899,12 @@ async function joinLiveAudio() {
     updateAudioCallUI(true);
     startCallWatermark();
     setTikTokMode(true); // TikTok layout by default with chat below
+    // Camera starts ON by default
+    camOff = false;
+    const myVideo2 = document.getElementById('my-video');
+    if (myVideo2) { myVideo2.srcObject = localStream; myVideo2.style.display = 'block'; }
+    const myTile2 = document.getElementById('my-video-tile');
+    if (myTile2) myTile2.classList.add('has-video');
     const exitBtn = document.getElementById('call-exit-btn');
     if (exitBtn) exitBtn.style.display = 'flex';
     // Apply my saved effect

@@ -2833,9 +2833,13 @@ body {
 .video-grid.audio-mode .video-tile {
   background: radial-gradient(circle at 50% 40%, #111a2e, #000);
 }
-.video-grid.audio-mode .video-tile video { display: none !important; }
-.video-grid.audio-mode .cam-off-overlay { display: flex !important; background: transparent; }
+.video-grid.audio-mode .video-tile video { display: none; }
+.video-grid.audio-mode .cam-off-overlay { display: none; background: transparent; }
+.video-grid.audio-mode .video-tile video:not([style*="display: none"]) { display: block; }
 .video-grid.audio-mode .cam-off-icon { display: none; }
+/* إذا الكاميرا فُتحت: يظهر الفيديو بدل الصورة */
+.video-grid.audio-mode .video-tile.has-video .cam-off-overlay { display: none; }
+.video-grid.audio-mode .video-tile.has-video video { display: block; }
 .video-grid.audio-mode .cam-off-label { display: none; }
 .video-grid.audio-mode .cam-off-circle {
   width: 86px;
