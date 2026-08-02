@@ -2472,7 +2472,16 @@ function previewFamilyImage(input) {
   reader.readAsDataURL(file);
 }
 
+function showFamilyWins() {
+  const card = document.getElementById('family-wins-card');
+  const cups = document.getElementById('family-wins-cups');
+  const wins = parseInt(state.family?.battle_wins) || 0;
+  if (card) card.style.display = state.isFounder ? 'block' : 'none';
+  if (cups) cups.textContent = wins > 0 ? '🏆'.repeat(Math.min(wins, 10)) : 'لا توجد كؤوس بعد';
+}
+
 function showFamilyImageInUI() {
+  showFamilyWins();
   const card = document.getElementById('family-image-card');
   if (card) card.style.display = state?.isFounder ? 'block' : 'none';
   const img = document.getElementById('family-image-current');

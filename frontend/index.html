@@ -444,6 +444,11 @@
           <div><div class="member-name" id="founder-name" style="font-size:16px">الاسم</div><span class="member-role-tag">المؤسس</span></div>
         </div>
       </div>
+      <div class="card" id="family-wins-card" style="display:none">
+        <div class="card-title">🏆 كؤوس النصر</div>
+        <div style="text-align:center;font-size:28px;letter-spacing:6px" id="family-wins-cups">🏆🏆🏆</div>
+        <div style="text-align:center;font-size:12px;color:var(--text-muted)">عدد مرات فوز العائلة بالتحديات</div>
+      </div>
       <div class="card" id="family-image-card" style="display:none">
         <div class="card-title">📸 صورة العائلة <span style="font-size:12px;color:var(--text-muted)">(تظهر للأعضاء والعائلات المميزة)</span></div>
         <div style="text-align:center;margin-bottom:8px"><img id="family-image-current" src="" style="width:130px;height:100px;border-radius:12px;object-fit:cover;border:3px solid var(--gold);display:none"></div>
@@ -1967,6 +1972,7 @@ async function loadLandingPage() {
       featuredDiv.innerHTML = families.map(f =>
         '<div class="family-card-featured">' +
           (f.image && f.image.startsWith('data:') ? '<img src="' + f.image + '" style="width:100%;height:90px;object-fit:cover;border-radius:10px 10px 0 0;display:block">' : '') +
+          (parseInt(f.battle_wins) > 0 ? '<div class="fc-cups">' + '🏆'.repeat(Math.min(parseInt(f.battle_wins), 10)) + ' <span style="font-size:10px">' + f.battle_wins + '</span></div>' : '') +
           '<div class="fc-name">' + (f.name || '') + '</div>' +
           '<div class="fc-code rainbow-text">' + (f.subscription_code || '') + '</div>' +
           '<div class="fc-founder">👑 ' + (f.founder_name || '') + '</div>' +
