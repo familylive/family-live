@@ -427,13 +427,23 @@ app.post('/api/family/edit', authMiddleware, async (req, res) => {
     }
     // Free changes check
     if (info.changes_count >= info.free_changes && !paid) {
+      const priceRow = await db.getPricingByFeature('family_name_edit');
+      const coinPrice = priceRow?.coins || 10000;
       return res.json({
         requiresPayment: true,
-        price: info.price,
-        message: 'استهلكت ' + info.free_changes + ' تعديلات مجانية - التعديل القادم بـ ' + info.price + ' ريال'
+        price: coinPrice,
+        coinsPrice: coinPrice,
+        message: 'استهلكت ' + info.free_changes + ' تعديلات مجانية - التعديل القادم بـ 🪙 ' + coinPrice + ' عملة'
       });
     }
     await db.recordFamilyNameChange(req.user.familyId);
+    // Pay with coins if beyond free changes
+    if (info.changes_count >= info.free_changes || paid) {
+      const priceRow = await db.getPricingByFeature('family_name_edit');
+      const coinPrice = priceRow?.coins || 10000;
+      const pay = await db.payWithCoins(req.user.id, coinPrice, 'تعديل اسم العائلة');
+      if (pay.error) return res.status(400).json(pay);
+    }
   }
   
   if (name) {
@@ -1086,10 +1096,13 @@ app.post('/api/diwaniya/secret-room/purchase', authMiddleware, async (req, res) 
   if (req.user.role !== 'founder') return res.status(403).json({ error: 'فقط المؤسس' });
   const status = await db.getSecretRoomStatus(req.user.familyId);
   if (status.enabled) return res.json({ message: 'الغرفة المغلقة مفعلة بالفعل', enabled: true });
-  // Create payment via gateway
-  const user = await db.getUserById(req.user.id);
-  const payment = await db.createPayment(req.user.id, user.name, 'stcpay', status.price, 'تفعيل الغرفة المغلقة', '');
-  res.json({ requiresPayment: true, price: status.price, paymentId: payment.id, message: '📨 أرسل إثبات الدفع ثم تؤكد الإدارة التفعيل' });
+  // Pay with COINS only (admin sets the price)
+  const priceRow = await db.getPricingByFeature('secret_room');
+  const price = priceRow?.coins || 10000;
+  const pay = await db.payWithCoins(req.user.id, price, 'تفعيل الغرفة المغلقة (شهرياً)');
+  if (pay.error) return res.status(400).json(pay);
+  await db.enableSecretRoom(req.user.familyId);
+  res.json({ message: '✅ تم تفعيل الغرفة المغلقة مقابل 🪙 ' + price + ' عملة', enabled: true, wallet: pay.wallet });
 });
 
 // Admin: confirm payment activates secret room automatically
@@ -1112,8 +1125,13 @@ app.post('/api/diwaniya/capacity/purchase', authMiddleware, async (req, res) => 
   if (capacity !== 20 && capacity !== 40) return res.status(400).json({ error: 'الباقة غير متاحة' });
   const current = await db.getFamilyCapacity(req.user.familyId);
   if (capacity <= current) return res.status(400).json({ error: 'سعتك الحالية ' + current + ' أكبر أو تساوي هذه الباقة' });
+  // Pay with COINS only
+  const priceRow = await db.getPricingByFeature('capacity_' + capacity);
+  const price = priceRow?.coins || (capacity === 20 ? 5000 : 10000);
+  const pay = await db.payWithCoins(req.user.id, price, 'توسعة الديوانية إلى ' + capacity + ' عضو');
+  if (pay.error) return res.status(400).json(pay);
   const newCap = await db.purchaseCapacity(req.user.familyId, capacity);
-  res.json({ message: '✅ تم شراء توسعة الديوانية إلى ' + newCap + ' عضو', capacity: newCap });
+  res.json({ message: '✅ تم شراء توسعة الديوانية إلى ' + newCap + ' عضو مقابل 🪙 ' + price + ' عملة', capacity: newCap, wallet: pay.wallet });
 });
 
 // Set diwaniya capacity for a session (founder picks number)
@@ -1367,6 +1385,19 @@ app.post('/api/admin/wallet/add-coins', authMiddleware, adminMiddleware, async (
   io.to(`user_${userId}`).emit('coins_charged', { amount, byName: req.user.name });
   res.json({ message: '🪙 تم شحن ' + amount + ' كوينز إلى ' + target.name, wallet });
 });
+
+// Pricing (public)
+app.get('/api/pricing', asyncHandler(async (req, res) => {
+  res.json({ pricing: await db.getPricing() });
+}));
+
+// Admin: set coin price for any service
+app.post('/api/admin/pricing', authMiddleware, adminMiddleware, asyncHandler(async (req, res) => {
+  const { feature, name, coins } = req.body;
+  if (!feature || coins === undefined) return res.status(400).json({ error: 'البيانات ناقصة' });
+  const row = await db.setPricing(feature, name || feature, coins);
+  res.json({ message: '✅ تم تحديث سعر ' + (row.name || feature) + ' إلى 🪙 ' + row.coins + ' عملة', pricing: row });
+}));
 
 // =============== COINS & WALLET ===============
 
@@ -2519,6 +2550,18 @@ async function bootstrap() {
     onlineUsers.add(botUser.id); // bot is always "online"
     console.log('🤖 Test bot ready:', botUser.name, '|', botUser.id.slice(0,8));
   } catch(e) { console.log('Bot seed error:', e.message); }
+  
+  // Seed pricing (all services priced in COINS - admin adjustable)
+  try {
+    const prices = await db.getPricing();
+    if (!prices.length) {
+      await db.setPricing('secret_room', 'الغرفة المغلقة (شهرياً)', 10000);
+      await db.setPricing('capacity_20', 'توسعة الديوانية إلى 20 عضو', 5000);
+      await db.setPricing('capacity_40', 'توسعة الديوانية إلى 40 عضو', 10000);
+      await db.setPricing('family_name_edit', 'تعديل اسم العائلة', 10000);
+      console.log('✅ Seeded pricing');
+    }
+  } catch(e) { console.log('Pricing seed error:', e.message); }
   
   // Seed effects (3 free + paid, bought with coins)
   try {

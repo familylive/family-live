@@ -1607,11 +1607,16 @@ function toggleSecretRoomPurchase() {
 }
 
 async function purchaseSecretRoom() {
+  // Fetch the coin price first and confirm
   try {
+    const { pricing } = await api('GET', '/api/pricing');
+    const p = (pricing || []).find(x => x.feature === 'secret_room');
+    const price = p?.coins || 10000;
+    if (!confirm('🔒 تفعيل الغرفة المغلقة (شهرياً) - سعر الخدمة: 🪙 ' + price + ' عملة. سيتم خصمها من رصيدك بعد التأكيد. متابعة؟')) return;
     const result = await api('POST', '/api/diwaniya/secret-room/purchase');
-    document.getElementById('secret-room-price').textContent = result.price;
     showToast(result.message, 'success');
-    showPaymentModal(result.price, 'تفعيل الغرفة المغلقة');
+    refreshWalletHeader();
+    loadSecretRoomStatus();
   } catch(e) { showToast(e.message, 'error'); }
 }
 
@@ -1648,6 +1653,16 @@ async function loadDiwaniyaCapacity() {
   if (!state.family?.id) return;
   try {
     const { capacity, packages } = await api('GET', '/api/diwaniya/capacity');
+    // Show coin prices on the package cards
+    try {
+      const { pricing } = await api('GET', '/api/pricing');
+      const p20 = (pricing || []).find(x => x.feature === 'capacity_20');
+      const p40 = (pricing || []).find(x => x.feature === 'capacity_40');
+      const el20 = document.getElementById('cap20-price');
+      const el40 = document.getElementById('cap40-price');
+      if (el20) el20.textContent = '🪙 ' + (p20?.coins ?? 5000) + ' عملة';
+      if (el40) el40.textContent = '🪙 ' + (p40?.coins ?? 10000) + ' عملة';
+    } catch(e) {}
     const info = document.getElementById('capacity-info');
     const sel = document.getElementById('diwaniya-capacity-select');
     const pkgs = document.getElementById('capacity-packages');
@@ -1663,10 +1678,15 @@ async function loadDiwaniyaCapacity() {
 }
 
 async function purchaseCapacity(cap) {
-  if (!confirm('💳 شراء باقة توسعة الديوانية إلى ' + cap + ' عضو؟')) return;
+  // Fetch the coin price and confirm
   try {
+    const { pricing } = await api('GET', '/api/pricing');
+    const p = (pricing || []).find(x => x.feature === 'capacity_' + cap);
+    const price = p?.coins || (cap === 20 ? 5000 : 10000);
+    if (!confirm('👥 توسعة الديوانية إلى ' + cap + ' عضو - سعر الخدمة: 🪙 ' + price + ' عملة\nسيتم خصمها من رصيدك بعد التأكيد. متابعة؟')) return;
     const result = await api('POST', '/api/diwaniya/capacity/purchase', { capacity: cap });
     showToast(result.message, 'success');
+    refreshWalletHeader();
     loadDiwaniyaCapacity();
   } catch(e) { showToast(e.message, 'error'); }
 }

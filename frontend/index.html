@@ -558,7 +558,7 @@
         <div id="capacity-info" style="font-size:12px;color:var(--text-muted);margin-top:8px">👥 الحد الأقصى للعائلة: 15</div>
         <div id="secret-room-banner" style="display:none;margin-top:10px;padding:12px;background:rgba(201,147,12,.08);border:1px solid rgba(201,147,12,.3);border-radius:var(--radius-sm)">
           <p style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:6px">🔒 تفعيل الغرفة المغلقة (رقم سري للدخول)</p>
-          <p style="font-size:13px;color:var(--text-secondary);margin-bottom:8px">الاشتراك: <b style="color:var(--gold)" id="secret-room-price">100</b> ريال / شهرياً</p>
+          <p style="font-size:13px;color:var(--text-secondary);margin-bottom:8px">الاشتراك: <b style="color:var(--gold)" id="secret-room-price">10000</b> 🪙 عملة / شهرياً</p>
           <button class="btn btn-accent btn-full" onclick="purchaseSecretRoom()">💳 اشترك الآن</button>
         </div>
         <div id="capacity-packages" style="margin-top:8px;display:none">
@@ -566,12 +566,12 @@
           <div style="display:flex;gap:8px">
             <div style="flex:1;background:var(--bg-hover);border-radius:var(--radius-sm);padding:10px;text-align:center">
               <div style="font-size:15px;font-weight:800">👥 20 عضو</div>
-              <div style="color:var(--gold);font-weight:700">50 ريال</div>
+              <div style="color:var(--gold);font-weight:700" id="cap20-price">🪙 5000 عملة</div>
               <button class="btn btn-sm btn-accent" style="margin-top:6px" onclick="purchaseCapacity(20)">💳 شراء</button>
             </div>
             <div style="flex:1;background:var(--bg-hover);border-radius:var(--radius-sm);padding:10px;text-align:center">
               <div style="font-size:15px;font-weight:800">👥 40 عضو</div>
-              <div style="color:var(--gold);font-weight:700">100 ريال</div>
+              <div style="color:var(--gold);font-weight:700" id="cap40-price">🪙 10000 عملة</div>
               <button class="btn btn-sm btn-accent" style="margin-top:6px" onclick="purchaseCapacity(40)">💳 شراء</button>
             </div>
           </div>
@@ -1177,6 +1177,8 @@
           <button class="btn btn-accent" onclick="addCoinPackageAdmin()">➕</button>
         </div>
         <div id="admin-coin-packages" style="margin-top:8px"></div>
+        <div class="card-title" style="font-size:14px;margin-top:14px">⚙️ أسعار الخدمات (بالعملات 🪙)</div>
+        <div id="admin-pricing-list"></div>
         <div class="card-title" style="font-size:14px;margin-top:14px">🪙 شحن كوينزات لعضو</div>
         <div style="display:flex;gap:8px">
           <select class="form-input" id="admin-charge-user" style="flex:1"><option value="">اختر العضو...</option></select>

@@ -72,6 +72,7 @@ async function initDb() {
   await run(`CREATE TABLE IF NOT EXISTS violation_templates (id TEXT PRIMARY KEY, name TEXT NOT NULL, icon TEXT DEFAULT '🚫', status TEXT DEFAULT 'active', created_at TEXT DEFAULT now())`);
   try { await run("ALTER TABLE violations ADD COLUMN IF NOT EXISTS action TEXT"); } catch(e) {}
   try { await run("ALTER TABLE violations ADD COLUMN IF NOT EXISTS by_user_name TEXT"); } catch(e) {}
+  await run(`CREATE TABLE IF NOT EXISTS pricing (feature TEXT PRIMARY KEY, name TEXT NOT NULL, coins INTEGER DEFAULT 0, updated_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS effects (id TEXT PRIMARY KEY, name TEXT NOT NULL, emoji TEXT DEFAULT '✨', css_class TEXT, price INTEGER DEFAULT 0, status TEXT DEFAULT 'active', created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS user_effects (user_id TEXT NOT NULL, effect_id TEXT NOT NULL, purchased_at TEXT DEFAULT now(), PRIMARY KEY (user_id, effect_id))`);
   try { await run("ALTER TABLE users ADD COLUMN IF NOT EXISTS selected_effect TEXT"); } catch(e) {}
@@ -648,6 +649,19 @@ async function addFounderViolation(userId, reason, action, byUserId, byUserName)
   return queryOne('SELECT * FROM violations WHERE id = $1', [id]);
 }
 
+async function getPricing() { return query('SELECT * FROM pricing ORDER BY name'); }
+async function getPricingByFeature(feature) { return queryOne('SELECT * FROM pricing WHERE feature = $1', [feature]); }
+async function setPricing(feature, name, coins) {
+  await run('INSERT INTO pricing (feature, name, coins) VALUES ($1,$2,$3) ON CONFLICT (feature) DO UPDATE SET coins = $3, updated_at = now()', [feature, name, parseInt(coins) || 0]);
+  return getPricingByFeature(feature);
+}
+async function payWithCoins(userId, coins, detail) {
+  const w = await deductCoins(userId, coins);
+  if (!w) return { error: 'رصيدك من العملات لا يكفي' };
+  await run("INSERT INTO coin_transactions (id, user_id, type, coins, detail) VALUES ($1,$2,'service_purchase',$3,$4)", [uuidv4(), userId, coins, detail]);
+  return { ok: true, wallet: w };
+}
+
 async function getEffects() { return query("SELECT * FROM effects WHERE status = 'active' ORDER BY price"); }
 async function getEffectById(id) { return queryOne('SELECT * FROM effects WHERE id = $1', [id]); }
 async function addEffect(name, emoji, cssClass, price) {
@@ -974,6 +988,7 @@ module.exports = {
   createAnnouncement, getFamilyAnnouncements, getAnnouncementsForUser, deleteAnnouncement,
   createBattle, getBattleById, getActiveBattle, acceptBattle, rejectBattle, supportBattle, endBattle, finalizeBattle, addFamilySupportPoints, getOnlineFounders,
   getEffects, getEffectById, addEffect, getUserEffects, buyEffect, selectEffect, addFamilyBattleWin,
+  getPricing, getPricingByFeature, setPricing, payWithCoins,
   isDiwaniyaRestricted, restrictFromDiwaniya, unrestrictFromDiwaniya, getDiwaniyaRestrictions,
   seedViolationTemplates, getViolationTemplates, getAllViolationTemplates, addViolationTemplate, deleteViolationTemplate, addFounderViolation,
   getGiftItems, getAllGiftItems, addGiftItem, updateGiftItem, deleteGiftItem,
