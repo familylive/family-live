@@ -347,6 +347,21 @@ async function cancelAuction(auctionId) {
   return getAuctionById(auctionId);
 }
 async function getAuctionBids(auctionId) { return query('SELECT ab.*, u.name as user_name FROM auction_bids ab JOIN users u ON ab.user_id = u.id WHERE ab.auction_id = $1 ORDER BY ab.created_at DESC, ab.amount DESC', [auctionId]); }
+async function getAuctionParticipants(auctionId) {
+  return query("SELECT p.*, u.name as user_name, u.avatar, (SELECT MAX(b.created_at) FROM auction_bids b WHERE b.auction_id = p.auction_id AND b.user_id = p.user_id) as last_bid_at FROM auction_participants p JOIN users u ON p.user_id = u.id WHERE p.auction_id = $1 ORDER BY p.joined_at", [auctionId]);
+}
+async function getLastBidder(auctionId) {
+  return queryOne("SELECT b.*, u.name as user_name, u.avatar FROM auction_bids b JOIN users u ON b.user_id = u.id WHERE b.auction_id = $1 ORDER BY b.created_at DESC, b.amount DESC LIMIT 1", [auctionId]);
+}
+async function releaseAuctionCode(auctionId) {
+  const auction = await getAuctionById(auctionId);
+  if (!auction) return null;
+  await run("UPDATE auctions SET paid = -1, winner_id = NULL WHERE id = $1", [auctionId]);
+  // Return the code to the repository for admin relisting
+  await run("UPDATE subscription_codes SET used = 0, family_id = NULL WHERE code = $1", [auction.code]);
+  await run("DELETE FROM user_codes WHERE code = $1", [auction.code]);
+  return getAuctionById(auctionId);
+}
 async function isAuctionParticipant(auctionId, userId) { return queryOne('SELECT * FROM auction_participants WHERE auction_id = $1 AND user_id = $2', [auctionId, userId]); }
 async function getAvailableAuctionCodes() { return query("SELECT * FROM subscription_codes WHERE type = 'premium' AND (used = 0 OR used IS NULL) ORDER BY code ASC"); }
 
@@ -987,7 +1002,7 @@ module.exports = {
   createInvitation, createInvitationByPhone, getInvitationsByFamily, getInvitationByToken, acceptInvitation,
   openDiwaniya, closeDiwaniya, getActiveDiwaniya, getDiwaniyaSessionById, verifyDiwaniyaCode, getDiwaniyaHistory, addDiwaniyaMessage, getDiwaniyaMessages,
   createChallenge, respondToChallenge, completeChallenge, getFamilyChallenges, getPendingChallenges, getFamilyLeaderboard,
-  createAuction, getActiveAuctions, getAllAuctions, getAuctionById, joinAuction, placeBid, endAuction, confirmAuctionPayment, cancelAuction, getAuctionBids, isAuctionParticipant, getAvailableAuctionCodes,
+  createAuction, getActiveAuctions, getAllAuctions, getAuctionById, joinAuction, placeBid, endAuction, confirmAuctionPayment, cancelAuction, getAuctionBids, isAuctionParticipant, getAvailableAuctionCodes, getAuctionParticipants, getLastBidder, releaseAuctionCode,
   getAllFamilies, updateFamilyData, setFamilyStatus, deleteFamily, getAllUsersDetailed, updateUserByAdmin, deleteUserByAdmin, createAdminUser, createUserByRole, getAdminStats,
   getActiveAds, getAllAds, addAd, updateAd, deleteAd, trackAdView, trackAdClick, getAdsStats, getFeaturedFamilies,
   getUserFamilies, getUserFamilyCount, addUserToFamily, setCurrentFamily, getSetting, setSetting,

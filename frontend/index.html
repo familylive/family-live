@@ -4190,16 +4190,18 @@ async function loadAuctionsPage() {
         '<div class="auction-timer" data-end="' + end + '" data-id="' + a.id + '">' +
           '<span class="timer-icon">⏱️</span> <span class="countdown">--:--</span>' +
         '</div>' +
-        '<div class="auction-price">💰 <span class="current-price">' + fmtPrice(a.current_price || a.starting_price) + '</span></div>' +
+        '<div class="auction-price">🪙 <span class="current-price">' + (a.current_coins || (a.current_price || a.starting_price) * a.rate) + '</span> عملة</div>' +
         '<div class="auction-meta">' +
-          '<span>رسوم الدخول: ' + a.entry_fee + ' ريال</span>' +
-          '<span>أقل زيادة: ' + (a.min_increment || 10) + ' ريال</span>' +
+          '<span>رسوم الدخول: 🪙 ' + a.entry_coins + ' (غير مستردة)</span>' +
+          '<span onclick="showAuctionParticipants(\'' + a.id + '\')" style="cursor:pointer;color:var(--gold);font-weight:800">👥 المشاركون ←</span>' +
         '</div>' +
         '<div class="auction-bids" id="auction-bids-' + a.id + '"><div class="empty-bids">لا توجد مزايدات بعد</div></div>' +
         '<div class="auction-actions">' +
-          '<button class="btn btn-accent btn-full" onclick="joinAuction(\'' + a.id + '\')">🎟️ دخول المزاد</button>' +
+          '<button class="btn btn-accent btn-full" onclick="joinAuction(\'' + a.id + '\')">🎟️ دخول المزاد (🪙 ' + a.entry_coins + ')</button>' +
           '<div class="bid-row">' +
-            '<input type="number" class="form-input" id="bid-' + a.id + '" placeholder="الحد الأدنى ' + ((a.current_price||a.starting_price) + (a.min_increment||10)) + '" min="' + ((a.current_price||a.starting_price) + (a.min_increment||10)) + '" value="' + ((a.current_price||a.starting_price) + (a.min_increment||10)) + '">' +
+            '<select class="form-input" id="bid-' + a.id + '">' +
+              (a.bid_packages || []).map((p, i) => '<option value="' + (p / (a.rate || 50)) + '">باقة ' + (i+1) + ': 🪙 ' + p + ' عملة</option>').join('') +
+            '</select>' +
             '<button class="btn btn-primary" onclick="placeBid(\'' + a.id + '\')">💥 مزايدة</button>' +
           '</div>' +
         '</div>' +
@@ -4237,22 +4239,40 @@ async function loadAuctionsPage() {
 }
 
 async function joinAuction(auctionId) {
-  if (!confirm('دفع رسوم دخول المزاد؟ (محاكاة دفع)')) return;
   try {
+    const { auction } = await api('GET', '/api/auctions/' + auctionId);
+    const fee = auction?.entry_coins || 2500;
+    if (!confirm('🎟️ دخول المزاد؟\nرسوم الدخول: 🪙 ' + fee + ' عملة (تُدفع مرة واحدة فقط - غير مستردة)\nمتابعة؟')) return;
     const result = await api('POST', '/api/auctions/join', { auctionId });
     showToast(result.message, 'success');
+    refreshWalletHeader();
+    loadAuctionsPage();
   } catch(e) { showToast(e.message, 'error'); }
 }
 
 async function placeBid(auctionId) {
-  const input = document.getElementById('bid-' + auctionId);
-  const amount = parseInt(input.value);
-  if (!amount) return showToast('أدخل مبلغ المزايدة', 'error');
+  const sel = document.getElementById('bid-' + auctionId);
+  const amount = parseInt(sel.value);
+  if (!amount) return showToast('اختر باقة المزايدة', 'error');
+  const label = sel.options[sel.selectedIndex]?.textContent || ('🪙 ' + amount);
+  if (!confirm('💥 المزايدة بهذه الباقة: ' + label + '\nستخصم من رصيدك فوراً وتصبح المزايد الأخير. متابعة؟')) return;
   try {
     const result = await api('POST', '/api/auctions/bid', { auctionId, amount });
     showToast(result.message, 'success');
+    refreshWalletHeader();
     loadAuctionsPage();
   } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function showAuctionParticipants(auctionId) {
+  try {
+    const { participants, lastBidder } = await api('GET', '/api/auctions/' + auctionId);
+    const list = (participants || []).map(p =>
+      '<div class="bid-item"><span class="bid-user">👑 ' + (p.user_name || 'مؤسس') + '</span><span class="bid-amount">' + (p.last_bid_at ? '💥 زايد' : '⏸️ توقف') + '</span></div>'
+    ).join('') || '<div class="empty-bids">لا يوجد مشاركون</div>';
+    const last = lastBidder ? '<div style="font-size:11px;color:var(--gold);font-weight:800;margin-top:6px">🏆 آخر مزايد: ' + (lastBidder.user_name || '') + '</div>' : '';
+    alert('👥 المشاركون في المزاد:\n' + list.replace(/<[^>]+>/g, ' ') + '\n' + (lastBidder ? '🏆 آخر مزايد: ' + lastBidder.user_name : ''));
+  } catch(e) {}
 }
 
 async function loadBidHistory(auctionId) {

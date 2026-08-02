@@ -1147,8 +1147,26 @@ app.post('/api/diwaniya/capacity/set', authMiddleware, async (req, res) => {
 // =============== AUCTIONS ROUTES ===============
 
 // Get active auctions (public - visitors can view, login to bid)
+// Convert auction prices to coins using the SAR rate
+async function auctionInCoins(a) {
+  if (!a) return a;
+  const rate = await db.getSarToCoinsRate();
+  return {
+    ...a,
+    starting_coins: (parseInt(a.starting_price) || 0) * rate,
+    current_coins: (parseInt(a.current_price) || 0) * rate,
+    entry_coins: (parseInt(a.entry_fee) || 0) * rate,
+    bid_packages: [
+      (parseInt(a.starting_price) || 100) * rate,
+      ((parseInt(a.starting_price) || 100) * 2) * rate
+    ],
+    rate
+  };
+}
+
 app.get('/api/auctions/active', async (req, res) => {
-  const auctions = await db.getActiveAuctions();
+  let auctions = await db.getActiveAuctions();
+  auctions = await Promise.all(auctions.map(auctionInCoins));
   res.json({ auctions });
 });
 
@@ -1158,26 +1176,42 @@ app.get('/api/auctions/:id', authMiddleware, async (req, res) => {
   if (!auction) return res.status(404).json({ error: 'المزاد غير موجود' });
   const bids = await db.getAuctionBids(req.params.id);
   const participated = !!await db.isAuctionParticipant(req.params.id, req.user.id);
-  res.json({ auction, bids, participated });
+  const participants = await db.getAuctionParticipants(req.params.id);
+  const lastBidder = await db.getLastBidder(req.params.id);
+  res.json({ auction: await auctionInCoins(auction), bids, participated, participants, lastBidder });
 });
 
 // Join auction (pay entry fee - simulated)
-app.post('/api/auctions/join', authMiddleware, async (req, res) => {
+app.post('/api/auctions/join', authMiddleware, asyncHandler(async (req, res) => {
   const { auctionId } = req.body;
   if (!auctionId) return res.status(400).json({ error: 'معرف المزاد مطلوب' });
   const result = await db.joinAuction(auctionId, req.user.id);
   if (result.error) return res.status(400).json(result);
-  res.json({ message: '✅ تم الدخول للمزاد (رسوم الدخول: ' + result.entry_fee + ' ريال)', joined: true });
-});
+  if (!result.joined) return res.json({ message: 'أنت مشارك بالفعل', joined: true });
+  // Pay entry fee in COINS (once, non-refundable)
+  const rate = await db.getSarToCoinsRate();
+  const entryCoins = (parseInt(result.entry_fee) || 0) * rate;
+  const pay = await db.payWithCoins(req.user.id, entryCoins, 'رسوم دخول المزاد (غير مستردة)');
+  if (pay.error) {
+    await db.execQuery('DELETE FROM auction_participants WHERE auction_id = $1 AND user_id = $2', [auctionId, req.user.id]);
+    return res.status(400).json(pay);
+  }
+  res.json({ message: '✅ دخلت المزاد - رسوم الدخول 🪙 ' + entryCoins + ' (غير مستردة)', joined: true, wallet: pay.wallet });
+}));
 
 // Place bid
-app.post('/api/auctions/bid', authMiddleware, async (req, res) => {
+app.post('/api/auctions/bid', authMiddleware, asyncHandler(async (req, res) => {
   const { auctionId, amount } = req.body;
   if (!auctionId || !amount) return res.status(400).json({ error: 'المزاد والمبلغ مطلوبان' });
+  // Bid = buy the package in coins (deduct immediately)
+  const rate = await db.getSarToCoinsRate();
+  const bidCoins = parseInt(amount) * rate;
+  const pay = await db.payWithCoins(req.user.id, bidCoins, 'مزايدة في المزاد');
+  if (pay.error) return res.status(400).json(pay);
   const result = await db.placeBid(auctionId, req.user.id, parseInt(amount));
   if (result.error) return res.status(400).json(result);
-  res.json({ message: '✅ تمت المزايدة: ' + amount + ' ريال', auction: result });
-});
+  res.json({ message: '✅ زايدت بـ 🪙 ' + bidCoins + ' عملة — أنت الآن المزايد الأخير', auction: await auctionInCoins(result), wallet: pay.wallet });
+}));
 
 // Admin: create auction
 app.post('/api/admin/auctions/create', authMiddleware, adminMiddleware, async (req, res) => {
@@ -1210,12 +1244,36 @@ app.post('/api/admin/auctions/end', authMiddleware, adminMiddleware, async (req,
   res.json({ message: '🏁 تم إنهاء المزاد', auction });
 });
 
-// Admin: confirm payment
+// Winner pays the final bid coins to own the code
+app.post('/api/auctions/pay', authMiddleware, asyncHandler(async (req, res) => {
+  const { auctionId } = req.body;
+  const auction = await db.getAuctionById(auctionId);
+  if (!auction || auction.status !== 'ended') return res.status(400).json({ error: 'المزاد غير متاح للدفع' });
+  if (auction.winner_id !== req.user.id) return res.status(403).json({ error: 'أنت لست الفائز' });
+  if (auction.paid) return res.json({ message: 'دفعت مسبقاً والرمز ملكك', success: true });
+  if (auction.paid === -1) return res.status(400).json({ error: 'انتهت مهلة الدفع - عاد الرمز للمستودع' });
+  const rate = await db.getSarToCoinsRate();
+  const finalCoins = (parseInt(auction.current_price) || 0) * rate;
+  const pay = await db.payWithCoins(req.user.id, finalCoins, 'سداد قيمة الرمز المميز من المزاد');
+  if (pay.error) return res.status(400).json(pay);
+  await db.confirmAuctionPayment(auctionId);
+  res.json({ message: '💰 دفعت 🪙 ' + finalCoins + ' — الرمز المميز أصبح ملكك!', wallet: pay.wallet });
+}));
+
+// Admin: confirm payment (manual)
 app.post('/api/admin/auctions/confirm-payment', authMiddleware, adminMiddleware, async (req, res) => {
   const { auctionId } = req.body;
   const auction = await db.confirmAuctionPayment(auctionId);
   if (!auction) return res.status(400).json({ error: 'المزاد غير موجود' });
   res.json({ message: '💰 تم تأكيد السداد، وحصل الفائز على الرمز', auction });
+});
+
+// Admin: release code back to the repository (winner didn't pay)
+app.post('/api/admin/auctions/release', authMiddleware, adminMiddleware, async (req, res) => {
+  const { auctionId } = req.body;
+  const auction = await db.releaseAuctionCode(auctionId);
+  if (!auction) return res.status(400).json({ error: 'المزاد غير موجود' });
+  res.json({ message: '↩️ عاد الرمز لمستودع الرموز - يمكنك طرحه مرة أخرى', auction });
 });
 
 // Admin: cancel auction
