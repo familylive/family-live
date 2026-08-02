@@ -477,6 +477,9 @@ function connectSocket() {
   socket.on('audio_offer', (data) => { if (data.avatar) peerAvatars[data.from] = data.avatar; handleAudioOffer(data.from, data.userName, data.offer); });
   socket.on('audio_answer', (data) => handleAudioAnswer(data.from, data.answer));
   socket.on('audio_ice_candidate', (data) => handleIceCandidate(data.from, data.candidate));
+  socket.on('user_effect_changed', (data) => {
+    applyEffectToTile(document.getElementById('video-' + data.userId), data.effectId);
+  });
   socket.on('user_joined_call', (data) => {
     if (data.avatar) peerAvatars[data.userId] = data.avatar;
     if (inLiveCall && data.userId !== state.user?.id) {
@@ -1706,6 +1709,13 @@ async function joinLiveAudio() {
     setTikTokMode(true); // TikTok layout by default with chat below
     const exitBtn = document.getElementById('call-exit-btn');
     if (exitBtn) exitBtn.style.display = 'flex';
+    // Apply my saved effect
+    if (state.user?.selected_effect) { myEffect = state.user.selected_effect; applyMyEffect(myEffect); }
+    // Load my owned effects list to know what I own
+    try {
+      const { effects } = await api('GET', '/api/effects');
+      myEffectOwned = true;
+    } catch(e) {}
     if (isModeratorVisit) {
       showToast('🕵️ أنت مراقب - تسمع فقط، كاميرا ومايك مقفلان', 'success');
       // Force UI state

@@ -72,6 +72,10 @@ async function initDb() {
   await run(`CREATE TABLE IF NOT EXISTS violation_templates (id TEXT PRIMARY KEY, name TEXT NOT NULL, icon TEXT DEFAULT '🚫', status TEXT DEFAULT 'active', created_at TEXT DEFAULT now())`);
   try { await run("ALTER TABLE violations ADD COLUMN IF NOT EXISTS action TEXT"); } catch(e) {}
   try { await run("ALTER TABLE violations ADD COLUMN IF NOT EXISTS by_user_name TEXT"); } catch(e) {}
+  await run(`CREATE TABLE IF NOT EXISTS effects (id TEXT PRIMARY KEY, name TEXT NOT NULL, emoji TEXT DEFAULT '✨', css_class TEXT, price INTEGER DEFAULT 0, status TEXT DEFAULT 'active', created_at TEXT DEFAULT now())`);
+  await run(`CREATE TABLE IF NOT EXISTS user_effects (user_id TEXT NOT NULL, effect_id TEXT NOT NULL, purchased_at TEXT DEFAULT now(), PRIMARY KEY (user_id, effect_id))`);
+  try { await run("ALTER TABLE users ADD COLUMN IF NOT EXISTS selected_effect TEXT"); } catch(e) {}
+  try { await run("ALTER TABLE families ADD COLUMN IF NOT EXISTS battle_wins INTEGER DEFAULT 0"); } catch(e) {}
   await run(`CREATE TABLE IF NOT EXISTS battles (id TEXT PRIMARY KEY, session_id TEXT, player_a_id TEXT, player_b_id TEXT, status TEXT DEFAULT 'pending', duration_minutes INTEGER DEFAULT 3, coins_a INTEGER DEFAULT 0, coins_b INTEGER DEFAULT 0, winner_id TEXT, start_time TEXT, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS diwaniya_restrictions (id TEXT PRIMARY KEY, session_id TEXT NOT NULL, user_id TEXT NOT NULL, type TEXT DEFAULT 'restrict', created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS gift_items (id TEXT PRIMARY KEY, name TEXT NOT NULL, emoji TEXT DEFAULT '🎁', coins INTEGER DEFAULT 10, price INTEGER DEFAULT 0, status TEXT DEFAULT 'active', gift_image TEXT, created_at TEXT DEFAULT now())`);
@@ -644,6 +648,28 @@ async function addFounderViolation(userId, reason, action, byUserId, byUserName)
   return queryOne('SELECT * FROM violations WHERE id = $1', [id]);
 }
 
+async function getEffects() { return query("SELECT * FROM effects WHERE status = 'active' ORDER BY price"); }
+async function getEffectById(id) { return queryOne('SELECT * FROM effects WHERE id = $1', [id]); }
+async function addEffect(name, emoji, cssClass, price) {
+  const id = uuidv4();
+  await run('INSERT INTO effects (id, name, emoji, css_class, price) VALUES ($1,$2,$3,$4,$5)', [id, name, emoji, cssClass || '', parseInt(price) || 0]);
+  return queryOne('SELECT * FROM effects WHERE id = $1', [id]);
+}
+async function getUserEffects(userId) { return query('SELECT effect_id FROM user_effects WHERE user_id = $1', [userId]); }
+async function buyEffect(userId, effectId) {
+  await run('INSERT INTO user_effects (user_id, effect_id) VALUES ($1,$2) ON CONFLICT DO NOTHING', [userId, effectId]);
+  return true;
+}
+async function selectEffect(userId, effectId) {
+  await run('UPDATE users SET selected_effect = $1 WHERE id = $2', [effectId || null, userId]);
+  return getUserById(userId);
+}
+async function addFamilyBattleWin(familyId) {
+  if (!familyId) return;
+  await run('UPDATE families SET battle_wins = battle_wins + 1 WHERE id = $1', [familyId]);
+  const f = await getFamily(familyId);
+  return f;
+}
 async function createBattle(sessionId, playerA, playerB, durationMinutes, familyAId, familyBId) {
   const id = uuidv4();
   const cross = familyAId && familyBId && familyAId !== familyBId ? 1 : 0;
@@ -947,6 +973,7 @@ module.exports = {
   getActivePackages, getAllPackages, addPackage, updatePackage, deletePackage, getPaymentSettings, savePaymentSettings, createPayment, getAllPayments, getMyPayments, confirmPayment, rejectPayment, getFamilyEditInfo, recordFamilyNameChange, getFamilyCapacity, purchaseCapacity, setDiwaniyaCapacity, getCapacityPackages,
   createAnnouncement, getFamilyAnnouncements, getAnnouncementsForUser, deleteAnnouncement,
   createBattle, getBattleById, getActiveBattle, acceptBattle, rejectBattle, supportBattle, endBattle, finalizeBattle, addFamilySupportPoints, getOnlineFounders,
+  getEffects, getEffectById, addEffect, getUserEffects, buyEffect, selectEffect, addFamilyBattleWin,
   isDiwaniyaRestricted, restrictFromDiwaniya, unrestrictFromDiwaniya, getDiwaniyaRestrictions,
   seedViolationTemplates, getViolationTemplates, getAllViolationTemplates, addViolationTemplate, deleteViolationTemplate, addFounderViolation,
   getGiftItems, getAllGiftItems, addGiftItem, updateGiftItem, deleteGiftItem,

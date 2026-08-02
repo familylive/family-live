@@ -1890,6 +1890,40 @@ app.post('/api/battles/join-invite', authMiddleware, asyncHandler(async (req, re
   res.json({ message: '📨 أرسلت دعوة انضمام للبث' });
 }));
 
+// Effects: list with owned status
+app.get('/api/effects', authMiddleware, asyncHandler(async (req, res) => {
+  const effects = await db.getEffects();
+  const owned = (await db.getUserEffects(req.user.id)).map(e => e.effect_id);
+  const list = effects.map(e => ({ ...e, owned: owned.includes(e.id) }));
+  res.json({ effects: list });
+}));
+
+// Buy an effect with coins
+app.post('/api/effects/buy', authMiddleware, asyncHandler(async (req, res) => {
+  const { effectId } = req.body;
+  const eff = await db.getEffectById(effectId);
+  if (!eff) return res.status(404).json({ error: 'المؤثر غير موجود' });
+  if (eff.price <= 0) return res.status(400).json({ error: 'هذا المؤثر مجاني' });
+  const wallet = await db.deductCoins(req.user.id, eff.price);
+  if (!wallet) return res.status(400).json({ error: 'رصيدك من الكوينزات لا يكفي - اشحن رصيدك أولاً' });
+  await db.buyEffect(req.user.id, effectId);
+  await db.runRaw("INSERT INTO coin_transactions (id, user_id, type, coins, detail) VALUES ($1,$2,'effect_purchase',$3,$4)", [require('crypto').randomUUID(), req.user.id, eff.price, 'شراء مؤثر: ' + eff.emoji + ' ' + eff.name]);
+  res.json({ message: '✅ اشتريت المؤثر ' + eff.emoji + ' ' + eff.name + ' بـ ' + eff.price + ' كوينز', wallet });
+}));
+
+// Select/unselect an effect (visible to everyone on the tile)
+app.post('/api/effects/select', authMiddleware, asyncHandler(async (req, res) => {
+  const { effectId } = req.body; // null to remove
+  if (effectId) {
+    const owned = await db.getUserEffects(req.user.id);
+    if (!owned.some(e => e.effect_id === effectId)) return res.status(403).json({ error: 'لم تشترِ هذا المؤثر بعد' });
+  }
+  const user = await db.selectEffect(req.user.id, effectId || null);
+  // Tell everyone in the family + session
+  if (user?.family_id) io.to(`family_${user.family_id}`).emit('user_effect_changed', { userId: req.user.id, effectId: effectId || null });
+  res.json({ message: effectId ? '✨ تم تفعيل المؤثر' : 'المؤثر متوقف', user });
+}));
+
 // Online founders (for cross-family challenges)
 app.get('/api/founders/online', authMiddleware, asyncHandler(async (req, res) => {
   const founders = await db.getOnlineFounders();
@@ -1984,10 +2018,15 @@ app.post('/api/battles/end', authMiddleware, asyncHandler(async (req, res) => {
   const loserId = winnerId === battle.player_a_id ? battle.player_b_id : battle.player_a_id;
   const loser = await db.getUserById(loserId);
   const final = await db.endBattle(battleId, winnerId);
-  // Reward winner: +500 coins
+  // Reward winner: +500 coins + battle win cup for the family
   await db.addCoins(winnerId, 500);
+  let winCups = null;
+  try {
+    const wu = await db.getUserById(winnerId);
+    if (wu?.family_id) winCups = await db.addFamilyBattleWin(wu.family_id);
+  } catch(e) {}
   // Broadcast victory round (2 min) - loser executes the penalty
-  const victoryData = { ...final, winnerName, loserName: loser?.name || 'الخصم', reward: 500 };
+  const victoryData = { ...final, winnerName, loserName: loser?.name || 'الخصم', reward: 500, winCups: winCups?.battle_wins || 0 };
   if (battle.session_id) io.to(`session_${battle.session_id}`).emit('battle_victory', victoryData);
   if (battle.family_a_id) io.to(`family_${battle.family_a_id}`).emit('battle_victory', victoryData);
   if (battle.family_b_id) io.to(`family_${battle.family_b_id}`).emit('battle_victory', victoryData);
@@ -2246,7 +2285,7 @@ io.on('connection', (socket) => {
     
     // Tell existing participants about new user (observers included so they receive audio)
     participants.forEach(p => {
-      io.to(p.socketId).emit('user_joined_call', { userId, userName, avatar, isObserver: !!isObserver || forcedAudioOnly });
+      io.to(p.socketId).emit('user_joined_call', { userId, userName, avatar, effect: u2?.selected_effect || null, isObserver: !!isObserver || forcedAudioOnly });
     });
     
     participants.push({ socketId: socket.id, userId, userName, avatar, isObserver: !!isObserver || forcedAudioOnly, wantsVideo });
@@ -2337,6 +2376,15 @@ io.on('connection', (socket) => {
     } catch(e) {}
   });
 
+  // Effect change relay within the session
+  socket.on('user_effect_change', (data) => {
+    const { effectId, sessionId } = data;
+    const me = socket.userId;
+    if (sessionId) socket.to(`session_${sessionId}`).emit('user_effect_changed', { userId: me, effectId: effectId || null });
+    // Also persist on the user record
+    db.runRaw('UPDATE users SET selected_effect = $1 WHERE id = $2', [effectId || null, me]).catch(() => {});
+  });
+
   // Camera invite: founder invites a present member to join on camera
   socket.on('camera_invite', (data) => {
     const { to, sessionId, founderId, founderName } = data;
@@ -2424,6 +2472,21 @@ async function bootstrap() {
   
   // Seed violation templates
   try { await db.seedViolationTemplates(); } catch(e) { console.log('Template seed error:', e.message); }
+  
+  // Seed effects (3 free + paid, bought with coins)
+  try {
+    const effs = await db.getEffects();
+    if (!effs.length) {
+      await db.addEffect('نجوم', '✨', 'fx-stars', 0);
+      await db.addEffect('قلوب', '💖', 'fx-hearts', 0);
+      await db.addEffect('قوس قزح', '🌈', 'fx-rainbow', 0);
+      await db.addEffect('نار', '🔥', 'fx-fire', 500);
+      await db.addEffect('فراشات', '🦋', 'fx-butterflies', 800);
+      await db.addEffect('تاج ملكي', '👑', 'fx-crown', 1000);
+      await db.addEffect('برق', '⚡', 'fx-lightning', 1500);
+      console.log('✅ Seeded effects');
+    }
+  } catch(e) { console.log('Effects seed error:', e.message); }
   
   // Attach animated GIFs to default gifts (if none uploaded yet)
   try {

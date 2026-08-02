@@ -2992,3 +2992,67 @@ body {
   transition: transform .15s;
 }
 .call-exit-btn:active { transform: scale(.9); }
+
+/* ===== Tile effects (overlays on the picture) ===== */
+.video-tile.fx-stars::after, .video-tile.fx-hearts::after, .video-tile.fx-rainbow::after,
+.video-tile.fx-fire::after, .video-tile.fx-butterflies::after, .video-tile.fx-crown::after, .video-tile.fx-lightning::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 40;
+  border-radius: inherit;
+}
+.video-tile.fx-stars::after {
+  background:
+    radial-gradient(circle at 15% 20%, rgba(255,255,255,.95) 2px, transparent 3px),
+    radial-gradient(circle at 80% 30%, rgba(255,215,0,.9) 2px, transparent 3px),
+    radial-gradient(circle at 30% 75%, rgba(255,255,255,.8) 2px, transparent 3px),
+    radial-gradient(circle at 70% 85%, rgba(255,215,0,.85) 2px, transparent 3px);
+  animation: fxTwinkle 1.2s ease-in-out infinite;
+}
+@keyframes fxTwinkle { 0%,100% { opacity: .4; } 50% { opacity: 1; } }
+.video-tile.fx-hearts::after {
+  background:
+    radial-gradient(circle at 20% 25%, rgba(255,80,120,.9) 3px, transparent 4px),
+    radial-gradient(circle at 75% 20%, rgba(255,80,120,.8) 3px, transparent 4px),
+    radial-gradient(circle at 25% 70%, rgba(255,80,120,.85) 3px, transparent 4px),
+    radial-gradient(circle at 80% 75%, rgba(255,80,120,.9) 3px, transparent 4px);
+  animation: fxFloatHearts 1.6s ease-in-out infinite;
+}
+@keyframes fxFloatHearts { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+.video-tile.fx-rainbow::after {
+  background: linear-gradient(120deg, rgba(255,0,0,.25), rgba(255,165,0,.25), rgba(255,255,0,.25), rgba(0,255,0,.25), rgba(0,150,255,.25), rgba(150,0,255,.25));
+  background-size: 300% 300%;
+  animation: fxRainbow 4s linear infinite;
+}
+@keyframes fxRainbow { 0% { background-position: 0% 50%; } 100% { background-position: 300% 50%; } }
+.video-tile.fx-fire::after {
+  background: radial-gradient(circle at 50% 100%, rgba(255,80,0,.5), transparent 65%);
+  animation: fxFire 1s ease-in-out infinite;
+}
+@keyframes fxFire { 0%,100% { opacity: .5; } 50% { opacity: 1; } }
+.video-tile.fx-butterflies::after {
+  background:
+    radial-gradient(circle at 15% 30%, rgba(200,120,255,.9) 3px, transparent 4px),
+    radial-gradient(circle at 85% 60%, rgba(255,120,200,.9) 3px, transparent 4px),
+    radial-gradient(circle at 45% 85%, rgba(120,200,255,.9) 3px, transparent 4px);
+  animation: fxButterfly 2s ease-in-out infinite;
+}
+@keyframes fxButterfly { 0%,100% { transform: translate(0,0); } 33% { transform: translate(8px,-8px); } 66% { transform: translate(-6px,6px); } }
+.video-tile.fx-crown::after {
+  background:
+    radial-gradient(circle at 20% 12%, rgba(255,215,0,.95) 5px, transparent 6px),
+    radial-gradient(circle at 50% 8%, rgba(255,215,0,.9) 6px, transparent 7px),
+    radial-gradient(circle at 80% 12%, rgba(255,215,0,.95) 5px, transparent 6px);
+  animation: fxCrown 1.4s ease-in-out infinite;
+}
+@keyframes fxCrown { 0%,100% { opacity: .6; } 50% { opacity: 1; } }
+.video-tile.fx-lightning::after {
+  background: radial-gradient(circle at 50% 50%, rgba(255,255,0,.35), transparent 70%);
+  animation: fxLightning 1.8s steps(2) infinite;
+}
+@keyframes fxLightning { 0%,70% { opacity: .2; } 75%,90% { opacity: 1; } 100% { opacity: .2; } }
+
+/* Family victory cups */
+.cup-badge { color: var(--gold); font-weight: 900; }
