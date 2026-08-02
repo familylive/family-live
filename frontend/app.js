@@ -264,6 +264,7 @@ async function refreshData() {
 }
 
 function updateAllUI() {
+  if (typeof updateLevelUI === 'function') updateLevelUI();
   if (typeof updateChatGiftBtn === 'function') updateChatGiftBtn();
   try {
   document.getElementById('menu-user-name').textContent = state.user?.name || '';
@@ -360,6 +361,28 @@ function updateAllUI() {
     loadDiwaniyaMessages(state.activeSession.id);
   }
   } catch(e) { console.error('updateAllUI error:', e.message); }
+}
+
+// ==================== LEVELS ====================
+function levelBadge(level) {
+  const lv = parseInt(level) || 0;
+  const tier = lv >= 40 ? 'lv-diamond' : lv >= 30 ? 'lv-purple' : lv >= 20 ? 'lv-gold' : lv >= 10 ? 'lv-silver' : 'lv-bronze';
+  return '<span class="level-badge ' + tier + '" title="المستوى ' + lv + '">Lv ' + lv + '</span>';
+}
+function levelTierName(level) {
+  const lv = parseInt(level) || 0;
+  return lv >= 40 ? '💎 ماسي' : lv >= 30 ? '🟣 ملكي' : lv >= 20 ? '🟡 ذهبي' : lv >= 10 ? '⚪ فضي' : '🟤 برونزي';
+}
+function updateLevelUI() {
+  const lv = parseInt(state.user?.level) || 0;
+  const menuLv = document.getElementById('menu-level-badge');
+  if (menuLv) menuLv.innerHTML = levelBadge(lv);
+  const dashLv = document.getElementById('dashboard-level-badge');
+  if (dashLv) dashLv.innerHTML = levelBadge(lv);
+  const profLv = document.getElementById('profile-level');
+  if (profLv) profLv.innerHTML = levelBadge(lv) + ' <span style="font-size:11px;color:var(--text-muted)">' + levelTierName(lv) + '</span>';
+  const profPoints = document.getElementById('profile-level-points');
+  if (profPoints) profPoints.textContent = 'نقاط المستوى: ' + (parseInt(state.user?.level_points) || 0);
 }
 
 // ==================== MENU VISIBILITY ====================
@@ -597,6 +620,13 @@ function connectSocket() {
     refreshWalletHeader();
     loadWallet();
     loadMyCodes();
+  });
+  socket.on('level_up', (data) => {
+    const lv = data.level || 0;
+    state.user.level = lv;
+    updateLevelUI();
+    showToast('🎉 مبروك! وصلت للمستوى ' + lv + ' (' + levelTierName(lv) + ')', 'success');
+    playNotificationSound();
   });
   socket.on('hold_released', (data) => {
     showToast('🪙 عادت لك ' + (data.coins || 0) + ' 🪙 محجوزة من مزايدة الرمز (' + (data.code || '') + ')', 'success');

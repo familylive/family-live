@@ -81,6 +81,10 @@ async function initDb() {
   await run(`CREATE TABLE IF NOT EXISTS user_effects (user_id TEXT NOT NULL, effect_id TEXT NOT NULL, purchased_at TEXT DEFAULT now(), PRIMARY KEY (user_id, effect_id))`);
   try { await run("ALTER TABLE users ADD COLUMN IF NOT EXISTS selected_effect TEXT"); } catch(e) {}
   try { await run("ALTER TABLE users ADD COLUMN IF NOT EXISTS hold_balance INTEGER DEFAULT 0"); } catch(e) {}
+  try { await run("ALTER TABLE users ADD COLUMN IF NOT EXISTS level INTEGER DEFAULT 0"); } catch(e) {}
+  try { await run("ALTER TABLE users ADD COLUMN IF NOT EXISTS level_points INTEGER DEFAULT 0"); } catch(e) {}
+  try { await run("ALTER TABLE users ADD COLUMN IF NOT EXISTS charges_count INTEGER DEFAULT 0"); } catch(e) {}
+  try { await run("ALTER TABLE users ADD COLUMN IF NOT EXISTS broadcasts_count INTEGER DEFAULT 0"); } catch(e) {}
   try { await run("ALTER TABLE families ADD COLUMN IF NOT EXISTS battle_wins INTEGER DEFAULT 0"); } catch(e) {}
   await run(`CREATE TABLE IF NOT EXISTS battles (id TEXT PRIMARY KEY, session_id TEXT, player_a_id TEXT, player_b_id TEXT, status TEXT DEFAULT 'pending', duration_minutes INTEGER DEFAULT 3, coins_a INTEGER DEFAULT 0, coins_b INTEGER DEFAULT 0, winner_id TEXT, start_time TEXT, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS diwaniya_restrictions (id TEXT PRIMARY KEY, session_id TEXT NOT NULL, user_id TEXT NOT NULL, type TEXT DEFAULT 'restrict', created_at TEXT DEFAULT now())`);
@@ -766,6 +770,17 @@ async function getSiteTotalCoins() {
   return parseInt(r?.value) || 0;
 }
 
+async function addLevelPoints(userId, points, type) {
+  // type: 'charge' (+3) or 'broadcast' (+1)
+  await run('UPDATE users SET level_points = level_points + $1 WHERE id = $2', [points, userId]);
+  if (type === 'charge') await run('UPDATE users SET charges_count = charges_count + 1 WHERE id = $2'.replace('$2', '$1'), [userId]);
+  if (type === 'broadcast') await run('UPDATE users SET broadcasts_count = broadcasts_count + 1 WHERE id = $2'.replace('$2', '$1'), [userId]);
+  // Level = level_points
+  await run('UPDATE users SET level = level_points WHERE id = $1', [userId]);
+  return getUserById(userId);
+}
+async function getUserLevel(userId) { return queryOne('SELECT level, level_points, charges_count, broadcasts_count FROM users WHERE id = $1', [userId]); }
+
 async function getWallet(userId) {
   const u = await queryOne('SELECT coins, wallet, hold_balance FROM users WHERE id = $1', [userId]);
   return u ? { coins: parseInt(u.coins) || 0, wallet: parseInt(u.wallet) || 0, hold: parseInt(u.hold_balance) || 0 } : { coins: 0, wallet: 0, hold: 0 };
@@ -1137,6 +1152,7 @@ module.exports = {
   addAuctionLog, getAuctionLogs, getReportsData,
   getEffects, getEffectById, addEffect, getUserEffects, buyEffect, selectEffect, addFamilyBattleWin,
   getPricing, getPricingByFeature, setPricing, deletePricing, getSarToCoinsRate, setSarToCoinsRate, payWithCoins, settleAuction, getSiteTotalCoins,
+  addLevelPoints, getUserLevel,
   getWithdrawFee, setWithdrawFee,
   isDiwaniyaRestricted, restrictFromDiwaniya, unrestrictFromDiwaniya, getDiwaniyaRestrictions,
   seedViolationTemplates, getViolationTemplates, getAllViolationTemplates, addViolationTemplate, deleteViolationTemplate, addFounderViolation,

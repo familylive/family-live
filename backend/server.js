@@ -1576,6 +1576,8 @@ app.post('/api/admin/wallet/add-coins', authMiddleware, adminMiddleware, async (
   if (!target) return res.status(404).json({ error: 'العضو غير موجود' });
   const wallet = await db.addCoins(userId, amount);
   await db.runRaw("INSERT INTO coin_transactions (id, user_id, type, coins, detail, created_at) VALUES ($1,$2,'admin_credit',$3,$4,$5)", [require('crypto').randomUUID(), userId, amount, 'شحن من الإدارة بواسطة ' + req.user.name, new Date().toISOString()]);
+  // Level up: +3 points per charge
+  try { await db.addLevelPoints(userId, 3, 'charge'); io.to(`user_${userId}`).emit('level_up', { level: (await db.getUserLevel(userId))?.level || 0 }); } catch(e) {}
   // Live notification to the charged member
   io.to(`user_${userId}`).emit('coins_charged', { amount, byName: req.user.name });
   res.json({ message: '🪙 تم شحن ' + amount + ' كوينز إلى ' + target.name, wallet });
@@ -2567,6 +2569,12 @@ io.on('connection', (socket) => {
     try {
       const urow = await db.getUserById(userId);
       avatar = urow?.avatar || null;
+    } catch(e) {}
+    
+    // Level up: +1 point per broadcast join
+    try {
+      const lv = await db.addLevelPoints(userId, 1, 'broadcast');
+      if (lv) io.to(`user_${userId}`).emit('level_up', { level: lv.level || 0 });
     } catch(e) {}
     
     // Fetch family name for the join chat notification
