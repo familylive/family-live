@@ -1273,6 +1273,39 @@ app.get('/api/admin/backup', authMiddleware, adminMiddleware, asyncHandler(async
   res.json({ backup });
 }));
 
+// Admin: restore from a backup JSON
+app.post('/api/admin/restore', authMiddleware, adminMiddleware, asyncHandler(async (req, res) => {
+  const { backup } = req.body;
+  if (!backup || typeof backup !== 'object') return res.status(400).json({ error: 'ملف النسخة غير صالح' });
+  const tables = Object.keys(backup);
+  if (!tables.length) return res.status(400).json({ error: 'الملف فارغ' });
+  const order = ['users','families','subscription_codes','user_codes','settings','pricing','effects','gift_items','coin_packages',
+    'auctions','auction_bids','auction_participants','auction_logs','coin_transactions','gifts','payments','withdrawals',
+    'invitations','diwaniya_sessions','diwaniya_messages','challenges','battles','violations','banned_words','ads',
+    'announcements','agreements','support_messages','support_tickets','moderator_visits','diwaniya_restrictions','violation_templates','user_effects'];
+  const sorted = [...order.filter(t => tables.includes(t)), ...tables.filter(t => !order.includes(t))];
+  // Clear existing rows (children first)
+  for (const t of [...sorted].reverse()) {
+    try { await db.runRaw('DELETE FROM ' + t); } catch(e) {}
+  }
+  // Insert backed-up rows
+  let restored = 0;
+  for (const t of sorted) {
+    const rows = backup[t] || [];
+    if (!rows.length) continue;
+    for (const row of rows) {
+      try {
+        const cols = Object.keys(row);
+        const vals = cols.map(c => row[c]);
+        const placeholders = cols.map((_, i) => '$' + (i + 1)).join(',');
+        await db.runRaw('INSERT INTO ' + t + ' (' + cols.join(',') + ') VALUES (' + placeholders + ') ON CONFLICT DO NOTHING', vals);
+        restored++;
+      } catch(e) {}
+    }
+  }
+  res.json({ message: '✅ تمت استعادة النسخة (' + sorted.length + ' جداول، ' + restored + ' سجل)' });
+}));
+
 // Admin: full reports (balance, top families, top chargers, withdrawals)
 app.get('/api/admin/reports', authMiddleware, adminMiddleware, asyncHandler(async (req, res) => {
   res.json(await db.getReportsData());

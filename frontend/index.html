@@ -1153,6 +1153,15 @@
     <!-- Admin Page - لوحة الإدارة -->
     <div id="page-admin" class="page-content">
       <div class="page-title">⚙️ لوحة الإدارة <button class="btn btn-sm btn-accent" style="float:left" onclick="navigateTo('reports')">📊 التقارير</button></div>
+      <div class="card" style="border:1.5px solid rgba(232,184,48,.4)">
+        <div class="card-title">💾 النسخ الاحتياطي</div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-accent" style="flex:1" onclick="exportBackup()">📥 تصدير نسخة احتياطية</button>
+          <button class="btn btn-primary" style="flex:1" onclick="document.getElementById('backup-file-input').click()">📤 إعادة نسخة</button>
+          <input type="file" id="backup-file-input" accept=".json" style="display:none" onchange="restoreBackup(this)">
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:6px">التصدير يحفظ كل البيانات بملف · الإعادة تستبدل البيانات الحالية بالملف</div>
+      </div>
       <div class="page-subtitle">إدارة جميع العوائل</div>
       
       <div class="card" id="admin-auction-section">
