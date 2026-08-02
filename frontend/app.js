@@ -2059,6 +2059,96 @@ function unmuteAllMics() {
   showToast('🎙️ فتحت كل المايكات', 'success');
 }
 
+// ==================== FILTER PIPELINE (applied to SENT video) ====================
+const CSS_FILTERS = {
+  '': '', 'filter-soft': 'blur(.35px) brightness(1.08) contrast(.9) saturate(1.15)',
+  'filter-gold': 'sepia(.35) brightness(1.06) saturate(1.3) hue-rotate(-8deg)',
+  'filter-pink': 'saturate(1.25) brightness(1.05) hue-rotate(320deg) sepia(.15)',
+  'filter-vivid': 'saturate(1.6) contrast(1.08) brightness(1.02)',
+  'filter-classic': 'sepia(.45) contrast(1.02) brightness(1.03)',
+  'filter-bw': 'grayscale(1) contrast(1.1)'
+};
+let filterPipeline = null;
+let activeFilter = '';
+
+async function applyFilterToFeed(filterClass) {
+  const myVideo = document.getElementById('my-video');
+  if (!myVideo || !localStream) return;
+  const videoTrack = localStream.getVideoTracks()[0];
+  if (!videoTrack) return;
+  if (filterPipeline) {
+    clearInterval(filterPipeline.timer);
+    if (filterPipeline.srcVideo) filterPipeline.srcVideo.remove();
+    filterPipeline = null;
+  }
+  if (!filterClass) {
+    activeFilter = '';
+    myVideo.srcObject = localStream;
+    Object.values(peerConnections).forEach(pc => {
+      const s = pc.getSenders().find(s => s.track && s.track.kind === 'video');
+      if (s) s.replaceTrack(videoTrack).catch(() => {});
+    });
+    updateTileFilterUI();
+    return;
+  }
+  activeFilter = filterClass;
+  const srcVideo = document.createElement('video');
+  srcVideo.srcObject = localStream;
+  srcVideo.autoplay = true;
+  srcVideo.playsInline = true;
+  srcVideo.muted = true;
+  srcVideo.style.display = 'none';
+  document.body.appendChild(srcVideo);
+  const w = videoTrack.getSettings?.().width || 640;
+  const h = videoTrack.getSettings?.().height || 480;
+  const canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  const canvasStream = canvas.captureStream(24);
+  const newTrack = canvasStream.getVideoTracks()[0];
+  const draw = () => {
+    try { ctx.filter = CSS_FILTERS[filterClass] || 'none'; ctx.drawImage(srcVideo, 0, 0, w, h); } catch(e) {}
+  };
+  draw();
+  const timer = setInterval(draw, 70);
+  myVideo.srcObject = canvasStream;
+  Object.values(peerConnections).forEach(pc => {
+    const s = pc.getSenders().find(s => s.track && s.track.kind === 'video');
+    if (s) s.replaceTrack(newTrack).catch(() => {});
+  });
+  filterPipeline = { timer, srcVideo };
+  updateTileFilterUI();
+}
+
+function toggleTileFilterBar() {
+  const bar = document.getElementById('tile-filter-bar');
+  if (bar) bar.style.display = bar.style.display === 'none' ? 'flex' : 'none';
+}
+function tileSelectFilter(el) {
+  const f = el.dataset.filter || '';
+  applyFilterToFeed(f);
+  document.querySelectorAll('#tile-filter-bar .filter-opt').forEach(o => o.classList.toggle('selected', o.dataset.filter === f));
+  document.getElementById('tile-filter-bar').style.display = 'none';
+  showToast(f ? '✨ الفلتر مفعّل - الجميع يشاهدونه' : 'الفلتر متوقف', 'success');
+}
+function updateTileFilterUI() {
+  const bar = document.getElementById('tile-filter-bar');
+  if (bar) document.querySelectorAll('#tile-filter-bar .filter-opt').forEach(o => o.classList.toggle('selected', o.dataset.filter === activeFilter));
+}
+
+// Exit call with confirmation + back to dashboard
+function askExitCall() {
+  document.getElementById('exit-call-modal').style.display = 'flex';
+}
+function confirmExitCall(go) {
+  document.getElementById('exit-call-modal').style.display = 'none';
+  if (go) {
+    leaveLiveAudio();
+    setTimeout(() => navigateTo('dashboard'), 300);
+    showToast('🚪 خرجت من المكالمة - أهلاً بك في الرئيسية', 'success');
+  }
+}
+
 // Connected families (in the broadcast) - invite to join & chat, then battle
 async function openConnectedFamilies() {
   const list = document.getElementById('connected-families-list');
