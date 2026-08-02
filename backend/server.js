@@ -1555,6 +1555,20 @@ app.get('/api/wallet', authMiddleware, async (req, res) => {
   res.json({ wallet, rate, packages });
 });
 
+// Buy CUSTOM amount of coins (with 15% VAT)
+app.post('/api/wallet/buy-custom', authMiddleware, asyncHandler(async (req, res) => {
+  const { coins } = req.body;
+  const amount = parseInt(coins);
+  if (!amount || amount <= 0) return res.status(400).json({ error: 'أدخل عدد الكونزات' });
+  const rate = await db.getSarToCoinsRate(); // coins per 1 SAR (default 50)
+  const price = Math.round((amount / rate) * 100) / 100; // SAR before VAT
+  const vat = Math.round(price * 0.15 * 100) / 100;
+  const total = Math.round((price + vat) * 100) / 100;
+  const user = await db.getUserById(req.user.id);
+  const payment = await db.createPayment(req.user.id, user.name, 'stcpay', total, 'شراء كونزات مخصص (' + amount + ')', '');
+  res.json({ requiresPayment: true, coins: amount, price, vat, total, paymentId: payment.id, message: 'تفاصيل العملية جاهزة - أرسل إثبات الدفع' });
+}));
+
 // Buy coins (creates payment)
 app.post('/api/wallet/buy-coins', authMiddleware, async (req, res) => {
   const { packageId } = req.body;
@@ -1610,14 +1624,14 @@ app.get('/api/admin/coin-packages', authMiddleware, adminMiddleware, async (req,
   res.json({ packages: await db.getAllCoinPackages() });
 });
 app.post('/api/admin/coin-packages/add', authMiddleware, adminMiddleware, async (req, res) => {
-  const { coins, price } = req.body;
+  const { coins, price, title, badge } = req.body;
   if (!coins || !price) return res.status(400).json({ error: 'البيانات مطلوبة' });
-  const pkg = await db.addCoinPackage(parseInt(coins), parseInt(price));
+  const pkg = await db.addCoinPackage(parseInt(coins), parseInt(price), title, badge);
   res.json({ message: '✅ تمت إضافة الباقة', package: pkg });
 });
 app.post('/api/admin/coin-packages/update', authMiddleware, adminMiddleware, async (req, res) => {
-  const { id, coins, price, status } = req.body;
-  const pkg = await db.updateCoinPackage(id, { coins, price, status });
+  const { id, coins, price, status, title, badge } = req.body;
+  const pkg = await db.updateCoinPackageFull(id, title, coins, price, badge, status);
   res.json({ message: '✅ تم التحديث', package: pkg });
 });
 app.post('/api/admin/coin-packages/delete', authMiddleware, adminMiddleware, async (req, res) => {

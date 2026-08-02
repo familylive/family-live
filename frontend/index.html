@@ -902,6 +902,24 @@
         <div class="card-title">🛍️ باقات شراء الكونزات</div>
         <div id="buy-packages-list"><div class="empty-state"><div class="empty-text">لا توجد باقات</div></div></div>
       </div>
+      <div class="card" style="border:1.5px solid rgba(232,184,48,.4)">
+        <div class="card-title">✏️ تخصيص</div>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:8px">حدد عدد الكونزات اللي تبيها — السعر والضريبة يظهرون تلقائياً</p>
+        <div style="display:flex;gap:8px;align-items:center">
+          <img src="/assets/coin.png" class="coin-ico-lg" alt="كونزه">
+          <input class="form-input" id="custom-coins-input" type="number" placeholder="عدد الكونزات (مثال: 1000)" style="flex:1" oninput="calcCustomPackage()" onkeydown="if(event.key==='Enter')buyCustomCoins()">
+        </div>
+        <div id="custom-details" style="display:none;margin-top:12px;background:var(--bg-hover);border-radius:10px;padding:12px;font-size:13px">
+          <div style="font-weight:800;color:var(--gold);margin-bottom:8px">📋 تفاصيل العملية</div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>شحن العملات</span><b id="custom-coins-total">0</b></div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>إجمالي العملات</span><b id="custom-coins-sum">0 كونزه</b></div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>السعر (قبل الضريبة)</span><b id="custom-price">0 ريال</b></div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>ضريبة القيمة المضافة (15%)</span><b id="custom-vat">0 ريال</b></div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>بالدولار ≈</span><b id="custom-usd">$0</b></div>
+          <div style="display:flex;justify-content:space-between;border-top:1px dashed var(--border);padding-top:8px;font-weight:900;color:var(--gold)"><span>المبلغ الإجمالي (شامل الضريبة)</span><span id="custom-total">0 ريال</span></div>
+        </div>
+        <button class="btn btn-accent btn-full" style="margin-top:12px" onclick="buyCustomCoins()">💳 اشتري الآن</button>
+      </div>
     </div>
     <div id="page-wallet" class="page-content">
       <div class="page-title">💰 محفظتي</div>
@@ -930,6 +948,19 @@
         <div id="coin-packages-list"><div class="empty-state"><div class="empty-text">لا توجد باقات</div></div></div>
       </div>
 
+      <div class="card" style="border:1.5px solid rgba(232,184,48,.4)">
+        <div class="card-title">✏️ تخصيص (شراء كونزات بعدد محدد)</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <img src="/assets/coin.png" class="coin-ico-lg" alt="كونزه">
+          <input class="form-input" id="custom-coins-input-w" type="number" placeholder="عدد الكونزات" style="flex:1" oninput="calcCustomPackageW()" onkeydown="if(event.key==='Enter')buyCustomCoins()">
+        </div>
+        <div id="custom-details-w" style="display:none;margin-top:10px;background:var(--bg-hover);border-radius:10px;padding:10px;font-size:12.5px">
+          <div style="display:flex;justify-content:space-between"><span>السعر</span><b id="custom-price-w">0</b></div>
+          <div style="display:flex;justify-content:space-between"><span>ضريبة 15%</span><b id="custom-vat-w">0</b></div>
+          <div style="display:flex;justify-content:space-between;font-weight:900;color:var(--gold)"><span>الإجمالي</span><b id="custom-total-w">0</b></div>
+        </div>
+        <button class="btn btn-accent btn-full" style="margin-top:10px" onclick="buyCustomCoins()">💳 اشتري الآن</button>
+      </div>
       <div class="card">
         <div class="card-title">💰 تحويل الكونزات إلى مبلغ</div>
         <div style="display:flex;gap:8px">
