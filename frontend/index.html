@@ -4391,12 +4391,34 @@ async function generateCodeAndAuction() {
 async function loadAvailableCodesDropdowns() {
   try {
     const { codes } = await api('GET', '/api/admin/auctions/available-codes');
-    const opts = '<option value="">اختر رمزاً...</option>' + codes.map(c => '<option value="' + c.code + '">' + c.code + '</option>').join('');
+    if (!state.sarRate) { try { const { rate } = await api('GET', '/api/pricing'); state.sarRate = rate || 50; } catch(e) {} }
+    const rate = state.sarRate || 50;
+    const opts = '<option value="">اختر رمزاً...</option>' + codes.map(c =>
+      '<option value="' + c.code + '" data-price="' + (c.price || 0) + '">' + c.code + ' — 🪙 ' + ((c.price || 0) * rate) + ' كونزه (' + (c.price || 0) + ' ريال)</option>'
+    ).join('');
     const sel1 = document.getElementById('auction-code-2');
     const sel2 = document.getElementById('auction-code');
-    if (sel1) sel1.innerHTML = opts;
-    if (sel2) sel2.innerHTML = opts;
+    if (sel1) { sel1.innerHTML = opts; sel1.onchange = () => autoFillAuctionPrice(sel1); }
+    if (sel2) { sel2.innerHTML = opts; sel2.onchange = () => autoFillAuctionPrice(sel2); }
   } catch(e) {}
+}
+
+// عند اختيار رمز: تعبئة سعر البداية تلقائياً من سعر الرمز
+function autoFillAuctionPrice(sel) {
+  const opt = sel.options[sel.selectedIndex];
+  if (!opt || !opt.dataset.price) return;
+  const price = parseInt(opt.dataset.price) || 0;
+  // النموذج الرئيسي للإدارة
+  const start2 = document.getElementById('auction-starting-2');
+  if (start2 && sel.id === 'auction-code-2') {
+    start2.value = price || 100;
+    const coinEl = document.getElementById('auction-start-coin-2');
+    if (coinEl) coinEl.textContent = '🪙 ' + (price * (state.sarRate || 50));
+  }
+  const start1 = document.getElementById('auction-starting');
+  if (start1 && sel.id === 'auction-code') {
+    start1.value = price || 100;
+  }
 }
 
 async function createAuction() {
