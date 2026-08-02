@@ -3162,9 +3162,10 @@ body {
 
 /* Level image badge */
 .level-img {
-  width: 42px;
-  height: 42px;
+  width: 52px;
+  height: 20px;
   vertical-align: middle;
   margin-right: 4px;
   filter: drop-shadow(0 2px 6px rgba(0,0,0,.4));
+  object-fit: fill;
 }
