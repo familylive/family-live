@@ -468,7 +468,7 @@ async function deleteFamily(familyId) {
   await run('DELETE FROM families WHERE id = $1', [familyId]);
   return true;
 }
-async function getAllUsersDetailed() { return query('SELECT u.id, u.name, u.email, u.phone, u.whatsapp, u.country, u.city, u.role, u.points, u.public_id, u.last_seen, u.can_open_diwaniya, f.name as family_name, f.subscription_code FROM users u LEFT JOIN families f ON u.family_id = f.id ORDER BY u.role, u.name'); }
+async function getAllUsersDetailed() { return query('SELECT u.id, u.name, u.email, u.phone, u.whatsapp, u.country, u.city, u.role, u.points, u.level, u.public_id, u.last_seen, u.can_open_diwaniya, f.name as family_name, f.subscription_code FROM users u LEFT JOIN families f ON u.family_id = f.id ORDER BY u.role, u.name'); }
 async function updateUserByAdmin(userId, data) {
   const { name, email, whatsapp, phone, role } = data;
   if (name !== undefined) await run('UPDATE users SET name = $1 WHERE id = $2', [name, userId]);

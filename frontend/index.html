@@ -3957,6 +3957,7 @@ function showUsersTab(role) {
     data.map(u =>
       '<div class="admin-family-item" id="user-item-' + u.id + '">' +
         '<div class="admin-family-name">' + (u.name || '') + '</div>' +
+        ((parseInt(u.level) >= 0 && parseInt(u.level) <= 100) ? '<div style="margin:4px 0"><img src="/assets/levels/level_' + u.level + '.' + (u.level >= 1 && u.level <= 10 ? 'gif' : 'png') + '?v=4" style="width:64px;height:24px"></div>' : '') +
         '<div class="admin-family-meta">📧 ' + (u.email || '-') + ' · 📱 ' + (u.whatsapp || '-') + ' · 🏠 ' + (u.family_name || '-') + ' · ⭐ ' + (u.points||0) + '</div>' +
         '<div class="admin-family-actions">' +
           '<button class="btn btn-sm" onclick="editUser(\'' + u.id + '\')">✏️ تعديل</button>' +
