@@ -3006,6 +3006,24 @@ function initAvatarZoom() {
 document.addEventListener('DOMContentLoaded', initAvatarZoom);
 setTimeout(initAvatarZoom, 1500);
 
+// ==================== PRICING PAGE (ميز عائلتك) ====================
+async function loadPremiumPricing() {
+  try {
+    const { rate } = await api('GET', '/api/pricing');
+    state.sarRate = rate || 50;
+    const premiumSar = 2000; // سعر الرمز المميز
+    const customSar = 2500;  // سعر المخصص
+    const e1 = document.getElementById('pricing-premium-coins');
+    const e2 = document.getElementById('pricing-premium-sar');
+    const e3 = document.getElementById('pricing-custom-coins');
+    const e4 = document.getElementById('pricing-custom-sar');
+    if (e1) e1.textContent = (premiumSar * rate).toLocaleString('en');
+    if (e2) e2.textContent = '= ' + premiumSar.toLocaleString('en') + ' ريال';
+    if (e3) e3.textContent = (customSar * rate).toLocaleString('en');
+    if (e4) e4.textContent = '= ' + customSar.toLocaleString('en') + ' ريال';
+  } catch(e) {}
+}
+
 // ==================== BUY PAGE + CUSTOM PACKAGE ====================
 let customRate = 50;
 let customMode = 'coins';
