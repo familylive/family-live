@@ -1848,6 +1848,14 @@ app.post('/api/diwaniya/message', authMiddleware, async (req, res) => {
   res.json(result);
 });
 
+// Online founders (for cross-family challenges)
+app.get('/api/founders/online', authMiddleware, asyncHandler(async (req, res) => {
+  const founders = await db.getOnlineFounders();
+  // Mark who is actually online via sockets
+  const online = founders.map(f => ({ ...f, online: onlineUsers.has(f.id) })).filter(f => f.online && f.id !== req.user.id);
+  res.json({ founders: online });
+}));
+
 // =============== BATTLES (live support challenge) ===============
 
 // Start a battle challenge (challenge a member present in the call)
@@ -1864,10 +1872,16 @@ app.post('/api/battles/start', authMiddleware, asyncHandler(async (req, res) => 
   const me = await db.getUserById(req.user.id);
   const opp = await db.getUserById(opponentId);
   if (!opp) return res.status(404).json({ error: 'العضو غير موجود' });
-  const battle = await db.createBattle(sessionId, req.user.id, opponentId, durationMinutes);
+  // Cross-family: founders from different families can battle (no session needed)
+  let famA = null, famB = null;
+  if (opp.family_id && opp.family_id !== req.user.familyId) {
+    famA = req.user.familyId;
+    famB = opp.family_id;
+  }
+  const battle = await db.createBattle(sessionId, req.user.id, opponentId, durationMinutes, famA, famB);
   io.to(`user_${opponentId}`).emit('battle_invite', {
     battleId: battle.id, sessionId, fromId: req.user.id, fromName: me.name,
-    fromAvatar: me.avatar, duration: battle.duration_minutes
+    fromAvatar: me.avatar, duration: battle.duration_minutes, crossFamily: !!famB
   });
   res.json({ message: '⚔️ أرسلت تحدياً إلى ' + opp.name, battle });
 }));
@@ -1879,7 +1893,9 @@ app.post('/api/battles/accept', authMiddleware, asyncHandler(async (req, res) =>
   if (!battle) return res.status(404).json({ error: 'التحدي غير موجود' });
   if (battle.player_b_id !== req.user.id) return res.status(403).json({ error: 'هذا التحدي ليس لك' });
   const updated = await db.acceptBattle(battleId, new Date().toISOString());
-  io.to(`session_${battle.session_id}`).emit('battle_started', updated);
+  if (battle.session_id) io.to(`session_${battle.session_id}`).emit('battle_started', updated);
+  if (battle.family_a_id) io.to(`family_${battle.family_a_id}`).emit('battle_started', updated);
+  if (battle.family_b_id) io.to(`family_${battle.family_b_id}`).emit('battle_started', updated);
   res.json({ message: '⚔️ بدأ التحدي! الدعم يفوز', battle: updated });
 }));
 
@@ -1901,7 +1917,16 @@ app.post('/api/battles/support', authMiddleware, asyncHandler(async (req, res) =
   if (!wallet) return res.status(400).json({ error: 'رصيدك لا يكفي' });
   await db.runRaw("INSERT INTO coin_transactions (id, user_id, type, coins, detail) VALUES ($1,$2,'battle_support',$3,$4)", [require('crypto').randomUUID(), req.user.id, amount, 'دعم في تحدي مباشر']);
   const updated = await db.supportBattle(battleId, side, amount);
-  io.to(`session_${battle.session_id}`).emit('battle_update', updated);
+  // Raise family support points (featured ranking) for the supported player's family
+  const playerId = side === 'a' ? battle.player_a_id : battle.player_b_id;
+  try {
+    const p = await db.getUserById(playerId);
+    if (p?.family_id) await db.addFamilySupportPoints(p.family_id, amount);
+  } catch(e) {}
+  // Broadcast to session + both families (cross-family)
+  if (battle.session_id) io.to(`session_${battle.session_id}`).emit('battle_update', updated);
+  if (battle.family_a_id) io.to(`family_${battle.family_a_id}`).emit('battle_update', updated);
+  if (battle.family_b_id) io.to(`family_${battle.family_b_id}`).emit('battle_update', updated);
   res.json({ message: '⚔️ دعمت اللاعب بـ ' + amount + ' كوينز', battle: updated, wallet });
 }));
 
@@ -1917,7 +1942,9 @@ app.post('/api/battles/end', authMiddleware, asyncHandler(async (req, res) => {
   const final = await db.endBattle(battleId, winnerId);
   // Reward winner: +500 coins
   await db.addCoins(winnerId, 500);
-  io.to(`session_${battle.session_id}`).emit('battle_ended', { ...final, winnerName, reward: 500 });
+  if (battle.session_id) io.to(`session_${battle.session_id}`).emit('battle_ended', { ...final, winnerName, reward: 500 });
+  if (battle.family_a_id) io.to(`family_${battle.family_a_id}`).emit('battle_ended', { ...final, winnerName, reward: 500 });
+  if (battle.family_b_id) io.to(`family_${battle.family_b_id}`).emit('battle_ended', { ...final, winnerName, reward: 500 });
   res.json({ message: '🏆 فاز ' + winnerName + '!', battle: final });
 }));
 

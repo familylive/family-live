@@ -96,6 +96,10 @@ async function initDb() {
   try { await run("ALTER TABLE families ADD COLUMN IF NOT EXISTS name_changed_at TEXT"); } catch(e) {}
   try { await run("ALTER TABLE families ADD COLUMN IF NOT EXISTS name_changes_count INTEGER DEFAULT 0"); } catch(e) {}
   try { await run("ALTER TABLE families ADD COLUMN IF NOT EXISTS image TEXT"); } catch(e) {}
+  try { await run("ALTER TABLE families ADD COLUMN IF NOT EXISTS support_points INTEGER DEFAULT 0"); } catch(e) {}
+  try { await run("ALTER TABLE battles ADD COLUMN IF NOT EXISTS family_a_id TEXT"); } catch(e) {}
+  try { await run("ALTER TABLE battles ADD COLUMN IF NOT EXISTS family_b_id TEXT"); } catch(e) {}
+  try { await run("ALTER TABLE battles ADD COLUMN IF NOT EXISTS cross_family INTEGER DEFAULT 0"); } catch(e) {}
   try { await run("ALTER TABLE families ADD COLUMN IF NOT EXISTS description TEXT"); } catch(e) {}
   try { await run("ALTER TABLE diwaniya_sessions ADD COLUMN IF NOT EXISTS secret_code TEXT"); } catch(e) {}
   try { await run("ALTER TABLE diwaniya_sessions ADD COLUMN IF NOT EXISTS capacity INTEGER DEFAULT 15"); } catch(e) {}
@@ -404,7 +408,7 @@ async function deleteAd(id) { await run('DELETE FROM ads WHERE id = $1', [id]); 
 async function trackAdView(id) { await run('UPDATE ads SET views = views + 1 WHERE id = $1', [id]); }
 async function trackAdClick(id) { await run('UPDATE ads SET clicks = clicks + 1 WHERE id = $1', [id]); }
 async function getAdsStats() { const r = await queryOne('SELECT COUNT(*) as total, COALESCE(SUM(views),0) as views, COALESCE(SUM(clicks),0) as clicks FROM ads'); return { total: r.total || 0, views: r.views || 0, clicks: r.clicks || 0 }; }
-async function getFeaturedFamilies(limit = 5) { return query("SELECT f.id, f.name, f.subscription_code, f.image, (SELECT COUNT(*) FROM users WHERE family_id = f.id) as members_count, u.name as founder_name FROM families f LEFT JOIN users u ON f.founder_id = u.id WHERE f.status = 'active' ORDER BY members_count DESC LIMIT $1", [limit]); }
+async function getFeaturedFamilies(limit = 5) { return query("SELECT f.id, f.name, f.subscription_code, f.image, f.support_points, (SELECT COUNT(*) FROM users WHERE family_id = f.id) as members_count, u.name as founder_name FROM families f LEFT JOIN users u ON f.founder_id = u.id WHERE f.status = 'active' ORDER BY f.support_points DESC, members_count DESC LIMIT $1", [limit]); }
 
 // =============== USER FAMILIES ===============
 async function getUserFamilies(userId) { return query('SELECT uf.*, f.name as family_name, f.subscription_code FROM user_families uf JOIN families f ON uf.family_id = f.id WHERE uf.user_id = $1 ORDER BY uf.joined_at DESC', [userId]); }
@@ -639,10 +643,18 @@ async function addFounderViolation(userId, reason, action, byUserId, byUserName)
   return queryOne('SELECT * FROM violations WHERE id = $1', [id]);
 }
 
-async function createBattle(sessionId, playerA, playerB, durationMinutes) {
+async function createBattle(sessionId, playerA, playerB, durationMinutes, familyAId, familyBId) {
   const id = uuidv4();
-  await run('INSERT INTO battles (id, session_id, player_a_id, player_b_id, duration_minutes) VALUES ($1,$2,$3,$4,$5)', [id, sessionId, playerA, playerB, parseInt(durationMinutes) || 3]);
+  const cross = familyAId && familyBId && familyAId !== familyBId ? 1 : 0;
+  await run('INSERT INTO battles (id, session_id, player_a_id, player_b_id, duration_minutes, family_a_id, family_b_id, cross_family) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)', [id, sessionId || null, playerA, playerB, parseInt(durationMinutes) || 3, familyAId || null, familyBId || null, cross]);
   return queryOne('SELECT * FROM battles WHERE id = $1', [id]);
+}
+async function addFamilySupportPoints(familyId, coins) {
+  if (!familyId) return;
+  await run('UPDATE families SET support_points = support_points + $1 WHERE id = $2', [coins, familyId]);
+}
+async function getOnlineFounders() {
+  return query("SELECT u.id, u.name, u.avatar, u.public_id, f.id as family_id, f.name as family_name, f.subscription_code FROM users u LEFT JOIN families f ON u.family_id = f.id WHERE u.role = 'founder' ORDER BY u.name");
 }
 async function getBattleById(id) { return queryOne('SELECT * FROM battles WHERE id = $1', [id]); }
 async function getActiveBattle(sessionId) {
@@ -928,7 +940,7 @@ module.exports = {
   addModeratorStars, getModeratorProfile, rateModerator, getModeratorTier, updateModeratorTier, getTierSettings,
   getActivePackages, getAllPackages, addPackage, updatePackage, deletePackage, getPaymentSettings, savePaymentSettings, createPayment, getAllPayments, getMyPayments, confirmPayment, rejectPayment, getFamilyEditInfo, recordFamilyNameChange, getFamilyCapacity, purchaseCapacity, setDiwaniyaCapacity, getCapacityPackages,
   createAnnouncement, getFamilyAnnouncements, getAnnouncementsForUser, deleteAnnouncement,
-  createBattle, getBattleById, getActiveBattle, acceptBattle, rejectBattle, supportBattle, endBattle,
+  createBattle, getBattleById, getActiveBattle, acceptBattle, rejectBattle, supportBattle, endBattle, addFamilySupportPoints, getOnlineFounders,
   isDiwaniyaRestricted, restrictFromDiwaniya, unrestrictFromDiwaniya, getDiwaniyaRestrictions,
   seedViolationTemplates, getViolationTemplates, getAllViolationTemplates, addViolationTemplate, deleteViolationTemplate, addFounderViolation,
   getGiftItems, getAllGiftItems, addGiftItem, updateGiftItem, deleteGiftItem,

@@ -1523,8 +1523,19 @@ async function loadBattleStatus() {
         const { members } = await api('GET', '/api/family/members');
         const a = members.find(m => m.id === battle.player_a_id);
         const b = members.find(m => m.id === battle.player_b_id);
-        battle.player_a_name = a?.name || battle.player_a_id.slice(0,6);
-        battle.player_b_name = b?.name || battle.player_b_id.slice(0,6);
+        battle.player_a_name = a?.name;
+        battle.player_b_name = b?.name;
+        if (!battle.player_a_name || !battle.player_b_name) {
+          try {
+            const { founders } = await api('GET', '/api/founders/online');
+            founders.forEach(f => {
+              if (f.id === battle.player_a_id && !battle.player_a_name) battle.player_a_name = f.name + ' (👪 ' + f.family_name + ')';
+              if (f.id === battle.player_b_id && !battle.player_b_name) battle.player_b_name = f.name + ' (👪 ' + f.family_name + ')';
+            });
+          } catch(e) {}
+        }
+        if (!battle.player_a_name) battle.player_a_name = battle.player_a_id.slice(0,6);
+        if (!battle.player_b_name) battle.player_b_name = battle.player_b_id.slice(0,6);
       } catch(e) {}
       renderBattle(battle);
     }
@@ -1864,6 +1875,12 @@ function renderBattle(b) {
   document.getElementById('battle-name-b').textContent = nb;
   document.getElementById('battle-coins-a').textContent = '🪙 ' + (b.coins_a || 0);
   document.getElementById('battle-coins-b').textContent = '🪙 ' + (b.coins_b || 0);
+  // Self-support button: show if I am one of the players
+  const sself = document.getElementById('self-support-btn');
+  if (sself) {
+    const isPlayer = b.player_a_id === state.user?.id || b.player_b_id === state.user?.id;
+    sself.style.display = isPlayer ? 'inline-block' : 'none';
+  }
   const total = (b.coins_a || 0) + (b.coins_b || 0);
   // Tug-of-war line: 50% = center, moves toward the leader
   const linePos = total ? 50 + ((b.coins_a || 0) - (b.coins_b || 0)) / total * 50 : 50;
@@ -1908,6 +1925,53 @@ async function endBattleNow() {
   if (!currentBattle || currentBattle.status !== 'active') return;
   if (!confirm('🏁 إنهاء التحدي الآن؟')) return;
   try { await api('POST', '/api/battles/end', { battleId: currentBattle.id }); } catch(e) { showToast(e.message, 'error'); }
+}
+
+// Founder supports himself (boosts his side + raises his family ranking)
+async function supportSelfBattle() {
+  if (!currentBattle) return;
+  const meId = state.user?.id;
+  let side = null;
+  if (currentBattle.player_a_id === meId) side = 'a';
+  else if (currentBattle.player_b_id === meId) side = 'b';
+  if (!side) return showToast('أنت لست طرفاً في هذا التحدي', 'error');
+  const coins = prompt('🙋 كم كوينز تدعم نفسك به؟', '100');
+  if (!coins || parseInt(coins) <= 0) return;
+  if (!confirm('🙋 دعم نفسك بـ ' + coins + ' كوينز؟ (يرفع ترتيب عائلتك أيضاً)')) return;
+  try {
+    const r = await api('POST', '/api/battles/support', { battleId: currentBattle.id, side, coins });
+    showToast(r.message, 'success');
+    refreshWalletHeader();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+// Show online founders + challenge one
+async function openFounderBattleModal() {
+  const list = document.getElementById('online-founders-list');
+  list.innerHTML = '<div class="empty-state"><div class="empty-text">جاري التحميل...</div></div>';
+  document.getElementById('founder-battle-modal').style.display = 'flex';
+  try {
+    const { founders } = await api('GET', '/api/founders/online');
+    if (!founders?.length) {
+      list.innerHTML = '<div class="empty-state"><div class="empty-text">لا يوجد مؤسسون متصلون حالياً</div></div>';
+      return;
+    }
+    list.innerHTML = founders.map(f =>
+      '<div class="my-family-item" style="justify-content:space-between;align-items:center">' +
+        '<div><b>' + (f.name || 'مؤسس') + '</b><div style="font-size:11px;color:var(--text-muted)">👪 ' + (f.family_name || 'عائلة') + ' · رمز: ' + (f.subscription_code || '-') + '</div></div>' +
+        '<button class="btn btn-sm btn-accent" onclick="startFounderBattle(\'' + f.id + '\')">⚔️ تحدي</button>' +
+      '</div>'
+    ).join('');
+  } catch(e) { list.innerHTML = '<div class="empty-text">فشل التحميل</div>'; }
+}
+
+async function startFounderBattle(opponentId) {
+  const duration = document.getElementById('founder-battle-duration')?.value || '3';
+  try {
+    const result = await api('POST', '/api/battles/start', { opponentId, sessionId: null, durationMinutes: duration });
+    showToast(result.message, 'success');
+    document.getElementById('founder-battle-modal').style.display = 'none';
+  } catch(e) { showToast(e.message, 'error'); }
 }
 
 // ==================== TIKTOK CHAT (on the black screen) ====================
