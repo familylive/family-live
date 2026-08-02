@@ -1063,13 +1063,22 @@ function stopMessagePolling() {
 
 let lastMsgCount = 0;
 let notifiedMsgIds = new Set();
+let lastMsgIds = '';
 
 async function loadDiwaniyaMessages(sessionId, isPoll = false) {
   try {
     const { messages } = await api('GET', `/api/diwaniya/messages/${sessionId}`);
     const room = document.getElementById('chat-room'); if (!room) return;
-    room.innerHTML = '';
-    messages.forEach(msg => addChatMessage(msg.user_name, msg.message, msg.user_id === state.user?.id, msg.avatar, msg.user_level));
+    // No full re-render if nothing new (prevents flicker every 3s)
+    const ids = (messages || []).map(m => m.id).join(',');
+    const empty = room.querySelector('.empty-state');
+    if (empty) room.innerHTML = '';
+    if (isPoll && ids === lastMsgIds && room.children.length > 0) return;
+    if (ids !== lastMsgIds) {
+      room.innerHTML = '';
+      messages.forEach(msg => addChatMessage(msg.user_name, msg.message, msg.user_id === state.user?.id, msg.avatar, msg.user_level));
+      lastMsgIds = ids;
+    }
     // Sync TikTok overlay chat if visible
     const tk = document.getElementById('tiktok-chat');
     if (tk && tk.style.display !== 'none') syncTikTokChat();
