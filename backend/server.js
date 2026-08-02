@@ -1203,14 +1203,40 @@ app.post('/api/auctions/join', authMiddleware, asyncHandler(async (req, res) => 
 app.post('/api/auctions/bid', authMiddleware, asyncHandler(async (req, res) => {
   const { auctionId, amount } = req.body;
   if (!auctionId || !amount) return res.status(400).json({ error: 'المزاد والمبلغ مطلوبان' });
-  // Bid = buy the package in coins (deduct immediately)
   const rate = await db.getSarToCoinsRate();
   const bidCoins = parseInt(amount) * rate;
-  const pay = await db.payWithCoins(req.user.id, bidCoins, 'مزايدة في المزاد');
-  if (pay.error) return res.status(400).json(pay);
+  const auction = await db.getAuctionById(auctionId);
+  if (!auction || auction.status !== 'active') return res.status(400).json({ error: 'المزاد غير نشط' });
+  
+  // Entry fee: taken once (first time only)
+  let participant = await db.isAuctionParticipant(auctionId, req.user.id);
+  const entryCoins = (parseInt(auction.entry_fee) || 0) * rate;
+  const totalNeeded = bidCoins + (participant ? 0 : entryCoins);
+  
+  // MUST have enough balance to cover the bid (+ entry if first time)
+  const wallet = await db.getWallet(req.user.id);
+  if ((wallet.coins || 0) < totalNeeded) {
+    return res.status(400).json({ error: 'رصيدك لا يغطي المزايدة - تحتاج 🪙 ' + totalNeeded + ' عملة (لديك 🪙 ' + (wallet.coins || 0) + ')' });
+  }
+  
+  // Entry fee first time (spent, non-refundable)
+  if (!participant) {
+    const pay = await db.payWithCoins(req.user.id, entryCoins, 'رسوم دخول المزاد (غير مستردة)');
+    if (pay.error) return res.status(400).json(pay);
+    await db.joinAuction(auctionId, req.user.id);
+    participant = true;
+  }
+  
+  // Bid amount goes to HOLD (returns after the auction ends)
+  const held = await db.addToHold(req.user.id, bidCoins);
+  if (!held) return res.status(400).json({ error: 'فشل حجز العملات' });
+  await db.runRaw("INSERT INTO coin_transactions (id, user_id, type, coins, detail) VALUES ($1,$2,'bid_hold',$3,$4)", [require('crypto').randomUUID(), req.user.id, bidCoins, 'حجز مزايدة في المزاد (' + auction.code + ') - يعود بعد انتهاء المزاد']);
   const result = await db.placeBid(auctionId, req.user.id, parseInt(amount));
-  if (result.error) return res.status(400).json(result);
-  res.json({ message: '✅ زايدت بـ 🪙 ' + bidCoins + ' عملة — أنت الآن المزايد الأخير', auction: await auctionInCoins(result), wallet: pay.wallet });
+  if (result.error) {
+    await db.releaseHold(req.user.id, bidCoins, auction.code);
+    return res.status(400).json(result);
+  }
+  res.json({ message: '✅ زايدت بـ 🪙 ' + bidCoins + ' — حُجزت وتعود لك بعد انتهاء المزاد', auction: await auctionInCoins(result), wallet: held });
 }));
 
 // Admin: create auction
@@ -1236,12 +1262,31 @@ app.get('/api/admin/auctions', authMiddleware, adminMiddleware, async (req, res)
   res.json({ auctions });
 });
 
-// Admin: end auction
+// Release all holds after an auction ends (returns coins + notifies bidders)
+async function releaseAuctionHolds(auctionId) {
+  try {
+    const auction = await db.getAuctionById(auctionId);
+    if (!auction) return;
+    const bids = await db.getAuctionBids(auctionId);
+    const totals = {};
+    bids.forEach(b => { totals[b.user_id] = (totals[b.user_id] || 0) + (parseInt(b.amount) || 0); });
+    for (const [uid, amt] of Object.entries(totals)) {
+      const rate = await db.getSarToCoinsRate();
+      const released = await db.releaseHold(uid, amt * rate, auction.code);
+      if (released > 0) {
+        io.to(`user_${uid}`).emit('hold_released', { coins: released, code: auction.code });
+      }
+    }
+  } catch(e) { console.log('Hold release error:', e.message); }
+}
+
+// Admin: end auction (releases all holds)
 app.post('/api/admin/auctions/end', authMiddleware, adminMiddleware, async (req, res) => {
   const { auctionId } = req.body;
   const auction = await db.endAuction(auctionId);
   if (!auction) return res.status(400).json({ error: 'المزاد غير متاح' });
-  res.json({ message: '🏁 تم إنهاء المزاد', auction });
+  await releaseAuctionHolds(auctionId);
+  res.json({ message: '🏁 تم إنهاء المزاد - عادت الحجوزات لأصحابها', auction });
 });
 
 // Winner pays the final bid coins to own the code
@@ -1276,12 +1321,13 @@ app.post('/api/admin/auctions/release', authMiddleware, adminMiddleware, async (
   res.json({ message: '↩️ عاد الرمز لمستودع الرموز - يمكنك طرحه مرة أخرى', auction });
 });
 
-// Admin: cancel auction
+// Admin: cancel auction (releases all holds)
 app.post('/api/admin/auctions/cancel', authMiddleware, adminMiddleware, async (req, res) => {
   const { auctionId } = req.body;
   const auction = await db.cancelAuction(auctionId);
   if (!auction) return res.status(400).json({ error: 'المزاد غير موجود' });
-  res.json({ message: '❌ تم إلغاء المزاد', auction });
+  await releaseAuctionHolds(auctionId);
+  res.json({ message: '❌ تم إلغاء المزاد - عادت الحجوزات لأصحابها', auction });
 });
 
 // =============== CURRENCY ===============

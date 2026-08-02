@@ -585,6 +585,12 @@ function connectSocket() {
     if (socket) socket.disconnect();
     location.reload();
   });
+  socket.on('hold_released', (data) => {
+    showToast('🪙 عادت لك ' + (data.coins || 0) + ' عملة محجوزة من مزايدة الرمز (' + (data.code || '') + ')', 'success');
+    playNotificationSound();
+    refreshWalletHeader();
+    loadWallet();
+  });
   socket.on('coins_charged', (data) => {
     showToast('🎉 تم شحن حسابك بـ ' + data.amount + ' كوينز!', 'success');
     playNotificationSound();

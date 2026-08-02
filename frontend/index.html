@@ -896,6 +896,7 @@
           <div><div style="font-size:28px;font-weight:900;color:var(--success)" id="wallet-money">0</div><div style="font-size:12px;color:var(--text-secondary)">💵 ريال في المحفظة</div></div>
         </div>
         <div style="font-size:11px;color:var(--text-muted);text-align:center" id="wallet-rate">1 كوينز = 1 ريال</div>
+        <div style="font-size:12px;color:#ff9f43;text-align:center;font-weight:800;margin-top:6px" id="wallet-hold" style="display:none"></div>
       </div>
 
       <div class="card card-glow">
@@ -4255,7 +4256,7 @@ async function placeBid(auctionId) {
   const amount = parseInt(sel.value);
   if (!amount) return showToast('اختر باقة المزايدة', 'error');
   const label = sel.options[sel.selectedIndex]?.textContent || ('🪙 ' + amount);
-  if (!confirm('💥 المزايدة بهذه الباقة: ' + label + '\nستخصم من رصيدك فوراً وتصبح المزايد الأخير. متابعة؟')) return;
+  if (!confirm('💥 المزايدة بهذه الباقة: ' + label + '\nتُحجز من رصيدك (🔒) وترجع لك بعد انتهاء المزاد. متابعة؟')) return;
   try {
     const result = await api('POST', '/api/auctions/bid', { auctionId, amount });
     showToast(result.message, 'success');

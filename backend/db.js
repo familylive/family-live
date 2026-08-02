@@ -78,6 +78,7 @@ async function initDb() {
   await run(`CREATE TABLE IF NOT EXISTS effects (id TEXT PRIMARY KEY, name TEXT NOT NULL, emoji TEXT DEFAULT '✨', css_class TEXT, price INTEGER DEFAULT 0, status TEXT DEFAULT 'active', created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS user_effects (user_id TEXT NOT NULL, effect_id TEXT NOT NULL, purchased_at TEXT DEFAULT now(), PRIMARY KEY (user_id, effect_id))`);
   try { await run("ALTER TABLE users ADD COLUMN IF NOT EXISTS selected_effect TEXT"); } catch(e) {}
+  try { await run("ALTER TABLE users ADD COLUMN IF NOT EXISTS hold_balance INTEGER DEFAULT 0"); } catch(e) {}
   try { await run("ALTER TABLE families ADD COLUMN IF NOT EXISTS battle_wins INTEGER DEFAULT 0"); } catch(e) {}
   await run(`CREATE TABLE IF NOT EXISTS battles (id TEXT PRIMARY KEY, session_id TEXT, player_a_id TEXT, player_b_id TEXT, status TEXT DEFAULT 'pending', duration_minutes INTEGER DEFAULT 3, coins_a INTEGER DEFAULT 0, coins_b INTEGER DEFAULT 0, winner_id TEXT, start_time TEXT, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS diwaniya_restrictions (id TEXT PRIMARY KEY, session_id TEXT NOT NULL, user_id TEXT NOT NULL, type TEXT DEFAULT 'restrict', created_at TEXT DEFAULT now())`);
@@ -668,6 +669,24 @@ async function addFounderViolation(userId, reason, action, byUserId, byUserName)
 
 async function getSarToCoinsRate() { return parseInt(await getSetting('sar_to_coins', '100')) || 100; }
 async function setSarToCoinsRate(rate) { await setSetting('sar_to_coins', parseInt(rate) || 100); return parseInt(rate) || 100; }
+async function addToHold(userId, amount) {
+  await run('UPDATE users SET coins = coins - $1, hold_balance = hold_balance + $1 WHERE id = $2', [amount, userId]);
+  return getWallet(userId);
+}
+async function releaseHold(userId, amount, code) {
+  const r = await queryOne('SELECT hold_balance FROM users WHERE id = $1', [userId]);
+  const rel = Math.min(parseInt(r?.hold_balance) || 0, amount || 999999999);
+  if (rel <= 0) return 0;
+  await run('UPDATE users SET hold_balance = hold_balance - $1, coins = coins + $1 WHERE id = $2', [rel, userId]);
+  // History entry: held coins returned from the auction bid
+  await run("INSERT INTO coin_transactions (id, user_id, type, coins, detail) VALUES ($1,$2,'hold_return',$3,$4)", [uuidv4(), userId, rel, 'عودة رصيد محجوز من مزايدة الرمز (' + (code || '') + ')']);
+  return rel;
+}
+async function getWallet(userId) {
+  const u = await queryOne('SELECT coins, wallet, hold_balance FROM users WHERE id = $1', [userId]);
+  return u ? { coins: parseInt(u.coins) || 0, wallet: parseInt(u.wallet) || 0, hold: parseInt(u.hold_balance) || 0 } : { coins: 0, wallet: 0, hold: 0 };
+}
+
 async function getPricing() {
   const rate = await getSarToCoinsRate();
   const rows = await query('SELECT * FROM pricing ORDER BY name');
@@ -1021,7 +1040,7 @@ module.exports = {
   isDiwaniyaRestricted, restrictFromDiwaniya, unrestrictFromDiwaniya, getDiwaniyaRestrictions,
   seedViolationTemplates, getViolationTemplates, getAllViolationTemplates, addViolationTemplate, deleteViolationTemplate, addFounderViolation,
   getGiftItems, getAllGiftItems, addGiftItem, updateGiftItem, deleteGiftItem,
-  getWallet, addCoins, deductCoins, sendGift, convertCoinsToWallet, getUserByPublicId, transferCoins, getCoinPackages, getAllCoinPackages, addCoinPackage, updateCoinPackage, deleteCoinPackage,
+  getWallet, addCoins, deductCoins, addToHold, releaseHold, sendGift, convertCoinsToWallet, getUserByPublicId, transferCoins, getCoinPackages, getAllCoinPackages, addCoinPackage, updateCoinPackage, deleteCoinPackage,
   requestWithdrawal, getMyWithdrawals, getAllWithdrawals, updateWithdrawal,
   getMyTransactions, getAllTransactions, getMyGifts, getGiftsByUser,
   getCurrencyRate, setCurrencyRate, getSecretRoomStatus, enableSecretRoom,
