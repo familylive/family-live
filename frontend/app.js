@@ -3045,7 +3045,7 @@ async function loadBuyPage() {
         const hot = p.badge && String(p.badge).includes('خصم');
         return '<div class="coin-package-card ' + tier + (hot ? ' hot' : '') + '" onclick="buyCoinsPackage(\'' + p.id + '\', ' + p.price + ', ' + p.coins + ')">' +
           (p.badge ? '<span class="pkg-badge">' + p.badge + '</span>' : '') +
-          '<div class="pkg-coins"><img src="/assets/coin.png" alt="<img src="/assets/coin.png" class="coin-ico" alt="">"> <b>' + p.coins.toLocaleString('en') + '</b></div>' +
+          '<div class="pkg-coins"><img src="/assets/coin.png" alt="كونزه"> <b>' + p.coins.toLocaleString('en') + '</b></div>' +
           '<div class="pkg-title">' + (p.title || 'باقة') + '</div>' +
           '<div class="pkg-price">' + p.price + ' ريال</div>' +
           '<div class="pkg-usd">≈ $' + (p.usd || (p.price/3.75).toFixed(2)) + '</div>' +
@@ -3158,6 +3158,6 @@ async function buyCustomCoins() {
 function coinVal(coins) {
   const c = parseInt(coins) || 0;
   const sar = Math.round((c / (state.sarRate || 50)) * 100) / 100;
-  return '<span class="coin-val"><img src="/assets/coin.png" class="coin-ico" alt="<img src="/assets/coin.png" class="coin-ico" alt="">"> <b>' + c.toLocaleString('en') + '</b>' +
+  return '<span class="coin-val"><img src="/assets/coin.png" class="coin-ico" alt="كونزه"> <b>' + c.toLocaleString('en') + '</b>' +
     '<span class="coin-sar">= ' + sar + ' ريال</span></span>';
 }
