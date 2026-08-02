@@ -1680,8 +1680,8 @@ async function loadDiwaniyaCapacity() {
       const p40 = (pricing || []).find(x => x.feature === 'capacity_40');
       const el20 = document.getElementById('cap20-price');
       const el40 = document.getElementById('cap40-price');
-      if (el20) el20.textContent = '🪙 ' + (p20?.coins ?? 5000) + ' كونزه';
-      if (el40) el40.textContent = '🪙 ' + (p40?.coins ?? 10000) + ' كونزه';
+      if (el20) el20.textContent = '<img src="/assets/coin.png" class="coin-ico" alt="كونزه"> ' + (p20?.coins ?? 5000) + ' كونزه';
+      if (el40) el40.textContent = '<img src="/assets/coin.png" class="coin-ico" alt="كونزه"> ' + (p40?.coins ?? 10000) + ' كونزه';
     } catch(e) {}
     const info = document.getElementById('capacity-info');
     const sel = document.getElementById('diwaniya-capacity-select');
@@ -2045,8 +2045,8 @@ function renderBattle(b) {
   const na = b.player_a_name || 'لاعب أ', nb = b.player_b_name || 'لاعب ب';
   document.getElementById('battle-name-a').textContent = na;
   document.getElementById('battle-name-b').textContent = nb;
-  document.getElementById('battle-coins-a').textContent = '🪙 ' + (b.coins_a || 0);
-  document.getElementById('battle-coins-b').textContent = '🪙 ' + (b.coins_b || 0);
+  document.getElementById('battle-coins-a').textContent = '<img src="/assets/coin.png" class="coin-ico" alt="كونزه"> ' + (b.coins_a || 0);
+  document.getElementById('battle-coins-b').textContent = '<img src="/assets/coin.png" class="coin-ico" alt="كونزه"> ' + (b.coins_b || 0);
   // Self-support button: show if I am one of the players
   const sself = document.getElementById('self-support-btn');
   if (sself) {

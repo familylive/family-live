@@ -1151,11 +1151,15 @@ app.post('/api/diwaniya/capacity/set', authMiddleware, async (req, res) => {
 async function auctionInCoins(a) {
   if (!a) return a;
   const rate = await db.getSarToCoinsRate();
+  const usdRate = await db.getCurrencyRate().catch(() => 3.75);
+  const usdPerSar = 1 / (usdRate || 3.75);
   return {
     ...a,
     starting_coins: (parseInt(a.starting_price) || 0) * rate,
     current_coins: (parseInt(a.current_price) || 0) * rate,
     entry_coins: (parseInt(a.entry_fee) || 0) * rate,
+    current_sar: parseInt(a.current_price) || 0,
+    current_usd: Math.round(((parseInt(a.current_price) || 0) * usdPerSar) * 100) / 100,
     bid_packages: [
       (parseInt(a.starting_price) || 100) * rate,
       ((parseInt(a.starting_price) || 100) * 2) * rate
