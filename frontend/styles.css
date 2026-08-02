@@ -2828,3 +2828,34 @@ body {
 /* Clickable founder row in connected families */
 .founder-row { cursor: pointer; transition: all .15s; }
 .founder-row:hover { border-color: var(--gold); background: rgba(232,184,48,.08); }
+
+/* Audio-only mode: black tiles + avatar circles with gold frames */
+.video-grid.audio-mode .video-tile {
+  background: radial-gradient(circle at 50% 40%, #111a2e, #000);
+}
+.video-grid.audio-mode .video-tile video { display: none !important; }
+.video-grid.audio-mode .cam-off-overlay { display: flex !important; background: transparent; }
+.video-grid.audio-mode .cam-off-icon { display: none; }
+.video-grid.audio-mode .cam-off-label { display: none; }
+.video-grid.audio-mode .cam-off-circle {
+  width: 86px;
+  height: 86px;
+  border: 3px solid var(--gold);
+  box-shadow: 0 0 18px rgba(232,184,48,.3);
+}
+.video-grid.audio-mode .cam-off-circle .avatar-emoji { font-size: 38px; }
+.video-grid.tiktok-mode.audio-mode .video-tile:not(.local) .cam-off-circle {
+  width: 64px;
+  height: 64px;
+}
+.video-grid.tiktok-mode.audio-mode .video-tile:not(.local) .cam-off-circle .avatar-emoji { font-size: 28px; }
+/* Speaking: golden glow frame on the avatar */
+.video-tile.speaking .cam-off-circle {
+  border-color: #ffd75e !important;
+  box-shadow: 0 0 26px rgba(255,215,0,.85), 0 0 50px rgba(255,215,0,.35) !important;
+  animation: avatarSpeak 1s ease-in-out infinite;
+}
+@keyframes avatarSpeak {
+  0%,100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}

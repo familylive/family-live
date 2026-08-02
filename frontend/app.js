@@ -627,6 +627,15 @@ function connectSocket() {
   socket.on('battle_finalized', () => {
     renderBattle(null);
   });
+  socket.on('mic_forced', (data) => {
+    // Founder forced my mic state
+    if (!localStream) return;
+    localStream.getAudioTracks().forEach(t => t.enabled = !data.muted);
+    micMuted = !!data.muted;
+    const micBtn = document.getElementById('mic-toggle-btn');
+    if (micBtn) micBtn.classList.toggle('muted', micMuted);
+    showToast(data.muted ? '🔇 تم كتم مايكك بواسطة المؤسس' : '🎙️ فتح المؤسس مايكك', data.muted ? 'error' : 'success');
+  });
   socket.on('camera_invite', (data) => {
     // I was invited to go on camera
     pendingCameraInvite = data;
@@ -1658,6 +1667,8 @@ async function joinLiveAudio() {
     if (invBtn) invBtn.style.display = (state.isFounder || state.user?.role === 'admin') ? 'block' : 'none';
     const famBtn = document.getElementById('families-btn');
     if (famBtn) famBtn.style.display = (state.isFounder || state.user?.role === 'admin') ? 'block' : 'none';
+    const mmBtn = document.getElementById('mic-manage-btn');
+    if (mmBtn) mmBtn.style.display = (state.isFounder || state.user?.role === 'admin') ? 'block' : 'none';
     const bsb = document.getElementById('battle-start-box');
     if (bsb) bsb.style.display = (state.isFounder || state.user?.role === 'admin') ? 'block' : 'none';
     updateAudioCallUI(true);
@@ -2001,6 +2012,41 @@ async function supportSelfBattle() {
   } catch(e) { showToast(e.message, 'error'); }
 }
 
+// ==================== MIC MANAGER (founder) ====================
+function openMicManager() {
+  const list = document.getElementById('mic-manager-list');
+  list.innerHTML = '';
+  // Me (founder) always unmuted
+  list.innerHTML += '<div class="my-family-item" style="justify-content:space-between;align-items:center;opacity:.85">' +
+    '<div><b>' + (state.user?.name || 'أنت') + '</b> <span style="font-size:10px;color:var(--gold)">👑 أنت</span></div>' +
+    '<span style="font-size:11px;color:var(--success)">🎙️ مفتوح دائماً</span></div>';
+  Object.entries(state.callMembers || {}).forEach(([id, name]) => {
+    list.innerHTML += '<div class="my-family-item" style="justify-content:space-between;align-items:center">' +
+      '<div><b>' + name + '</b></div>' +
+      '<div style="display:flex;gap:6px">' +
+        '<button class="btn btn-sm btn-danger" onclick="micControl(\'' + id + '\', true)">🔇 كتم</button>' +
+        '<button class="btn btn-sm btn-success" onclick="micControl(\'' + id + '\', false)">🎙️ فتح</button>' +
+      '</div></div>';
+  });
+  document.getElementById('mic-manager-modal').style.display = 'flex';
+}
+function micControl(userId, muted) {
+  if (!state.activeSession?.id) return;
+  socket.emit('mic_control', { sessionId: state.activeSession.id, userId, muted });
+  showToast((muted ? '🔇 تم كتم ' : '🎙️ تم فتح مايك ') + (state.callMembers[userId] || 'العضو'), muted ? 'error' : 'success');
+}
+function muteAllMics() {
+  if (!state.activeSession?.id) return;
+  if (!confirm('🔇 كتم كل المايكات وتتكلم أنت فقط؟')) return;
+  socket.emit('mic_mute_all', { sessionId: state.activeSession.id, exceptId: state.user?.id });
+  showToast('🔇 تم كتم الكل - تتكلم أنت فقط', 'error');
+}
+function unmuteAllMics() {
+  if (!state.activeSession?.id) return;
+  socket.emit('mic_mute_all', { sessionId: state.activeSession.id, exceptId: null });
+  showToast('🎙️ فتحت كل المايكات', 'success');
+}
+
 // Connected families (in the broadcast) - invite to join & chat, then battle
 async function openConnectedFamilies() {
   const list = document.getElementById('connected-families-list');
@@ -2189,12 +2235,38 @@ function setTikTokMode(on) {
   const grid = document.getElementById('video-grid');
   if (!grid) return;
   grid.classList.toggle('tiktok-mode', on);
+  grid.classList.toggle('audio-mode', on); // audio-only: black + avatar circles
   const tk = document.getElementById('tiktok-chat');
   if (tk) tk.style.display = on ? 'flex' : 'none';
   const btn = document.getElementById('tiktok-mode-btn');
   if (btn) btn.classList.toggle('zoom', on);
-  if (on) setTimeout(syncTikTokChat, 300);
+  if (on) {
+    setTimeout(syncTikTokChat, 300);
+    ensureAudioOverlays();
+  }
   if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+}
+
+// Ensure every tile shows the avatar circle in audio mode
+function ensureAudioOverlays() {
+  const myTile = document.getElementById('my-video-tile');
+  if (myTile && !myTile.querySelector('.cam-off-overlay')) {
+    const overlay = document.createElement('div');
+    overlay.className = 'cam-off-overlay';
+    overlay.style.display = 'none';
+    overlay.innerHTML = '<div class="cam-off-circle">' + avatarHtml(state.user?.avatar) + '</div><div class="cam-off-icon">🚫</div><div class="cam-off-label">كاميرا مغلقة</div>';
+    myTile.appendChild(overlay);
+  }
+  document.querySelectorAll('.video-tile:not(.local)').forEach(tile => {
+    if (!tile.querySelector('.cam-off-overlay')) {
+      const pid = (tile.id || '').replace('video-', '');
+      const overlay = document.createElement('div');
+      overlay.className = 'cam-off-overlay';
+      overlay.style.display = 'none';
+      overlay.innerHTML = '<div class="cam-off-circle">' + avatarHtml(peerAvatars[pid]) + '</div><div class="cam-off-icon">🚫</div><div class="cam-off-label">كاميرا مغلقة</div>';
+      tile.appendChild(overlay);
+    }
+  });
 }
 
 function toggleTikTokMode() {

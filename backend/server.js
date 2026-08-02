@@ -1273,6 +1273,14 @@ app.post('/api/gifts/send', authMiddleware, asyncHandler(async (req, res) => {
   const gift = await db.execQuery("SELECT * FROM gift_items WHERE id = $1 AND status = 'active'", [giftId]);
   if (!gift.length) return res.status(400).json({ error: 'الهدية غير متاحة' });
   const fromUser = await db.getUserById(req.user.id);
+  // Self-support: founder sends a gift to himself -> raises family featured ranking
+  if (toId === req.user.id) {
+    const w = await db.deductCoins(req.user.id, gift[0].coins);
+    if (!w) return res.status(400).json({ error: 'رصيدك لا يكفي' });
+    if (fromUser?.family_id) await db.addFamilySupportPoints(fromUser.family_id, gift[0].coins);
+    await db.runRaw("INSERT INTO coin_transactions (id, user_id, type, coins, detail) VALUES ($1,$2,'self_support',$3,$4)", [require('crypto').randomUUID(), req.user.id, gift[0].coins, 'دعم ذاتي: ' + gift[0].emoji + ' ' + gift[0].name]);
+    return res.json({ message: '🙋 دعمت نفسك بـ ' + gift[0].coins + ' كوينز - ارتفعت نقاط عائلتك!', wallet: w });
+  }
   const result = await db.sendGift(req.user.id, toId, gift[0].coins, 'هدية: ' + gift[0].emoji + ' ' + gift[0].name);
   if (result.error) return res.status(400).json(result);
   // Broadcast gift animation to the session (with sender/recipient/family info)
@@ -1656,6 +1664,8 @@ app.post('/api/diwaniya/open', authMiddleware, async (req, res) => {
 
 // Close diwaniya
 app.post('/api/diwaniya/close/:sessionId', authMiddleware, async (req, res) => {
+  // Reset mic/camera room state for this session
+  if (audioRooms[req.params.sessionId]) delete audioRooms[req.params.sessionId];
   const userFull = await db.getUserById(req.user.id);
   const isFounder = req.user.role === 'founder';
   const isManager = userFull && userFull.can_open_diwaniya == 1;
@@ -2267,6 +2277,33 @@ io.on('connection', (socket) => {
     console.log(`🎤 User left audio call ${sessionId}`);
   });
   
+  // Mic control: founder mutes/unmutes a participant
+  socket.on('mic_control', (data) => {
+    const { sessionId, userId, muted } = data;
+    const room = audioRooms[sessionId];
+    if (!room) return;
+    const target = room.find(p => p.userId === userId);
+    if (target) {
+      target.micMuted = !!muted;
+      io.to(target.socketId).emit('mic_forced', { muted });
+      console.log(`🎛️ Mic ${muted ? 'muted' : 'unmuted'} for ${userId} in ${sessionId}`);
+    }
+  });
+
+  // Mic mute all except the founder
+  socket.on('mic_mute_all', (data) => {
+    const { sessionId, exceptId } = data;
+    const room = audioRooms[sessionId];
+    if (!room) return;
+    room.forEach(p => {
+      if (p.userId !== exceptId) {
+        p.micMuted = true;
+        io.to(p.socketId).emit('mic_forced', { muted: true });
+      }
+    });
+    console.log(`🎛️ All mics muted in ${sessionId} except ${exceptId}`);
+  });
+
   // Live camera state: update participant wantsVideo + enforce limit on toggle
   socket.on('camera_state', async (data) => {
     const { sessionId, on } = data;
