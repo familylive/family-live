@@ -413,7 +413,7 @@ async function deleteAd(id) { await run('DELETE FROM ads WHERE id = $1', [id]); 
 async function trackAdView(id) { await run('UPDATE ads SET views = views + 1 WHERE id = $1', [id]); }
 async function trackAdClick(id) { await run('UPDATE ads SET clicks = clicks + 1 WHERE id = $1', [id]); }
 async function getAdsStats() { const r = await queryOne('SELECT COUNT(*) as total, COALESCE(SUM(views),0) as views, COALESCE(SUM(clicks),0) as clicks FROM ads'); return { total: r.total || 0, views: r.views || 0, clicks: r.clicks || 0 }; }
-async function getFeaturedFamilies(limit = 5) { return query("SELECT f.id, f.name, f.subscription_code, f.image, f.support_points, (SELECT COUNT(*) FROM users WHERE family_id = f.id) as members_count, u.name as founder_name FROM families f LEFT JOIN users u ON f.founder_id = u.id WHERE f.status = 'active' ORDER BY f.support_points DESC, members_count DESC LIMIT $1", [limit]); }
+async function getFeaturedFamilies(limit = 5) { return query("SELECT f.id, f.name, f.subscription_code, f.image, f.support_points, f.battle_wins, (SELECT COUNT(*) FROM users WHERE family_id = f.id) as members_count, u.name as founder_name FROM families f LEFT JOIN users u ON f.founder_id = u.id WHERE f.status = 'active' ORDER BY f.support_points DESC, members_count DESC LIMIT $1", [limit]); }
 
 // =============== USER FAMILIES ===============
 async function getUserFamilies(userId) { return query('SELECT uf.*, f.name as family_name, f.subscription_code FROM user_families uf JOIN families f ON uf.family_id = f.id WHERE uf.user_id = $1 ORDER BY uf.joined_at DESC', [userId]); }
