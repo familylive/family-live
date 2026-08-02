@@ -593,18 +593,18 @@ function connectSocket() {
     loadMyCodes();
   });
   socket.on('hold_released', (data) => {
-    showToast('🪙 عادت لك ' + (data.coins || 0) + ' عملة محجوزة من مزايدة الرمز (' + (data.code || '') + ')', 'success');
+    showToast('🪙 عادت لك ' + (data.coins || 0) + ' كونزه محجوزة من مزايدة الرمز (' + (data.code || '') + ')', 'success');
     playNotificationSound();
     refreshWalletHeader();
     loadWallet();
   });
   socket.on('coins_charged', (data) => {
-    showToast('🎉 تم شحن حسابك بـ ' + data.amount + ' كوينز!', 'success');
+    showToast('🎉 تم شحن حسابك بـ ' + data.amount + ' كونزه!', 'success');
     playNotificationSound();
     refreshWalletHeader();
   });
   socket.on('coins_transferred', (data) => {
-    showToast('🔄 استلمت ' + data.amount + ' كوينز من ' + (data.fromName || 'عضو') + ' (' + (data.fromPublicId || '') + ')', 'success');
+    showToast('🔄 استلمت ' + data.amount + ' كونزه من ' + (data.fromName || 'عضو') + ' (' + (data.fromPublicId || '') + ')', 'success');
     playNotificationSound();
     refreshWalletHeader();
   });
@@ -1632,7 +1632,7 @@ async function purchaseSecretRoom() {
     const { pricing } = await api('GET', '/api/pricing');
     const p = (pricing || []).find(x => x.feature === 'secret_room');
     const price = p?.coins || 10000;
-    if (!confirm('🔒 تفعيل الغرفة المغلقة (شهرياً) - سعر الخدمة: 🪙 ' + price + ' عملة. سيتم خصمها من رصيدك بعد التأكيد. متابعة؟')) return;
+    if (!confirm('🔒 تفعيل الغرفة المغلقة (شهرياً) - سعر الخدمة: 🪙 ' + price + ' كونزه. سيتم خصمها من رصيدك بعد التأكيد. متابعة؟')) return;
     const result = await api('POST', '/api/diwaniya/secret-room/purchase');
     showToast(result.message, 'success');
     refreshWalletHeader();
@@ -1680,8 +1680,8 @@ async function loadDiwaniyaCapacity() {
       const p40 = (pricing || []).find(x => x.feature === 'capacity_40');
       const el20 = document.getElementById('cap20-price');
       const el40 = document.getElementById('cap40-price');
-      if (el20) el20.textContent = '🪙 ' + (p20?.coins ?? 5000) + ' عملة';
-      if (el40) el40.textContent = '🪙 ' + (p40?.coins ?? 10000) + ' عملة';
+      if (el20) el20.textContent = '🪙 ' + (p20?.coins ?? 5000) + ' كونزه';
+      if (el40) el40.textContent = '🪙 ' + (p40?.coins ?? 10000) + ' كونزه';
     } catch(e) {}
     const info = document.getElementById('capacity-info');
     const sel = document.getElementById('diwaniya-capacity-select');
@@ -1703,7 +1703,7 @@ async function purchaseCapacity(cap) {
     const { pricing } = await api('GET', '/api/pricing');
     const p = (pricing || []).find(x => x.feature === 'capacity_' + cap);
     const price = p?.coins || (cap === 20 ? 5000 : 10000);
-    if (!confirm('👥 توسعة الديوانية إلى ' + cap + ' عضو - سعر الخدمة: 🪙 ' + price + ' عملة\nسيتم خصمها من رصيدك بعد التأكيد. متابعة؟')) return;
+    if (!confirm('👥 توسعة الديوانية إلى ' + cap + ' عضو - سعر الخدمة: 🪙 ' + price + ' كونزه\nسيتم خصمها من رصيدك بعد التأكيد. متابعة؟')) return;
     const result = await api('POST', '/api/diwaniya/capacity/purchase', { capacity: cap });
     showToast(result.message, 'success');
     refreshWalletHeader();
@@ -2088,9 +2088,9 @@ function renderBattle(b) {
 
 async function supportBattle(side) {
   if (!currentBattle) return showToast('لا يوجد تحدٍّ نشط', 'error');
-  const coins = prompt('🎁 كم كوينز تدعم به؟', '100');
+  const coins = prompt('🎁 كم كونزه تدعم به؟', '100');
   if (!coins || parseInt(coins) <= 0) return;
-  if (!confirm('⚔️ دعم اللاعب بـ ' + coins + ' كوينز؟')) return;
+  if (!confirm('⚔️ دعم اللاعب بـ ' + coins + ' كونزه؟')) return;
   try {
     const r = await api('POST', '/api/battles/support', { battleId: currentBattle.id, side, coins });
     showToast(r.message, 'success');
@@ -2112,9 +2112,9 @@ async function supportSelfBattle() {
   if (currentBattle.player_a_id === meId) side = 'a';
   else if (currentBattle.player_b_id === meId) side = 'b';
   if (!side) return showToast('أنت لست طرفاً في هذا التحدي', 'error');
-  const coins = prompt('🙋 كم كوينز تدعم نفسك به؟', '100');
+  const coins = prompt('🙋 كم كونزه تدعم نفسك به؟', '100');
   if (!coins || parseInt(coins) <= 0) return;
-  if (!confirm('🙋 دعم نفسك بـ ' + coins + ' كوينز؟ (يرفع ترتيب عائلتك أيضاً)')) return;
+  if (!confirm('🙋 دعم نفسك بـ ' + coins + ' كونزه؟ (يرفع ترتيب عائلتك أيضاً)')) return;
   try {
     const r = await api('POST', '/api/battles/support', { battleId: currentBattle.id, side, coins });
     showToast(r.message, 'success');
