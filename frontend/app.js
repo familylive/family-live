@@ -640,7 +640,9 @@ function connectSocket() {
     // I was invited to go on camera
     pendingCameraInvite = data;
     selectedInviteMode = 'both';
+    selectedInviteFilter = '';
     document.querySelectorAll('.invite-mode').forEach(m => m.classList.toggle('selected', m.dataset.mode === 'both'));
+    document.querySelectorAll('.filter-opt').forEach(f => f.classList.toggle('selected', f.dataset.filter === ''));
     document.getElementById('camera-invite-text').textContent = 'تمت دعوتك للمشاركة بكاميرا الديوانية من قبل ' + (data.founderName || 'المؤسس');
     document.getElementById('camera-invite-modal').style.display = 'flex';
     playNotificationSound();
@@ -1669,8 +1671,7 @@ async function joinLiveAudio() {
     if (famBtn) famBtn.style.display = (state.isFounder || state.user?.role === 'admin') ? 'block' : 'none';
     const mmBtn = document.getElementById('mic-manage-btn');
     if (mmBtn) mmBtn.style.display = (state.isFounder || state.user?.role === 'admin') ? 'block' : 'none';
-    const beautyBtn = document.getElementById('beauty-filter-btn');
-    if (beautyBtn) beautyBtn.style.display = 'block';
+
     const bsb = document.getElementById('battle-start-box');
     if (bsb) bsb.style.display = (state.isFounder || state.user?.role === 'admin') ? 'block' : 'none';
     updateAudioCallUI(true);
@@ -2014,19 +2015,7 @@ async function supportSelfBattle() {
   } catch(e) { showToast(e.message, 'error'); }
 }
 
-// ==================== BEAUTY FILTER ====================
-let beautyOn = false;
-function toggleBeautyFilter() {
-  beautyOn = !beautyOn;
-  const myVideo = document.getElementById('my-video');
-  if (myVideo) myVideo.classList.toggle('beauty', beautyOn);
-  const myTile = document.getElementById('my-video-tile');
-  if (myTile) myTile.classList.toggle('beauty-tile', beautyOn);
-  // Also apply to the tile soft-glow overlay
-  const btn = document.getElementById('beauty-filter-btn');
-  if (btn) btn.classList.toggle('zoom', beautyOn);
-  showToast(beautyOn ? '✨ فلتر التجميل مفعّل' : 'فلتر التجميل متوقف', 'success');
-}
+
 function openMicManager() {
   const list = document.getElementById('mic-manager-list');
   list.innerHTML = '';
@@ -2509,6 +2498,13 @@ async function enableMyCamera() {
 
 let pendingCameraInvite = null;
 let selectedInviteMode = 'both';
+let selectedInviteFilter = '';
+
+function selectInviteFilter(el) {
+  document.querySelectorAll('.filter-opt').forEach(f => f.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedInviteFilter = el.dataset.filter || '';
+}
 
 function selectInviteMode(el) {
   document.querySelectorAll('.invite-mode').forEach(m => m.classList.remove('selected'));
@@ -2531,6 +2527,12 @@ function respondCameraInvite(accept) {
     }
     if (wantCam) {
       enableMyCamera().then(ok => {
+        // Apply the chosen beauty filter to my camera feed
+        const myVideo = document.getElementById('my-video');
+        if (myVideo && ok) {
+          myVideo.classList.remove('filter-soft','filter-gold','filter-pink','filter-vivid','filter-classic','filter-bw','beauty');
+          if (selectedInviteFilter) myVideo.classList.add(selectedInviteFilter);
+        }
         socket.emit('camera_invite_response', { to: pendingCameraInvite.founderId, accept: ok, inviteeName: state.user?.name });
         showToast(ok ? '🎥 تم تشغيل كاميرتك - أنت الآن بالمشاركة!' : 'تعذر تشغيل الكاميرا', ok ? 'success' : 'error');
       });

@@ -663,10 +663,7 @@
               <button class="call-control-btn" id="cam-invite-btn" onclick="openCameraInvite()" style="display:none" title="دعوة للمشاركة بالكاميرا">
                 <svg viewBox="0 0 24 24"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z" fill="currentColor"/><circle cx="18.5" cy="5.5" r="4.2" fill="currentColor"/><path d="M18.5 3.5v4M16.5 5.5h4" stroke="#0e1830" stroke-width="1.8" stroke-linecap="round"/></svg>
               </button>
-                  <button class="call-control-btn" id="beauty-filter-btn" onclick="toggleBeautyFilter()" title="فلتر التجميل" style="display:none">
-                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.6 4.6L18 8l-4.4 1.4L12 14l-1.6-4.6L6 8l4.4-1.4z"/><path d="M18 14l.9 2.6L21.5 17l-2.6.9L18 20.5l-.9-2.6L14.5 17l2.6-.9z"/><path d="M6 13l.8 2.2L9 16l-2.2.8L6 19l-.8-2.2L3 16l2.2-.8z"/></svg>
-              </button>
-              <button class="call-control-btn" id="mic-manage-btn" onclick="openMicManager()" title="إدارة المايكات" style="display:none">
+                  <button class="call-control-btn" id="mic-manage-btn" onclick="openMicManager()" title="إدارة المايكات" style="display:none">
                 <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/><path d="M19 11h-2c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92z"/></svg>
               </button>
               <button class="call-control-btn" id="families-btn" onclick="openConnectedFamilies()" title="العوائل المتصلة" style="display:none">
@@ -1446,7 +1443,17 @@
       <div class="modal-box" style="max-width:340px;text-align:center">
         <h3 style="color:var(--gold);margin-bottom:10px">📹 دعوة كاميرا</h3>
         <p id="camera-invite-text" style="font-size:13px;margin-bottom:14px"></p>
-        <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">اختر طريقة المشاركة:</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">اختر فلتر صورتك:</div>
+        <div class="filter-picker" id="invite-filter-picker">
+          <div class="filter-opt" data-filter="" onclick="selectInviteFilter(this)"><span class="filter-demo demo-none">أ</span><span class="filter-name">بدون</span></div>
+          <div class="filter-opt" data-filter="filter-soft" onclick="selectInviteFilter(this)"><span class="filter-demo demo-soft">أ</span><span class="filter-name">✨ ناعم</span></div>
+          <div class="filter-opt" data-filter="filter-gold" onclick="selectInviteFilter(this)"><span class="filter-demo demo-gold">أ</span><span class="filter-name">🌅 ذهبي</span></div>
+          <div class="filter-opt" data-filter="filter-pink" onclick="selectInviteFilter(this)"><span class="filter-demo demo-pink">أ</span><span class="filter-name">🌸 وردي</span></div>
+          <div class="filter-opt" data-filter="filter-vivid" onclick="selectInviteFilter(this)"><span class="filter-demo demo-vivid">أ</span><span class="filter-name">🌈 حيوي</span></div>
+          <div class="filter-opt" data-filter="filter-classic" onclick="selectInviteFilter(this)"><span class="filter-demo demo-classic">أ</span><span class="filter-name">🎞️ كلاسيك</span></div>
+          <div class="filter-opt" data-filter="filter-bw" onclick="selectInviteFilter(this)"><span class="filter-demo demo-bw">أ</span><span class="filter-name">🖤 أبيض وأسود</span></div>
+        </div>
+        <div style="font-size:12px;color:var(--text-muted);margin:8px 0 6px">اختر طريقة المشاركة:</div>
         <div class="invite-mode-grid">
           <div class="invite-mode" data-mode="both" onclick="selectInviteMode(this)">
             <span class="invite-check">✓</span>
