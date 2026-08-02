@@ -373,7 +373,7 @@ async function getReportsData() {
   // Top 10 users by charging (incoming coins)
   const topChargers = await query("SELECT u.id, u.name, u.family_id, COALESCE(SUM(ct.coins),0) as charged FROM users u LEFT JOIN coin_transactions ct ON ct.user_id = u.id AND ct.coins > 0 GROUP BY u.id ORDER BY charged DESC LIMIT 10");
   // Withdrawals in the last 30 days
-  const withdrawals = await query("SELECT w.* FROM withdrawals w WHERE w.created_at >= now() - interval '30 days' ORDER BY w.created_at DESC");
+  const withdrawals = await query("SELECT w.* FROM withdrawals w WHERE w.created_at::timestamptz >= now() - interval '30 days' ORDER BY w.created_at DESC");
   return {
     rate,
     site_balance: siteBalance,
