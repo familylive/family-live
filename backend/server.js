@@ -1240,6 +1240,7 @@ app.post('/api/auctions/bid', authMiddleware, asyncHandler(async (req, res) => {
     await db.releaseHold(req.user.id, bidCoins, auction.code);
     return res.status(400).json(result);
   }
+  await db.addAuctionLog(auctionId, auction.code, 'bid', req.user.id, req.user.name, bidCoins, 'مزايدة (حجز)');
   res.json({ message: '✅ زايدت بـ 🪙 ' + bidCoins + ' — حُجزت وتعود لك بعد انتهاء المزاد', auction: await auctionInCoins(result), wallet: held });
 }));
 
@@ -1251,6 +1252,7 @@ app.post('/api/admin/auctions/create', authMiddleware, adminMiddleware, async (r
   }
   const auction = await db.createAuction(code, parseInt(startingPrice), parseInt(entryFee), parseInt(durationMinutes), parseInt(minIncrement || 10), req.user.id);
   if (auction?.error) return res.status(400).json(auction);
+  await db.addAuctionLog(auction.id, code, 'created', req.user.id, req.user.name, parseInt(startingPrice), 'فتح مزاد بسعر البداية');
   res.json({ message: '🏷️ تم فتح المزاد', auction });
 });
 
@@ -1259,6 +1261,11 @@ app.get('/api/admin/auctions/available-codes', authMiddleware, adminMiddleware, 
   const codes = await db.getAvailableAuctionCodes();
   res.json({ codes });
 });
+
+// Admin: auction reports (sales/returns/bids)
+app.get('/api/admin/auction-logs', authMiddleware, adminMiddleware, asyncHandler(async (req, res) => {
+  res.json({ logs: await db.getAuctionLogs() });
+}));
 
 // Admin: all auctions
 app.get('/api/admin/auctions', authMiddleware, adminMiddleware, async (req, res) => {
@@ -1275,6 +1282,13 @@ async function settleAuctionHolds(auctionId) {
     const winnerId = auction.winner_id;
     const result = await db.settleAuction(auctionId, winnerId);
     if (!result || result.error) return;
+    // Log the sale/return
+    if (winnerId && result.winnerHeld > 0) {
+      await db.addAuctionLog(auctionId, auction.code, 'sold', winnerId, null, result.winnerHeld, 'بيع الرمز — خصم عملات الفائز المحجوزة');
+    }
+    if (result.released > 0) {
+      await db.addAuctionLog(auctionId, auction.code, 'returned', null, null, result.released, 'إرجاع حجوزات المزايدين بعد انتهاء المزاد');
+    }
     // Notify bidders
     const bids = await db.getAuctionBids(auctionId);
     const totals = {};
@@ -1329,6 +1343,9 @@ app.post('/api/admin/auctions/release', authMiddleware, adminMiddleware, async (
   const { auctionId } = req.body;
   const auction = await db.releaseAuctionCode(auctionId);
   if (!auction) return res.status(400).json({ error: 'المزاد غير موجود' });
+  await db.addAuctionLog(auctionId, auction.code, 'returned', req.user.id, req.user.name, 0, 'إرجاع الرمز للمستودع (لم يدفع الفائز)');
+  // Notify admins about the return
+  io.emit('auction_report', { type: 'returned', code: auction.code, message: '↩️ عاد الرمز ' + auction.code + ' لمستودع الرموز' });
   res.json({ message: '↩️ عاد الرمز لمستودع الرموز - يمكنك طرحه مرة أخرى', auction });
 });
 

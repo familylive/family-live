@@ -579,6 +579,9 @@ function connectSocket() {
     if (chip) chip.remove();
     showToast('👢 تم طرد عضو بواسطة ' + (data.byName || 'المؤسس'), 'error');
   });
+  socket.on('auction_report', (data) => {
+    if (state.user?.role === 'admin') showToast(data.message || 'تقرير مزاد جديد', 'success');
+  });
   socket.on('session_invalid', () => {
     localStorage.clear();
     sessionStorage.clear();

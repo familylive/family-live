@@ -57,6 +57,7 @@ async function initDb() {
   await run(`CREATE TABLE IF NOT EXISTS user_families (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, family_id TEXT NOT NULL, is_current INTEGER DEFAULT 0, joined_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)`);
   await run(`CREATE TABLE IF NOT EXISTS ads (id TEXT PRIMARY KEY, title TEXT NOT NULL, image_url TEXT, link_url TEXT, status TEXT DEFAULT 'active', position TEXT DEFAULT 'banner', start_time TEXT, end_time TEXT, views INTEGER DEFAULT 0, clicks INTEGER DEFAULT 0, created_at TEXT DEFAULT now())`);
+  await run(`CREATE TABLE IF NOT EXISTS auction_logs (id TEXT PRIMARY KEY, auction_id TEXT, code TEXT, event TEXT, user_id TEXT, user_name TEXT, amount INTEGER DEFAULT 0, detail TEXT, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS auctions (id TEXT PRIMARY KEY, code TEXT NOT NULL, starting_price INTEGER DEFAULT 100, entry_fee INTEGER DEFAULT 50, current_price INTEGER DEFAULT 100, min_increment INTEGER DEFAULT 10, start_time TEXT DEFAULT now(), end_time TEXT NOT NULL, status TEXT DEFAULT 'active', winner_id TEXT, paid INTEGER DEFAULT 0, created_by TEXT, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS auction_bids (id TEXT PRIMARY KEY, auction_id TEXT NOT NULL, user_id TEXT NOT NULL, amount INTEGER NOT NULL, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS auction_participants (id TEXT PRIMARY KEY, auction_id TEXT NOT NULL, user_id TEXT NOT NULL, paid_entry INTEGER DEFAULT 1, joined_at TEXT DEFAULT now())`);
@@ -320,7 +321,13 @@ async function joinAuction(auctionId, userId) {
 async function placeBid(auctionId, userId, amount) {
   const auction = await queryOne("SELECT * FROM auctions WHERE id = $1 AND status = 'active'", [auctionId]);
   if (!auction) return { error: 'المزاد غير متاح' };
-  if (auction.end_time <= new Date().toISOString()) { await run('UPDATE auctions SET status = \'ended\', winner_id = $1 WHERE id = $2', [auction.winner_id, auctionId]); return { error: 'انتهى المزاد' }; }
+  if (auction.end_time <= new Date().toISOString()) {
+    const lastBid = await queryOne('SELECT * FROM auction_bids WHERE auction_id = $1 ORDER BY created_at DESC, amount DESC LIMIT 1', [auctionId]);
+    const wid = lastBid ? lastBid.user_id : null;
+    await run("UPDATE auctions SET status = 'ended', winner_id = $1 WHERE id = $2", [wid, auctionId]);
+    if (!wid) await run('UPDATE subscription_codes SET used = 0 WHERE code = $1', [auction.code]);
+    return { error: 'انتهى المزاد' };
+  }
   if (amount < auction.current_price + auction.min_increment) return { error: 'المبلغ أقل من الحد الأدنى للمزايدة (' + (auction.current_price + auction.min_increment) + ' ريال)' };
   const participant = await queryOne('SELECT * FROM auction_participants WHERE auction_id = $1 AND user_id = $2', [auctionId, userId]);
   if (!participant) return { error: 'يجب دفع رسوم الدخول أولاً' };
@@ -347,9 +354,17 @@ async function cancelAuction(auctionId) {
   const auction = await queryOne('SELECT * FROM auctions WHERE id = $1', [auctionId]);
   await run("UPDATE auctions SET status = 'cancelled' WHERE id = $1", [auctionId]);
   if (auction) await run('UPDATE subscription_codes SET used = 0 WHERE code = $1', [auction.code]);
+  if (auction) await run('UPDATE subscription_codes SET used = 0 WHERE code = $1', [auction.code]);
   return getAuctionById(auctionId);
 }
 async function getAuctionBids(auctionId) { return query('SELECT ab.*, u.name as user_name FROM auction_bids ab JOIN users u ON ab.user_id = u.id WHERE ab.auction_id = $1 ORDER BY ab.created_at DESC, ab.amount DESC', [auctionId]); }
+async function addAuctionLog(auctionId, code, event, userId, userName, amount, detail) {
+  await run('INSERT INTO auction_logs (id, auction_id, code, event, user_id, user_name, amount, detail) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
+    [uuidv4(), auctionId || null, code || '', event, userId || null, userName || '', amount || 0, detail || '']);
+}
+async function getAuctionLogs() {
+  return query('SELECT * FROM auction_logs ORDER BY created_at DESC LIMIT 200');
+}
 async function getAuctionParticipants(auctionId) {
   return query("SELECT p.*, u.name as user_name, u.avatar, (SELECT MAX(b.created_at) FROM auction_bids b WHERE b.auction_id = p.auction_id AND b.user_id = p.user_id) as last_bid_at FROM auction_participants p JOIN users u ON p.user_id = u.id WHERE p.auction_id = $1 ORDER BY p.joined_at", [auctionId]);
 }
@@ -1090,6 +1105,7 @@ module.exports = {
   getActivePackages, getAllPackages, addPackage, updatePackage, deletePackage, getPaymentSettings, savePaymentSettings, createPayment, getAllPayments, getMyPayments, confirmPayment, rejectPayment, getFamilyEditInfo, recordFamilyNameChange, getFamilyCapacity, purchaseCapacity, setDiwaniyaCapacity, getCapacityPackages,
   createAnnouncement, getFamilyAnnouncements, getAnnouncementsForUser, deleteAnnouncement,
   createBattle, getBattleById, getActiveBattle, acceptBattle, rejectBattle, supportBattle, endBattle, finalizeBattle, addFamilySupportPoints, getOnlineFounders,
+  addAuctionLog, getAuctionLogs,
   getEffects, getEffectById, addEffect, getUserEffects, buyEffect, selectEffect, addFamilyBattleWin,
   getPricing, getPricingByFeature, setPricing, deletePricing, getSarToCoinsRate, setSarToCoinsRate, payWithCoins, settleAuction, getSiteTotalCoins,
   isDiwaniyaRestricted, restrictFromDiwaniya, unrestrictFromDiwaniya, getDiwaniyaRestrictions,
