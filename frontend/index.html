@@ -1177,8 +1177,23 @@
           <button class="btn btn-accent" onclick="addCoinPackageAdmin()">➕</button>
         </div>
         <div id="admin-coin-packages" style="margin-top:8px"></div>
-        <div class="card-title" style="font-size:14px;margin-top:14px">⚙️ أسعار الخدمات (بالعملات 🪙)</div>
+        <div class="card-title" style="font-size:14px;margin-top:14px">⚙️ أسعار الخدمات (ريال ← عملات)</div>
+        <div class="form-group">
+          <label>سعر الصرف الرئيسي: 1 ريال = <b style="color:var(--gold)"><span id="sar-rate-display">100</span> 🪙 عملة</b></label>
+          <div style="display:flex;gap:8px">
+            <input class="form-input" id="sar-rate-input" type="number" placeholder="كم عملة يعادل 1 ريال؟" style="flex:1">
+            <button class="btn btn-accent" onclick="saveSarRate()">💾 حفظ المعدل</button>
+          </div>
+        </div>
         <div id="admin-pricing-list"></div>
+        <div style="border-top:1px dashed var(--border);margin-top:10px;padding-top:10px">
+          <div class="form-group"><label>اسم الخدمة</label><input class="form-input" id="new-service-name" type="text" placeholder="مثال: باقة شهرية ذهبية"></div>
+          <div style="display:flex;gap:8px">
+            <input class="form-input" id="new-service-feature" type="text" placeholder="معرف (مثال: gold_membership)" dir="ltr" style="flex:1">
+            <input class="form-input" id="new-service-price" type="number" placeholder="السعر بالريال" style="width:110px">
+          </div>
+          <button class="btn btn-primary btn-full" style="margin-top:8px" onclick="addAdminService()">➕ إضافة خدمة جديدة</button>
+        </div>
         <div class="card-title" style="font-size:14px;margin-top:14px">🪙 شحن كوينزات لعضو</div>
         <div style="display:flex;gap:8px">
           <select class="form-input" id="admin-charge-user" style="flex:1"><option value="">اختر العضو...</option></select>

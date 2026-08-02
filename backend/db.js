@@ -72,7 +72,9 @@ async function initDb() {
   await run(`CREATE TABLE IF NOT EXISTS violation_templates (id TEXT PRIMARY KEY, name TEXT NOT NULL, icon TEXT DEFAULT '🚫', status TEXT DEFAULT 'active', created_at TEXT DEFAULT now())`);
   try { await run("ALTER TABLE violations ADD COLUMN IF NOT EXISTS action TEXT"); } catch(e) {}
   try { await run("ALTER TABLE violations ADD COLUMN IF NOT EXISTS by_user_name TEXT"); } catch(e) {}
-  await run(`CREATE TABLE IF NOT EXISTS pricing (feature TEXT PRIMARY KEY, name TEXT NOT NULL, coins INTEGER DEFAULT 0, updated_at TEXT DEFAULT now())`);
+  await run(`CREATE TABLE IF NOT EXISTS pricing (feature TEXT PRIMARY KEY, name TEXT NOT NULL, price_sar INTEGER DEFAULT 0, status TEXT DEFAULT 'active', updated_at TEXT DEFAULT now())`);
+  try { await run("ALTER TABLE pricing ADD COLUMN IF NOT EXISTS price_sar INTEGER DEFAULT 0"); } catch(e) {}
+  try { await run("ALTER TABLE pricing ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active'"); } catch(e) {}
   await run(`CREATE TABLE IF NOT EXISTS effects (id TEXT PRIMARY KEY, name TEXT NOT NULL, emoji TEXT DEFAULT '✨', css_class TEXT, price INTEGER DEFAULT 0, status TEXT DEFAULT 'active', created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS user_effects (user_id TEXT NOT NULL, effect_id TEXT NOT NULL, purchased_at TEXT DEFAULT now(), PRIMARY KEY (user_id, effect_id))`);
   try { await run("ALTER TABLE users ADD COLUMN IF NOT EXISTS selected_effect TEXT"); } catch(e) {}
@@ -649,12 +651,24 @@ async function addFounderViolation(userId, reason, action, byUserId, byUserName)
   return queryOne('SELECT * FROM violations WHERE id = $1', [id]);
 }
 
-async function getPricing() { return query('SELECT * FROM pricing ORDER BY name'); }
-async function getPricingByFeature(feature) { return queryOne('SELECT * FROM pricing WHERE feature = $1', [feature]); }
-async function setPricing(feature, name, coins) {
-  await run('INSERT INTO pricing (feature, name, coins) VALUES ($1,$2,$3) ON CONFLICT (feature) DO UPDATE SET coins = $3, updated_at = now()', [feature, name, parseInt(coins) || 0]);
+async function getSarToCoinsRate() { return parseInt(await getSetting('sar_to_coins', '100')) || 100; }
+async function setSarToCoinsRate(rate) { await setSetting('sar_to_coins', parseInt(rate) || 100); return parseInt(rate) || 100; }
+async function getPricing() {
+  const rate = await getSarToCoinsRate();
+  const rows = await query('SELECT * FROM pricing ORDER BY name');
+  return rows.map(r => ({ ...r, coins: (parseInt(r.price_sar) || 0) * rate }));
+}
+async function getPricingByFeature(feature) {
+  const rate = await getSarToCoinsRate();
+  const r = await queryOne('SELECT * FROM pricing WHERE feature = $1', [feature]);
+  return r ? { ...r, coins: (parseInt(r.price_sar) || 0) * rate } : null;
+}
+async function setPricing(feature, name, priceSar, status) {
+  await run('INSERT INTO pricing (feature, name, price_sar, status) VALUES ($1,$2,$3,$4) ON CONFLICT (feature) DO UPDATE SET name = $2, price_sar = $3, status = $4, updated_at = now()',
+    [feature, name, parseInt(priceSar) || 0, status || 'active']);
   return getPricingByFeature(feature);
 }
+async function deletePricing(feature) { await run('DELETE FROM pricing WHERE feature = $1', [feature]); return true; }
 async function payWithCoins(userId, coins, detail) {
   const w = await deductCoins(userId, coins);
   if (!w) return { error: 'رصيدك من العملات لا يكفي' };
@@ -988,7 +1002,7 @@ module.exports = {
   createAnnouncement, getFamilyAnnouncements, getAnnouncementsForUser, deleteAnnouncement,
   createBattle, getBattleById, getActiveBattle, acceptBattle, rejectBattle, supportBattle, endBattle, finalizeBattle, addFamilySupportPoints, getOnlineFounders,
   getEffects, getEffectById, addEffect, getUserEffects, buyEffect, selectEffect, addFamilyBattleWin,
-  getPricing, getPricingByFeature, setPricing, payWithCoins,
+  getPricing, getPricingByFeature, setPricing, deletePricing, getSarToCoinsRate, setSarToCoinsRate, payWithCoins,
   isDiwaniyaRestricted, restrictFromDiwaniya, unrestrictFromDiwaniya, getDiwaniyaRestrictions,
   seedViolationTemplates, getViolationTemplates, getAllViolationTemplates, addViolationTemplate, deleteViolationTemplate, addFounderViolation,
   getGiftItems, getAllGiftItems, addGiftItem, updateGiftItem, deleteGiftItem,

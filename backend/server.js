@@ -1386,17 +1386,33 @@ app.post('/api/admin/wallet/add-coins', authMiddleware, adminMiddleware, async (
   res.json({ message: '🪙 تم شحن ' + amount + ' كوينز إلى ' + target.name, wallet });
 });
 
-// Pricing (public)
+// Pricing (public): SAR price + converted coins + rate
 app.get('/api/pricing', asyncHandler(async (req, res) => {
-  res.json({ pricing: await db.getPricing() });
+  const pricing = await db.getPricing();
+  const rate = await db.getSarToCoinsRate();
+  res.json({ pricing, rate });
 }));
 
-// Admin: set coin price for any service
+// Admin: add/update a service (price in SAR - converted to coins by the rate)
 app.post('/api/admin/pricing', authMiddleware, adminMiddleware, asyncHandler(async (req, res) => {
-  const { feature, name, coins } = req.body;
-  if (!feature || coins === undefined) return res.status(400).json({ error: 'البيانات ناقصة' });
-  const row = await db.setPricing(feature, name || feature, coins);
-  res.json({ message: '✅ تم تحديث سعر ' + (row.name || feature) + ' إلى 🪙 ' + row.coins + ' عملة', pricing: row });
+  const { feature, name, price_sar, status } = req.body;
+  if (!feature) return res.status(400).json({ error: 'المعرف مطلوب' });
+  const row = await db.setPricing(feature, name || feature, price_sar, status);
+  res.json({ message: '✅ تم حفظ ' + (row.name || feature) + ' — السعر: ' + (row.price_sar || 0) + ' ريال = 🪙 ' + row.coins + ' عملة', pricing: row });
+}));
+
+// Admin: delete a service
+app.post('/api/admin/pricing/delete', authMiddleware, adminMiddleware, asyncHandler(async (req, res) => {
+  const { feature } = req.body;
+  await db.deletePricing(feature);
+  res.json({ message: '🗑️ تم حذف الخدمة' });
+}));
+
+// Admin: set the SAR->coins conversion rate (main settings)
+app.post('/api/admin/sar-rate', authMiddleware, adminMiddleware, asyncHandler(async (req, res) => {
+  const { rate } = req.body;
+  const r = await db.setSarToCoinsRate(rate);
+  res.json({ message: '✅ 1 ريال = 🪙 ' + r + ' عملة', rate: r });
 }));
 
 // =============== COINS & WALLET ===============
@@ -2555,10 +2571,11 @@ async function bootstrap() {
   try {
     const prices = await db.getPricing();
     if (!prices.length) {
-      await db.setPricing('secret_room', 'الغرفة المغلقة (شهرياً)', 10000);
-      await db.setPricing('capacity_20', 'توسعة الديوانية إلى 20 عضو', 5000);
-      await db.setPricing('capacity_40', 'توسعة الديوانية إلى 40 عضو', 10000);
-      await db.setPricing('family_name_edit', 'تعديل اسم العائلة', 10000);
+      await db.setPricing('secret_room', 'الغرفة المغلقة (شهرياً)', 100, 'active');
+      await db.setPricing('capacity_20', 'توسعة الديوانية إلى 20 عضو', 50, 'active');
+      await db.setPricing('capacity_40', 'توسعة الديوانية إلى 40 عضو', 100, 'active');
+      await db.setPricing('family_name_edit', 'تعديل اسم العائلة', 100, 'active');
+      await db.setSarToCoinsRate(100); // 1 SAR = 100 coins
       console.log('✅ Seeded pricing');
     }
   } catch(e) { console.log('Pricing seed error:', e.message); }
