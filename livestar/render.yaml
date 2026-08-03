@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: live-24
+    runtime: node
+    rootDir: livestar
+    plan: free
+    region: frankfurt
+    buildCommand: cd backend && npm install
+    startCommand: cd backend && node server.js
+    healthCheckPath: /

@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>24 · بث مباشر</title>
+<script src="https://cdn.jsdelivr.net/npm/livekit-client@2/dist/livekit-client.umd.min.js"></script>
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<style>
+:root{--bg:#0a0d18;--card:#141a2e;--gold:#e8b830;--pink:#ff2d78;--text:#fff;--muted:#8a93a8}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',Tahoma,sans-serif;min-height:100vh}
+#app{max-width:480px;margin:0 auto;min-height:100vh;position:relative}
+.hidden{display:none!important}
+.auth-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:30px;text-align:center}
+.logo24{font-size:70px;font-weight:900;background:linear-gradient(135deg,#ff2d78,#e8b830);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.tagline{color:var(--muted);margin:8px 0 30px}
+.input{width:100%;padding:14px;margin-bottom:12px;border-radius:12px;border:1px solid #2a3350;background:#141a2e;color:#fff;font-size:15px}
+.btn{width:100%;padding:14px;border:none;border-radius:12px;font-size:16px;font-weight:800;cursor:pointer;margin-top:8px}
+.btn-primary{background:linear-gradient(135deg,#ff2d78,#e8b830);color:#fff}
+.btn-danger{background:var(--pink);color:#fff}
+.btn-ghost{background:transparent;color:var(--gold);border:1px solid var(--gold)}
+.small{font-size:12px;color:var(--muted);margin-top:10px;cursor:pointer}
+.header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--card)}
+.header .logo{font-size:22px;font-weight:900;color:var(--gold)}
+.header .me{display:flex;align-items:center;gap:8px;font-size:13px}
+.live-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:12px}
+.live-card{position:relative;aspect-ratio:9/16;border-radius:14px;overflow:hidden;background:#000;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.live-card .ph{font-size:50px;opacity:.5}
+.live-badge{position:absolute;top:8px;right:8px;background:rgba(255,0,50,.9);font-size:10px;font-weight:900;padding:3px 8px;border-radius:10px}
+.live-info{position:absolute;bottom:0;left:0;right:0;padding:20px 8px 8px;background:linear-gradient(transparent,rgba(0,0,0,.9))}
+.live-name{font-size:12px;font-weight:800}
+.live-viewers{font-size:10px;color:var(--muted)}
+.bcast{position:fixed;inset:0;background:#000;z-index:60;display:flex;flex-direction:column}
+.bcast-video{flex:1;position:relative;overflow:hidden}
+.bcast-video video{width:100%;height:100%;object-fit:cover}
+.bcast-host{position:absolute;top:50px;left:12px;display:flex;align-items:center;gap:8px;background:rgba(0,0,0,.55);padding:6px 12px 6px 6px;border-radius:20px}
+.bcast-host .av{width:36px;height:36px;border-radius:50%;border:2px solid var(--gold);display:flex;align-items:center;justify-content:center;overflow:hidden;background:#333;font-size:18px}
+.bcast-host .av img{width:100%;height:100%;object-fit:cover}
+.bcast-close{position:absolute;top:50px;right:12px;width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,.4);background:rgba(0,0,0,.5);color:#fff;font-size:16px;cursor:pointer}
+.comments{position:absolute;top:120px;right:10px;width:70%;display:flex;flex-direction:column;gap:6px;pointer-events:none}
+.cmt{background:rgba(0,0,0,.55);border-radius:16px;padding:6px 12px;font-size:13px;animation:cmtIn .3s,cmtOut .4s 5s forwards}
+.cmt .n{color:var(--gold);font-weight:800}
+@keyframes cmtIn{from{transform:translateX(40px);opacity:0}to{transform:none;opacity:1}}
+@keyframes cmtOut{to{opacity:0}}
+.hearts{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.heart{position:absolute;bottom:20%;font-size:34px;animation:hfly 2s ease-out forwards}
+@keyframes hfly{0%{transform:translateY(0) scale(.5);opacity:0}15%{opacity:1;transform:translateY(-30px) scale(1.2)}100%{transform:translateY(-400px) scale(1.6);opacity:0}}
+.bcast-bottom{background:linear-gradient(transparent,#000);padding:10px 12px 20px;display:flex;flex-direction:column;gap:8px}
+.cmt-input{display:flex;gap:8px}
+.cmt-input input{flex:1;padding:10px 14px;border-radius:20px;border:1px solid #2a3350;background:rgba(20,26,46,.8);color:#fff;font-size:14px}
+.cmt-input button{border:none;border-radius:20px;padding:0 16px;background:var(--gold);font-weight:900;color:#000}
+.bcast-actions{display:flex;justify-content:space-between;align-items:center}
+.heart-btn{width:46px;height:46px;border-radius:50%;background:rgba(255,0,80,.15);border:1.5px solid rgba(255,0,80,.6);font-size:20px;cursor:pointer}
+.like-count{color:#fff;font-size:12px;text-align:center}
+.gift-bar{display:flex;gap:8px;overflow-x:auto;padding:4px 0}
+.gift-item{min-width:60px;text-align:center;background:#141a2e;border-radius:10px;padding:8px 4px;cursor:pointer}
+.gift-item .e{font-size:26px}
+.gift-item .c{font-size:10px;color:var(--gold);font-weight:800}
+.gift-float{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;font-size:90px;animation:giftBig 2s forwards}
+@keyframes giftBig{0%{transform:scale(0) rotate(-20deg);opacity:0}20%{transform:scale(1.4);opacity:1}80%{opacity:1}100%{transform:scale(1);opacity:0}}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--card);border:1px solid var(--gold);color:#fff;padding:10px 18px;border-radius:12px;z-index:99;font-size:13px}
+.nav{position:fixed;bottom:0;left:0;right:0;background:var(--card);display:flex;justify-content:space-around;padding:10px 0;border-top:1px solid #232c47;z-index:40}
+.nav button{background:none;border:none;color:var(--muted);font-size:11px;cursor:pointer}
+.nav button.active{color:var(--gold)}
+.admin-card{background:var(--card);border-radius:14px;padding:14px;margin:12px}
+.admin-card h3{font-size:14px;color:var(--gold);margin-bottom:10px}
+.admin-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #232c47;font-size:13px}
+.admin-row button{background:var(--pink);border:none;color:#fff;border-radius:8px;padding:6px 12px;font-size:11px;cursor:pointer}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="auth-screen" class="auth-screen">
+    <div class="logo24">24</div>
+    <div class="tagline">بث مباشر · لايف ستار</div>
+    <input class="input" id="a-name" placeholder="الاسم" style="display:none">
+    <input class="input" id="a-email" type="text" inputmode="email" placeholder="البريد الإلكتروني" dir="ltr">
+    <input class="input" id="a-pass" type="password" placeholder="كلمة المرور" dir="ltr">
+    <button class="btn btn-primary" id="a-btn" onclick="doAuth()">تسجيل الدخول</button>
+    <div class="small" onclick="toggleAuth()">ما عندك حساب؟ سجل الآن</div>
+  </div>
+
+  <div id="home" class="hidden">
+    <div class="header">
+      <div class="logo">24</div>
+      <div class="me"><span id="my-name">—</span> <span id="my-coins">🪙0</span></div>
+    </div>
+    <div class="live-grid" id="live-grid"><div style="color:var(--muted);grid-column:span 2;text-align:center;padding:40px">لا توجد بثوث الآن</div></div>
+    <button class="btn btn-primary" style="position:fixed;bottom:64px;left:50%;transform:translateX(-50%);width:auto;padding:12px 34px;z-index:45" onclick="goLive()">🎥 ابدأ البث</button>
+    <div class="nav">
+      <button class="active" onclick="show('home');loadBroadcasts()">🏠</button>
+      <button onclick="goLive()">🎥</button>
+      <button onclick="openProfile()">👤</button>
+      <button id="admin-nav" style="display:none" onclick="openAdmin()">⚙️</button>
+    </div>
+  </div>
+
+  <div id="profile" class="hidden">
+    <div class="header"><div class="logo">24</div><button class="btn-ghost" style="width:auto;padding:8px 16px" onclick="show('home')">← رجوع</button></div>
+    <div class="admin-card" style="text-align:center">
+      <div style="font-size:50px" id="p-av">👤</div>
+      <div style="font-weight:900;font-size:18px;margin-top:6px" id="p-name"></div>
+      <div style="color:var(--gold);margin:6px 0" id="p-coins"></div>
+      <div style="font-size:12px;color:var(--muted)" id="p-followers"></div>
+      <button class="btn btn-danger" onclick="logout()">تسجيل الخروج</button>
+    </div>
+  </div>
+
+  <div id="admin" class="hidden">
+    <div class="header"><div class="logo">24 · الإدارة</div><button class="btn-ghost" style="width:auto;padding:8px 16px" onclick="show('home')">←</button></div>
+    <div class="admin-card"><h3>🎥 البثوث النشطة</h3><div id="admin-broadcasts"></div></div>
+    <div class="admin-card"><h3>👥 المستخدمون</h3><div id="admin-users"></div></div>
+    <div class="admin-card"><h3>🎁 الهدايا</h3><div id="admin-gifts"></div></div>
+  </div>
+
+  <div id="bcast" class="bcast hidden">
+    <div class="bcast-video">
+      <video id="bcast-video" autoplay playsinline></video>
+      <div class="bcast-host">
+        <div class="av" id="host-av">👤</div>
+        <div><div id="host-name" style="font-weight:800;font-size:13px"></div><div style="font-size:10px;color:var(--muted)">👥 <span id="viewers">1</span> يشاهدون</div></div>
+      </div>
+      <button class="bcast-close" onclick="leaveBroadcast()">✕</button>
+      <div class="comments" id="comments"></div>
+      <div class="hearts" id="hearts"></div>
+      <div id="gift-float"></div>
+    </div>
+    <div class="bcast-bottom">
+      <div class="bcast-actions">
+        <div style="font-size:12px;color:var(--gold)" id="bcast-title">بث مباشر</div>
+        <div style="display:flex;align-items:center;gap:6px"><div class="like-count" id="like-count">0</div><button class="heart-btn" onclick="sendHeart()">❤️</button></div>
+      </div>
+      <div class="gift-bar" id="gift-bar"></div>
+      <div class="cmt-input">
+        <input id="cmt-text" placeholder="اكتب تعليقاً..." onkeydown="if(event.key==='Enter')sendChat()">
+        <button onclick="sendChat()">إرسال</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast" style="display:none"></div>
+<script>
+const API = '';
+let token = localStorage.getItem('24_token') || '';
+let me = null;
+let socket = null;
+let lkRoom = null;
+let myBcast = null;
+let roomName = null;
+let myRole = null;
+let likes = 0;
+const ADMIN_EMAILS = ['admin@familylive.com'];
+
+const GIFT_ITEMS = [
+  { e: '🌹', n: 'ورد', c: 10 }, { e: '❤️', n: 'قلب', c: 20 }, { e: '🎉', n: 'تصفيق', c: 50 },
+  { e: '👑', n: 'تاج', c: 100 }, { e: '💎', n: 'ماسة', c: 200 }, { e: '🚗', n: 'سيارة', c: 500 }, { e: '🏰', n: 'قلعة', c: 1000 }
+];
+function renderGifts() {
+  document.getElementById('gift-bar').innerHTML = GIFT_ITEMS.map(g =>
+    '<div class="gift-item" onclick="sendGift(\\'' + g.e + '\\',' + g.c + ')"><div class="e">' + g.e + '</div><div class="c">🪙' + g.c + '</div></div>').join('');
+}
+function toast(m, ok = true) {
+  const t = document.getElementById('toast');
+  t.textContent = m; t.style.display = 'block';
+  t.style.borderColor = ok ? 'var(--gold)' : 'var(--pink)';
+  clearTimeout(t._h); t._h = setTimeout(() => t.style.display = 'none', 2500);
+}
+async function api(method, path, body) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (token) opts.headers['Authorization'] = 'Bearer ' + token;
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(API + path, opts);
+  const d = await r.json();
+  if (!r.ok) throw new Error(d.error || 'خطأ');
+  return d;
+}
+function show(id) { ['auth-screen','home','profile','admin','bcast'].forEach(x => document.getElementById(x).classList.toggle('hidden', x !== id)); }
+function toggleAuth() {
+  const isLogin = document.getElementById('a-btn').textContent === 'تسجيل الدخول';
+  document.getElementById('a-name').style.display = isLogin ? 'block' : 'none';
+  document.getElementById('a-btn').textContent = isLogin ? 'إنشاء حساب' : 'تسجيل الدخول';
+}
+async function doAuth() {
+  const name = document.getElementById('a-name').value.trim();
+  const email = document.getElementById('a-email').value.trim();
+  const password = document.getElementById('a-pass').value;
+  const isLogin = document.getElementById('a-btn').textContent === 'تسجيل الدخول';
+  try {
+    const d = await api('POST', isLogin ? '/api/auth/login' : '/api/auth/register', { name, email, password });
+    token = d.token; localStorage.setItem('24_token', token);
+    me = d.user;
+    afterAuth();
+  } catch(e) { toast(e.message, false); }
+}
+function afterAuth() {
+  document.getElementById('my-name').textContent = me.name;
+  document.getElementById('my-coins').textContent = '🪙' + me.coins;
+  const isAdmin = ADMIN_EMAILS.includes(me.email);
+  document.getElementById('admin-nav').style.display = isAdmin ? 'block' : 'none';
+  show('home'); loadBroadcasts(); connectSocket();
+}
+function openProfile() {
+  document.getElementById('p-av').textContent = me.avatar || '👤';
+  document.getElementById('p-name').textContent = me.name;
+  document.getElementById('p-coins').textContent = '🪙 ' + me.coins;
+  document.getElementById('p-followers').textContent = '👥 متابعين: ' + (me.followers || 0);
+  show('profile');
+}
+function logout() { token = ''; localStorage.removeItem('24_token'); me = null; show('auth-screen'); }
+async function loadBroadcasts() {
+  try {
+    const { broadcasts } = await api('GET', '/api/broadcasts');
+    const grid = document.getElementById('live-grid');
+    if (!broadcasts.length) { grid.innerHTML = '<div style="color:var(--muted);grid-column:span 2;text-align:center;padding:40px">لا توجد بثوث الآن</div>'; return; }
+    grid.innerHTML = broadcasts.map(b => `
+      <div class="live-card" onclick="watchBroadcast('${b.id}','${b.room_name}','${b.host_name}','${b.host_avatar || '👤'}')">
+        <div class="live-badge">🔴 مباشر</div><div class="ph">🎥</div>
+        <div class="live-info"><div class="live-name">${b.host_name}</div><div class="live-viewers">اضغط للمشاهدة</div></div>
+      </div>`).join('');
+  } catch(e) {}
+}
+function connectSocket() {
+  if (socket) socket.disconnect();
+  socket = io(API);
+}
+async function goLive() {
+  if (!me) return show('auth-screen');
+  try {
+    const { id, room } = await api('POST', '/api/broadcast/start', { title: 'بث ' + me.name });
+    myBcast = id; roomName = room; myRole = 'host';
+    openBroadcast();
+    const lk = await api('POST', '/api/livekit/token', { room, role: 'host' });
+    lkRoom = new LivekitClient.Room();
+    lkRoom.on('trackPublished', (pub) => {
+      if (pub.track) document.getElementById('bcast-video').srcObject = new MediaStream([pub.track]);
+    });
+    lkRoom.on('trackSubscribed', (tr) => { document.getElementById('bcast-video').srcObject = new MediaStream([tr]); });
+    await lkRoom.connect(lk.url, lk.token);
+    await lkRoom.localParticipant.setCameraEnabled(true);
+    await lkRoom.localParticipant.setMicrophoneEnabled(true);
+    document.getElementById('bcast-title').textContent = '🎬 أنت تبث الآن';
+    socket.emit('join_broadcast', { id, name: me.name });
+    socket.emit('chat', { id, name: me.name, text: '🎬 بدأت البث!' });
+    loadBroadcasts();
+  } catch(e) { toast('فشل البث: ' + e.message, false); }
+}
+async function watchBroadcast(id, room, hostName, hostAv) {
+  if (!me) return show('auth-screen');
+  myBcast = id; roomName = room; myRole = 'viewer';
+  openBroadcast();
+  document.getElementById('host-name').textContent = hostName;
+  document.getElementById('host-av').innerHTML = (hostAv && hostAv.startsWith('data:')) ? '<img src="' + hostAv + '">' : (hostAv || '👤');
+  try {
+    const lk = await api('POST', '/api/livekit/token', { room, role: 'viewer' });
+    lkRoom = new LivekitClient.Room();
+    lkRoom.on('trackSubscribed', (tr) => { document.getElementById('bcast-video').srcObject = new MediaStream([tr]); });
+    lkRoom.on('trackUnsubscribed', () => { document.getElementById('bcast-video').srcObject = null; });
+    await lkRoom.connect(lk.url, lk.token);
+    socket.emit('join_broadcast', { id, name: me.name });
+  } catch(e) { toast('فشل المشاهدة: ' + e.message, false); }
+}
+function openBroadcast() {
+  show('bcast');
+  document.getElementById('comments').innerHTML = '';
+  document.getElementById('hearts').innerHTML = '';
+  document.getElementById('like-count').textContent = '0';
+  likes = 0;
+  document.getElementById('bcast-title').textContent = 'بث مباشر';
+}
+async function leaveBroadcast() {
+  if (socket && myBcast) socket.emit('leave_broadcast', { id: myBcast, name: me?.name });
+  if (lkRoom) { try { await lkRoom.disconnect(); } catch(e) {} lkRoom = null; }
+  if (myRole === 'host' && myBcast) { try { await api('POST', '/api/broadcast/stop', { id: myBcast }); } catch(e) {} }
+  myBcast = null; roomName = null; myRole = null;
+  document.getElementById('bcast-video').srcObject = null;
+  show('home'); loadBroadcasts();
+}
+function sendChat() {
+  const text = document.getElementById('cmt-text').value.trim();
+  if (!text || !myBcast || !me) return;
+  document.getElementById('cmt-text').value = '';
+  socket.emit('chat', { id: myBcast, name: me.name, text });
+}
+function addComment(name, text) {
+  const c = document.getElementById('comments');
+  const el = document.createElement('div');
+  el.className = 'cmt';
+  el.innerHTML = '<span class="n">' + name + '</span> ' + text;
+  c.appendChild(el);
+  while (c.children.length > 8) c.removeChild(c.firstChild);
+  setTimeout(() => el.remove(), 5500);
+}
+function sendHeart() {
+  likes++;
+  document.getElementById('like-count').textContent = likes;
+  const h = document.createElement('div');
+  h.className = 'heart'; h.textContent = '❤️';
+  h.style.left = (30 + Math.random() * 40) + '%';
+  document.getElementById('hearts').appendChild(h);
+  setTimeout(() => h.remove(), 2000);
+  if (myBcast) socket.emit('heart', { id: myBcast });
+}
+async function sendGift(emoji, coins) {
+  if (!myBcast || !me) return;
+  const gf = document.getElementById('gift-float');
+  gf.innerHTML = '<div class="gift-float">' + emoji + '</div>';
+  setTimeout(() => gf.innerHTML = '', 2000);
+  try {
+    const r = await api('POST', '/api/gift', { toId: me.id, coins, emoji });
+    me.coins = r.coins;
+    document.getElementById('my-coins').textContent = '🪙' + me.coins;
+    socket.emit('gift', { id: myBcast, name: me.name, emoji });
+  } catch(e) { toast(e.message, false); }
+}
+// Socket listeners
+socket?.on('chat', (d) => { if (d.id === myBcast) addComment(d.name, d.text); });
+socket?.on('heart', (d) => { if (d.id === myBcast) sendHeart(); });
+socket?.on('gift', (d) => {
+  if (d.id === myBcast) {
+    const gf = document.getElementById('gift-float');
+    gf.innerHTML = '<div class="gift-float">' + d.emoji + '</div>';
+    setTimeout(() => gf.innerHTML = '', 2000);
+    addComment(d.name, 'أرسل هدية ' + d.emoji);
+  }
+});
+socket?.on('viewers', (n) => { document.getElementById('viewers').textContent = n; });
+socket?.on('broadcast_ended', () => { if (myRole !== 'host') leaveBroadcast(); });
+
+// ===== ADMIN =====
+async function openAdmin() {
+  show('admin');
+  try {
+    const { broadcasts } = await api('GET', '/api/admin/broadcasts');
+    document.getElementById('admin-broadcasts').innerHTML = broadcasts.length
+      ? broadcasts.map(b => '<div class="admin-row"><span>🎥 ' + b.host_name + ' — ' + (b.title||'') + '</span><button onclick="adminStop(\\'' + b.id + '\\')">⏹️ إيقاف</button></div>').join('')
+      : '<div style="color:var(--muted);font-size:12px">لا توجد بثوث</div>';
+  } catch(e) {}
+  try {
+    const { users } = await api('GET', '/api/admin/users');
+    document.getElementById('admin-users').innerHTML = users.map(u =>
+      '<div class="admin-row"><span>' + u.name + ' · 🪙' + u.coins + '</span><button onclick="adminCharge(\\'' + u.id + '\\')">⚡ شحن</button></div>').join('');
+  } catch(e) {}
+  try {
+    const { gifts } = await api('GET', '/api/admin/gifts');
+    document.getElementById('admin-gifts').innerHTML = gifts.length
+      ? gifts.slice(0, 20).map(g => '<div class="admin-row"><span>' + g.from_name + ' ← ' + g.emoji + ' 🪙' + g.coins + '</span></div>').join('')
+      : '<div style="color:var(--muted);font-size:12px">لا توجد هدايا</div>';
+  } catch(e) {}
+}
+async function adminStop(id) {
+  try { await api('POST', '/api/admin/broadcast/stop', { id }); toast('⏹️ أوقفت البث'); openAdmin(); } catch(e) { toast(e.message, false); }
+}
+async function adminCharge(id) {
+  const coins = prompt('كم كونزه تشحن؟', '1000');
+  if (!coins) return;
+  try { const r = await api('POST', '/api/admin/charge', { userId: id, coins }); toast(r.message); openAdmin(); } catch(e) { toast(e.message, false); }
+}
+renderGifts();
+</script>
+</body>
+</html>
