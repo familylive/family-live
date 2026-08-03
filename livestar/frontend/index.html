@@ -310,17 +310,16 @@ async function goLive() {
     resetCams();
     const lk = await api('POST', '/api/livekit/token', { room, role: 'host' });
     lkRoom = new LivekitClient.Room();
-    // Local participant tile (camera 0)
-    lkRoom.localParticipant?.on('trackPublished', (pub) => {
-      if (pub.track?.kind === 'video') {
-        assignTile(lkRoom.localParticipant.identity, me.name, true);
-        const i = camTiles[lkRoom.localParticipant.identity];
-        if (i !== undefined) document.getElementById('cam-' + i).querySelector('video').srcObject = new MediaStream([pub.track]);
-      }
+    // Attach any published video track (local + guests) - fire on the room (works for local too)
+    lkRoom.on('trackPublished', (pub, participant) => {
+      if (pub.kind !== 'video' && !(pub.track && pub.track.kind === 'video')) return;
+      const isLocal = participant.identity === lkRoom.localParticipant?.identity;
+      const i = assignTile(participant.identity, isLocal ? me.name : (participant.name || 'ضيف'), isLocal || !hostIdentity);
+      if (i !== undefined && pub.track) document.getElementById('cam-' + i).querySelector('video').srcObject = new MediaStream([pub.track]);
     });
     lkRoom.on('trackSubscribed', (tr, pub, participant) => {
       if (tr.kind !== 'video') return;
-      const isHost = participant.identity === lkRoom.localParticipant?.identity;
+      const isHost = !hostIdentity || participant.identity === lkRoom.localParticipant?.identity;
       const i = assignTile(participant.identity, participant.name || 'ضيف', isHost);
       if (i !== undefined) document.getElementById('cam-' + i).querySelector('video').srcObject = new MediaStream([tr]);
     });
@@ -328,6 +327,13 @@ async function goLive() {
     await lkRoom.connect(lk.url, lk.token);
     await lkRoom.localParticipant.setCameraEnabled(true);
     await lkRoom.localParticipant.setMicrophoneEnabled(true);
+    // Attach local camera directly (safety)
+    const camPub = lkRoom.localParticipant.getTrackPublication(LivekitClient.Track.Source.Camera);
+    if (camPub && camPub.track) {
+      assignTile(lkRoom.localParticipant.identity, me.name, true);
+      const i = camTiles[lkRoom.localParticipant.identity];
+      if (i !== undefined) document.getElementById('cam-' + i).querySelector('video').srcObject = new MediaStream([camPub.track]);
+    }
     document.getElementById('bcast-title').textContent = '🎬 أنت تبث الآن';
     socket.emit('join_broadcast', { id, name: me.name });
     socket.emit('chat', { id, name: me.name, text: '🎬 بدأت البث!' });
