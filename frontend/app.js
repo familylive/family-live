@@ -2587,18 +2587,22 @@ function escapeHtml(s) {
 }
 
 function syncTikTokChat() {
-  // Re-render from the main chat room messages if available
+  // Re-render from the main chat room messages if available (keeps level badges)
   const list = document.getElementById('tiktok-chat-list');
   const room = document.getElementById('chat-room');
   if (!list || !room) return;
   list.innerHTML = '';
   Array.from(room.querySelectorAll('.chat-msg')).forEach(m => {
-    const name = m.querySelector('.chat-sender')?.textContent || '';
+    const senderEl = m.querySelector('.chat-sender');
+    const nameEl = senderEl?.firstChild;
+    const name = nameEl ? (nameEl.textContent || '') : (senderEl?.textContent || '');
     const text = m.querySelector('.chat-bubble')?.textContent || '';
     const isSent = m.classList.contains('sent');
+    const lvImg = senderEl?.querySelector('img');
+    const lvHtml = lvImg ? lvImg.outerHTML : '';
     const msg = document.createElement('div');
     msg.className = 'tiktok-chat-msg' + (isSent ? ' mine' : '');
-    msg.innerHTML = '<span class="tiktok-chat-name">' + escapeHtml(name) + '</span> ' + escapeHtml(text);
+    msg.innerHTML = '<span class="tiktok-chat-name">' + escapeHtml(name) + '</span> ' + lvHtml + escapeHtml(text);
     list.appendChild(msg);
   });
   while (list.children.length > 30) list.removeChild(list.firstChild);
