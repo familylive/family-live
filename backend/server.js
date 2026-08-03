@@ -2730,6 +2730,11 @@ io.on('connection', (socket) => {
     db.runRaw('UPDATE users SET selected_effect = $1 WHERE id = $2', [effectId || null, me]).catch(() => {});
   });
 
+  // Broadcast started notification
+  socket.on('broadcast_started', (data) => {
+    if (data?.sessionId) socket.to(`session_${data.sessionId}`).emit('broadcast_started', { sessionId: data.sessionId, hostName: data.hostName });
+  });
+
   // Camera invite: founder invites a present member to join on camera
   socket.on('camera_invite', (data) => {
     const { to, sessionId, founderId, founderName } = data;

@@ -2559,6 +2559,95 @@ function startVictoryTimer() {
   }, 1000);
 }
 
+// ==================== LIVEKIT REAL BROADCAST ====================
+let lkRoom = null;
+let lkMode = null; // 'host' | 'viewer'
+
+async function getLiveKitToken(room, role) {
+  const r = await api('POST', '/api/livekit/token', { room, role });
+  return r;
+}
+
+async function toggleLiveKitBroadcast() {
+  if (lkRoom) return stopLiveKitBroadcast();
+  if (!state.activeSession?.id) return showToast('افتح الديوانية أولاً', 'error');
+  try {
+    const { token, url, identity } = await getLiveKitToken(state.activeSession.id, 'host');
+    const room = new LivekitClient.Room({ adaptiveStream: true });
+    room.on('trackPublished', (pub) => {
+      if (pub.track) {
+        const el = document.getElementById('lk-video');
+        if (el) { el.srcObject = new MediaStream([pub.track]); el.style.display = 'block'; }
+      }
+    });
+    room.on('trackSubscribed', (track) => {
+      const el = document.getElementById('lk-video');
+      if (el) { el.srcObject = new MediaStream([track]); el.style.display = 'block'; }
+    });
+    room.on('participantDisconnected', () => { updateViewerCount(); });
+    await room.connect(url, token);
+    // نشر الكاميرا والمايك
+    await room.localParticipant.setCameraEnabled(true);
+    await room.localParticipant.setMicrophoneEnabled(true);
+    lkRoom = room;
+    lkMode = 'host';
+    // إخفاء فيديو P2P وإظهار فيديو البث
+    const myVideo = document.getElementById('my-video');
+    if (myVideo) myVideo.style.display = 'none';
+    const btn = document.getElementById('lk-broadcast-btn');
+    if (btn) btn.textContent = '⏹️ إيقاف البث المباشر';
+    showToast('🎬 بدأ البث المباشر! المشاهدون يرونك الآن', 'success');
+    // إظهار زر المشاهدة للآخرين عبر السيرفر (فيسبوكي) - نكتفي بالإشعار
+    io?.emit && socket.emit('broadcast_started', { sessionId: state.activeSession.id, hostName: state.user.name });
+    updateViewerCount();
+  } catch(e) { showToast('فشل البث: ' + (e.message || ''), 'error'); }
+}
+
+async function stopLiveKitBroadcast() {
+  try { await lkRoom?.disconnect(); } catch(e) {}
+  lkRoom = null; lkMode = null;
+  const el = document.getElementById('lk-video');
+  if (el) { el.srcObject = null; el.style.display = 'none'; }
+  const myVideo = document.getElementById('my-video');
+  if (myVideo && localStream) { myVideo.srcObject = localStream; myVideo.style.display = 'block'; }
+  const btn = document.getElementById('lk-broadcast-btn');
+  if (btn) btn.textContent = '🎬 بث مباشر (جمهور)';
+  showToast('⏹️ توقف البث المباشر', 'error');
+}
+
+async function watchLiveKitBroadcast() {
+  if (lkRoom) return stopLiveKitBroadcast();
+  if (!state.activeSession?.id) return showToast('لا يوجد بث نشط', 'error');
+  try {
+    const { token, url } = await getLiveKitToken(state.activeSession.id, 'viewer');
+    const room = new LivekitClient.Room({ adaptiveStream: true });
+    room.on('trackSubscribed', (track) => {
+      const el = document.getElementById('lk-video');
+      if (el) { el.srcObject = new MediaStream([track]); el.style.display = 'block'; }
+    });
+    room.on('participantConnected', () => { if (typeof updateViewerCount === 'function') updateViewerCount(); });
+    await room.connect(url, token);
+    lkRoom = room;
+    lkMode = 'viewer';
+    // مشاهدة كاملة: إخفاء كاميرتي وفتح شاشة البث
+    const myVideo = document.getElementById('my-video');
+    if (myVideo) myVideo.style.display = 'none';
+    const btn = document.getElementById('lk-watch-btn');
+    if (btn) btn.textContent = '⏹️ خروج من المشاهدة';
+    showToast('👀 أنت تشاهد البث الآن', 'success');
+    updateViewerCount();
+  } catch(e) { showToast('فشل المشاهدة: ' + (e.message || ''), 'error'); }
+}
+
+// إشعار بدء البث للأعضاء
+socket?.on('broadcast_started', (data) => {
+  const btn = document.getElementById('lk-watch-btn');
+  if (btn && !lkRoom) btn.style.display = 'block';
+  if (data?.hostName && data.hostName !== state.user?.name) {
+    showToast('🎬 ' + data.hostName + ' بدأ بثاً مباشراً - شاهد الآن!', 'success');
+  }
+});
+
 // ==================== TIKTOK LIVE (hearts, host info, viewers) ====================
 function updateTikTokLiveInfo() {
   const lv = parseInt(state.user?.level) || 0;

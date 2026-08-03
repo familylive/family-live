@@ -721,6 +721,10 @@
             <button class="btn btn-accent" style="flex:1" id="join-audio-btn" onclick="joinLiveAudio()">🎥 انضم لمكالمة الفيديو</button>
             <button class="btn btn-secondary" id="pre-cam-btn" onclick="flipCamera()" title="تبديل الكاميرا">📷</button>
           </div>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button class="btn btn-danger" style="flex:1" id="lk-broadcast-btn" onclick="toggleLiveKitBroadcast()">🎬 بث مباشر (جمهور)</button>
+            <button class="btn btn-primary" style="flex:1" id="lk-watch-btn" onclick="watchLiveKitBroadcast()" style="display:none">👀 شاهد البث</button>
+          </div>
         </div>
         <div class="chat-room" id="chat-room" style="display:none"><div class="empty-state"><div class="empty-text">افتح الديوانية لبدء المحادثة</div></div></div>
         <div class="chat-input" id="chat-input-row" style="display:none">
