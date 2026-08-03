@@ -257,22 +257,36 @@ function updateGridMode() {
   grid.classList.toggle('two', camCount === 2);
   grid.classList.toggle('three', camCount === 3);
 }
-function assignTile(identity, name) {
+let hostIdentity = null;
+
+function assignTile(identity, name, isHost) {
   // Reuse existing tile if participant already has one
   if (camTiles[identity] !== undefined) return camTiles[identity];
-  // Find free tile (0 is local, but local joins too)
-  for (let i = 0; i < 4; i++) {
+  if (isHost) hostIdentity = identity;
+  // Host always takes tile 0
+  if (isHost) {
+    camTiles[identity] = 0;
+    const t = document.getElementById('cam-0');
+    t.classList.remove('hidden');
+    t.querySelector('.cam-name').textContent = name || 'المضيف';
+    camCount = Math.max(camCount, 1);
+    updateGridMode();
+    return 0;
+  }
+  // Guests take tiles 1-3
+  const guestTiles = [1, 2, 3];
+  for (const i of guestTiles) {
     if (Object.values(camTiles).indexOf(i) === -1) {
       camTiles[identity] = i;
       const t = document.getElementById('cam-' + i);
       t.classList.remove('hidden');
-      t.querySelector('.cam-name').textContent = name || '';
+      t.querySelector('.cam-name').textContent = name || 'ضيف';
       camCount = Math.max(camCount, i + 1);
       updateGridMode();
       return i;
     }
   }
-  return -1; // 4 cameras full
+  return -1; // full
 }
 function freeTile(identity) {
   const i = camTiles[identity];
@@ -299,14 +313,15 @@ async function goLive() {
     // Local participant tile (camera 0)
     lkRoom.localParticipant?.on('trackPublished', (pub) => {
       if (pub.track?.kind === 'video') {
-        assignTile(lkRoom.localParticipant.identity, me.name);
+        assignTile(lkRoom.localParticipant.identity, me.name, true);
         const i = camTiles[lkRoom.localParticipant.identity];
         if (i !== undefined) document.getElementById('cam-' + i).querySelector('video').srcObject = new MediaStream([pub.track]);
       }
     });
     lkRoom.on('trackSubscribed', (tr, pub, participant) => {
       if (tr.kind !== 'video') return;
-      const i = assignTile(participant.identity, participant.name || 'ضيف');
+      const isHost = participant.identity === lkRoom.localParticipant?.identity;
+      const i = assignTile(participant.identity, participant.name || 'ضيف', isHost);
       if (i !== undefined) document.getElementById('cam-' + i).querySelector('video').srcObject = new MediaStream([tr]);
     });
     lkRoom.on('participantDisconnected', (participant) => freeTile(participant.identity));
@@ -329,9 +344,12 @@ async function watchBroadcast(id, room, hostName, hostAv) {
   try {
     const lk = await api('POST', '/api/livekit/token', { room, role: 'viewer' });
     lkRoom = new LivekitClient.Room();
+    let hostAssigned = false;
     lkRoom.on('trackSubscribed', (tr, pub, participant) => {
       if (tr.kind !== 'video') return;
-      const i = assignTile(participant.identity, participant.name || 'ضيف');
+      const isHost = !hostAssigned;
+      if (isHost) hostAssigned = true;
+      const i = assignTile(participant.identity, participant.name || 'ضيف', isHost);
       if (i !== undefined) document.getElementById('cam-' + i).querySelector('video').srcObject = new MediaStream([tr]);
     });
     lkRoom.on('trackUnsubscribed', (tr, pub, participant) => { freeTile(participant.identity); });
