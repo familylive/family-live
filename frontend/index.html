@@ -620,6 +620,17 @@
               <div class="video-name">أنت</div>
               <div class="tile-state" id="my-tile-state"></div>
             </div>
+            <!-- TikTok live overlay elements -->
+            <div class="tt-live-badge">🔴 مباشر</div>
+            <div class="tt-host-info">
+              <div class="tt-host-avatar" id="tt-host-avatar">👤</div>
+              <div>
+                <div class="tt-host-name"><span id="tt-host-level"></span> <span id="tt-host-name-text"></span></div>
+                <div class="tt-host-sub">👪 <span id="tt-host-family"></span> · 👥 <span id="tt-viewer-count">1</span></div>
+              </div>
+            </div>
+            <div class="tt-heart-btn" id="tt-heart-btn" onclick="sendTtHeart()">❤️</div>
+            <div id="tt-hearts-layer" class="tt-hearts-layer"></div>
             <!-- TikTok chat overlay: comments over the black screen -->
             <div id="tiktok-chat" class="tiktok-chat">
               <div id="tiktok-chat-list" class="tiktok-chat-list"></div>

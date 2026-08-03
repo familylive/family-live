@@ -606,6 +606,7 @@ function connectSocket() {
       if (!state.callMembers) state.callMembers = {};
       state.callMembers[data.userId] = data.userName;
       updateCallPresence();
+      if (typeof updateViewerCount === 'function') updateViewerCount();
       // New user joined, send them an offer
       setTimeout(() => createOffer(data.userId, data.userName), 500);
     }
@@ -614,6 +615,7 @@ function connectSocket() {
     removeRemoteAudio(data.userId);
     if (state.callMembers) delete state.callMembers[data.userId];
     updateCallPresence();
+    if (typeof updateViewerCount === 'function') updateViewerCount();
   });
   socket.on('call_full', (data) => {
     showToast(data.message || 'المكالمة ممتلئة', 'error');
@@ -1907,6 +1909,8 @@ async function joinLiveAudio() {
     updateAudioCallUI(true);
     startCallWatermark();
     setTikTokMode(true); // TikTok layout by default with chat below
+    updateTikTokLiveInfo();
+    updateViewerCount();
     // Camera starts ON by default
     camOff = false;
     const myVideo2 = document.getElementById('my-video');
@@ -2555,6 +2559,36 @@ function startVictoryTimer() {
   }, 1000);
 }
 
+// ==================== TIKTOK LIVE (hearts, host info, viewers) ====================
+function updateTikTokLiveInfo() {
+  const lv = parseInt(state.user?.level) || 0;
+  const lvEl = document.getElementById('tt-host-level');
+  if (lvEl) lvEl.innerHTML = (lv >= 0 && lv <= 100) ? '<img src="/assets/levels/level_' + lv + '.' + (lv >= 1 && lv <= 10 ? 'gif' : 'png') + '?v=5" style="width:40px;height:15px;vertical-align:middle">' : '';
+  const nameEl = document.getElementById('tt-host-name-text');
+  if (nameEl) nameEl.textContent = state.user?.name || '';
+  const avEl = document.getElementById('tt-host-avatar');
+  if (avEl) avEl.innerHTML = (state.user?.avatar && state.user.avatar.startsWith('data:')) ? '<img src="' + state.user.avatar + '">' : (state.user?.avatar || '👤');
+  const famEl = document.getElementById('tt-host-family');
+  if (famEl) famEl.textContent = state.family?.name || '';
+}
+
+function updateViewerCount() {
+  const el = document.getElementById('tt-viewer-count');
+  if (el) el.textContent = (Object.keys(state.callMembers || {}).length + 1);
+}
+
+function sendTtHeart() {
+  const layer = document.getElementById('tt-hearts-layer');
+  if (!layer) return;
+  const heart = document.createElement('div');
+  heart.className = 'tt-heart';
+  heart.textContent = '❤️';
+  heart.style.left = (30 + Math.random() * 40) + '%';
+  heart.style.animationDelay = (Math.random() * .3) + 's';
+  layer.appendChild(heart);
+  setTimeout(() => heart.remove(), 2500);
+}
+
 // ==================== TIKTOK CHAT (on the black screen) ====================
 function sendTikTokChat() {
   const input = document.getElementById('tiktok-chat-input');
@@ -2659,6 +2693,8 @@ function toggleTikTokMode() {
 // Tap on any video tile to zoom
 function bindVideoTileZoom() {
   document.getElementById('video-grid')?.addEventListener('click', (e) => {
+    // Ignore clicks on chat/buttons - only the video area opens fullscreen
+    if (e.target.closest('.tiktok-chat') || e.target.closest('.tt-heart-btn') || e.target.closest('button,input,select,textarea')) return;
     if (e.target.closest('.video-tile')) toggleCallFullscreen();
   }, true);
 }
