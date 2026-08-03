@@ -1816,11 +1816,17 @@ app.post('/api/admin/payments/confirm', authMiddleware, adminMiddleware, async (
       await db.enableSecretRoom(user.family_id);
     }
   }
-  // If buying coins, add coins to user wallet
-  if (payment && payment.purpose && payment.purpose.startsWith('شراء كوينزات')) {
+  // If buying coins, add coins to user wallet + level up (total charged)
+  if (payment && payment.purpose && (payment.purpose.startsWith('شراء كوينزات') || payment.purpose.startsWith('شراء كونزات'))) {
     const coinsMatch = payment.purpose.match(/\((\d+)\)/);
     if (coinsMatch) {
-      await db.addCoins(payment.user_id, parseInt(coinsMatch[1]));
+      const coins = parseInt(coinsMatch[1]);
+      await db.addCoins(payment.user_id, coins);
+      // Level up based on purchased coins
+      try {
+        const info = await db.addUserCharged(payment.user_id, coins);
+        if (info && info.level > 0) io.to(`user_${payment.user_id}`).emit('level_up', { level: info.level, remaining: info.next ? Math.max(0, info.next.coins_needed - info.charged) : 0 });
+      } catch(e) {}
     }
   }
   res.json({ message: '✅ تم تأكيد الدفع', payment });
