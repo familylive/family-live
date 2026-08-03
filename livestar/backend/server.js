@@ -22,11 +22,15 @@ const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY || 'APIj9zp2ZvZviH6';
 const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET || '7VL0TwtiCnACUWA3h604mL4d9EInFjULZ2EdOrDoE4P';
 const LIVEKIT_URL = process.env.LIVEKIT_URL || 'wss://familylive-vitm3l6f.livekit.cloud/';
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
-async function q(sql, p = []) { const r = await pool.query(sql, p); return r.rows; }
-async function q1(sql, p = []) { const r = await pool.query(sql, p); return r.rows[0] || null; }
+// In-memory fallback when DATABASE_URL is not set yet (so the app always works)
+let mem = { users: [], broadcasts: [], gifts: [], tx: [] };
+let useDb = !!process.env.DATABASE_URL;
+const pool = useDb ? new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } }) : null;
+async function q(sql, p = []) { if (!useDb) return []; const r = await pool.query(sql, p); return r.rows; }
+async function q1(sql, p = []) { if (!useDb) return null; const r = await pool.query(sql, p); return r.rows[0] || null; }
 
 async function initDb() {
+  if (!useDb) { console.log('💾 24 يعمل بذاكرة مؤقتة (بدون قاعدة) - أضف DATABASE_URL للتخزين الدائم'); return; }
   await pool.query(`CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, password TEXT NOT NULL,
     coins INTEGER DEFAULT 0, avatar TEXT DEFAULT '👤', followers INTEGER DEFAULT 0, created_at TEXT DEFAULT now()
@@ -44,7 +48,12 @@ async function initDb() {
   )`);
   console.log('✅ 24 DB ready');
 }
-initDb().catch(e => { console.log('DB error:', e.message); process.exit(1); });
+initDb().catch(e => { console.log('DB error:', e.message); });
+
+// Memory helpers (when no DB)
+function memUsers() { return useDb ? [] : mem.users; }
+function findUserByEmail(email) { return useDb ? null : mem.users.find(u => u.email.toLowerCase() === (email||'').toLowerCase()); }
+function findUserById(id) { return useDb ? null : mem.users.find(u => u.id === id); }
 
 function auth(req, res, next) {
   const t = req.headers.authorization?.split(' ')[1];
@@ -58,18 +67,20 @@ const ah = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch
 app.post('/api/auth/register', ah(async (req, res) => {
   const { name, email, password } = req.body;
   if (!name || !email || !password) return res.status(400).json({ error: 'املأ جميع الحقول' });
-  const ex = await q1('SELECT id FROM users WHERE lower(email)=lower($1)', [email]);
-  if (ex) return res.status(400).json({ error: 'البريد مسجل مسبقاً' });
+  let ex = await q1('SELECT id FROM users WHERE lower(email)=lower($1)', [email]);
+  if (useDb && ex) return res.status(400).json({ error: 'البريد مسجل مسبقاً' });
+  if (!useDb && findUserByEmail(email)) return res.status(400).json({ error: 'البريد مسجل مسبقاً' });
   const id = uuidv4();
   const hashed = bcrypt.hashSync(password, 10);
-  await q('INSERT INTO users (id, name, email, password, coins) VALUES ($1,$2,$3,$4,1000)', [id, name, email, hashed]);
+  if (useDb) await q('INSERT INTO users (id, name, email, password, coins) VALUES ($1,$2,$3,$4,1000)', [id, name, email, hashed]);
+  else mem.users.push({ id, name, email, password: hashed, coins: 1000, avatar: '👤', followers: 0 });
   const token = jwt.sign({ id, email }, JWT_SECRET, { expiresIn: '30d' });
   res.json({ token, user: { id, name, email, coins: 1000, avatar: '👤', followers: 0 } });
 }));
 
 app.post('/api/auth/login', ah(async (req, res) => {
   const { email, password } = req.body;
-  const u = await q1('SELECT * FROM users WHERE lower(email)=lower($1)', [email]);
+  const u = useDb ? await q1('SELECT * FROM users WHERE lower(email)=lower($1)', [email]) : findUserByEmail(email);
   if (!u || !bcrypt.compareSync(password, u.password)) return res.status(400).json({ error: 'بيانات الدخول غير صحيحة' });
   const token = jwt.sign({ id: u.id, email: u.email }, JWT_SECRET, { expiresIn: '30d' });
   res.json({ token, user: { id: u.id, name: u.name, email: u.email, coins: u.coins, avatar: u.avatar, followers: u.followers } });
