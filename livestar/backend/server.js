@@ -114,8 +114,7 @@ app.post('/api/livekit/token', auth, ah(async (req, res) => {
   const { room, role } = req.body;
   if (!room) return res.status(400).json({ error: 'اسم الغرفة مطلوب' });
   const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, { identity: req.user.id + '_' + (role === 'host' ? 'h' : 'v'), name: req.user.name, ttl: '4h' });
-  const { Track } = require('livekit-server-sdk');
-  at.addGrant({ roomJoin: true, room, canPublish: true, canPublishData: true, canSubscribe: true, canPublishSources: [Track.Source.Camera, Track.Source.Microphone] });
+  at.addGrant({ roomJoin: true, room, canPublish: true, canPublishData: true, canSubscribe: true });
   res.json({ token: await at.toJwt(), url: LIVEKIT_URL, role });
 }));
 
