@@ -22,15 +22,33 @@ const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY || 'APIj9zp2ZvZviH6';
 const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET || '7VL0TwtiCnACUWA3h604mL4d9EInFjULZ2EdOrDoE4P';
 const LIVEKIT_URL = process.env.LIVEKIT_URL || 'wss://familylive-vitm3l6f.livekit.cloud/';
 
-// In-memory fallback when DATABASE_URL is not set yet (so the app always works)
+// In-memory fallback when DATABASE_URL missing OR unreachable (app always works)
 let mem = { users: [], broadcasts: [], gifts: [], tx: [] };
-let useDb = !!process.env.DATABASE_URL;
-const pool = useDb ? new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } }) : null;
+let useDb = false;
+const dbUrl = (process.env.DATABASE_URL || '').trim();
+let pool = null;
+if (dbUrl) {
+  try {
+    pool = new Pool({ connectionString: dbUrl, ssl: { rejectUnauthorized: false }, connectionTimeoutMillis: 5000 });
+    useDb = true;
+  } catch(e) { useDb = false; }
+}
 async function q(sql, p = []) { if (!useDb) return []; const r = await pool.query(sql, p); return r.rows; }
 async function q1(sql, p = []) { if (!useDb) return null; const r = await pool.query(sql, p); return r.rows[0] || null; }
 
 async function initDb() {
   if (!useDb) { console.log('💾 24 يعمل بذاكرة مؤقتة (بدون قاعدة) - أضف DATABASE_URL للتخزين الدائم'); return; }
+  // Test the connection quickly; if unreachable -> fall back to memory
+  try {
+    await Promise.race([
+      pool.query('SELECT 1'),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('DB timeout')), 5000))
+    ]);
+  } catch(e) {
+    useDb = false;
+    console.log('💾 قاعدة البيانات غير متاحة - يعمل بذاكرة مؤقتة (' + e.message + ')');
+    return;
+  }
   await pool.query(`CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, password TEXT NOT NULL,
     coins INTEGER DEFAULT 0, avatar TEXT DEFAULT '👤', followers INTEGER DEFAULT 0, created_at TEXT DEFAULT now()
