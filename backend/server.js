@@ -2778,6 +2778,36 @@ io.on('connection', (socket) => {
   });
 });
 
+// =============== LIVEKIT (REAL BROADCAST) ================
+const { AccessToken } = require('livekit-server-sdk');
+
+// LiveKit credentials (broadcast engine)
+const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY || 'APIj9zp2ZvZviH6';
+const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET || '7VL0TwtiCnACUWA3h604mL4d9EInFjULZ2EdOrDoE4P';
+const LIVEKIT_URL = process.env.LIVEKIT_URL || 'wss://family-live-xxxx.livekit.cloud';
+
+// Create a LiveKit access token for a participant
+app.post('/api/livekit/token', authMiddleware, asyncHandler(async (req, res) => {
+  const { room, role } = req.body; // role: 'host' | 'viewer'
+  if (!room) return res.status(400).json({ error: 'اسم الغرفة مطلوب' });
+  const identity = req.user.id.slice(0, 8) + '_' + (role === 'host' ? 'host' : 'viewer');
+  const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
+    identity,
+    name: req.user.name,
+    ttl: '4h',
+  });
+  at.addGrant({
+    roomJoin: true,
+    room: room,
+    canPublish: role === 'host',          // المضيف يبث
+    canPublishData: true,
+    canSubscribe: true,
+    canPublishSources: role === 'host' ? ['camera','microphone','screen_share'] : [],
+  });
+  const token = await at.toJwt();
+  res.json({ token, url: LIVEKIT_URL, identity, role });
+}));
+
 // =============== SEED DATA ===============
 
 
