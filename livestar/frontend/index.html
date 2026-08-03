@@ -171,7 +171,7 @@ const GIFT_ITEMS = [
 ];
 function renderGifts() {
   document.getElementById('gift-bar').innerHTML = GIFT_ITEMS.map(g =>
-    '<div class="gift-item" onclick="sendGift(\\'' + g.e + '\\',' + g.c + ')"><div class="e">' + g.e + '</div><div class="c">🪙' + g.c + '</div></div>').join('');
+    '<div class="gift-item" onclick="sendGift(\'' + g.e + '\',' + g.c + ')"><div class="e">' + g.e + '</div><div class="c">🪙' + g.c + '</div></div>').join('');
 }
 function toast(m, ok = true) {
   const t = document.getElementById('toast');
