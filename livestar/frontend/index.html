@@ -431,13 +431,13 @@ async function openAdmin() {
   try {
     const { broadcasts } = await api('GET', '/api/admin/broadcasts');
     document.getElementById('admin-broadcasts').innerHTML = broadcasts.length
-      ? broadcasts.map(b => '<div class="admin-row"><span>🎥 ' + b.host_name + ' — ' + (b.title||'') + '</span><button onclick="adminStop(\\'' + b.id + '\\')">⏹️ إيقاف</button></div>').join('')
+      ? broadcasts.map(b => '<div class="admin-row"><span>🎥 ' + b.host_name + ' — ' + (b.title||'') + '</span><button onclick=\'adminStop(\'' + b.id + '\')\'>⏹️ إيقاف</button></div>').join('')
       : '<div style="color:var(--muted);font-size:12px">لا توجد بثوث</div>';
   } catch(e) {}
   try {
     const { users } = await api('GET', '/api/admin/users');
     document.getElementById('admin-users').innerHTML = users.map(u =>
-      '<div class="admin-row"><span>' + u.name + ' · 🪙' + u.coins + '</span><button onclick="adminCharge(\\'' + u.id + '\\')">⚡ شحن</button></div>').join('');
+      '<div class="admin-row"><span>' + u.name + ' · 🪙' + u.coins + '</span><button onclick=\'adminCharge(\'' + u.id + '\')\'>⚡ شحن</button></div>').join('');
   } catch(e) {}
   try {
     const { gifts } = await api('GET', '/api/admin/gifts');
