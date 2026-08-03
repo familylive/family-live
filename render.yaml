@@ -9,3 +9,14 @@ services:
     buildCommand: cd backend && npm install
     startCommand: cd backend && node server.js
     healthCheckPath: /
+  - type: web
+    name: live-24
+    runtime: node
+    repo: https://github.com/familylive/family-live
+    rootDir: livestar
+    plan: free
+    region: frankfurt
+    branch: main
+    buildCommand: cd backend && npm install
+    startCommand: cd backend && node server.js
+    healthCheckPath: /
