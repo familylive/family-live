@@ -34,6 +34,14 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',Tahoma,sans-s
 .bcast{position:fixed;inset:0;background:#000;z-index:60;display:flex;flex-direction:column}
 .bcast-video{flex:1;position:relative;overflow:hidden}
 .bcast-video video{width:100%;height:100%;object-fit:cover}
+.cam-grid{position:absolute;inset:0;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
+.cam-grid.one{grid-template-columns:1fr;grid-template-rows:1fr}
+.cam-grid.two{grid-template-columns:1fr 1fr;grid-template-rows:1fr}
+.cam-grid.three{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
+.cam-tile{position:relative;background:#000;overflow:hidden;border:1px solid #1a2240}
+.cam-tile video{width:100%;height:100%;object-fit:cover}
+.cam-tile .cam-name{position:absolute;bottom:6px;right:8px;font-size:11px;font-weight:800;background:rgba(0,0,0,.55);padding:2px 8px;border-radius:8px}
+.cam-tile .cam-off{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:40px;background:#0a0d18}
 .bcast-host{position:absolute;top:50px;left:12px;display:flex;align-items:center;gap:8px;background:rgba(0,0,0,.55);padding:6px 12px 6px 6px;border-radius:20px}
 .bcast-host .av{width:36px;height:36px;border-radius:50%;border:2px solid var(--gold);display:flex;align-items:center;justify-content:center;overflow:hidden;background:#333;font-size:18px}
 .bcast-host .av img{width:100%;height:100%;object-fit:cover}
@@ -115,8 +123,13 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',Tahoma,sans-s
   </div>
 
   <div id="bcast" class="bcast hidden">
-    <div class="bcast-video">
-      <video id="bcast-video" autoplay playsinline></video>
+    <div class="bcast-video" id="bcast-video">
+      <div class="cam-grid" id="cam-grid">
+        <div class="cam-tile" id="cam-0"><video autoplay playsinline muted></video><div class="cam-name">أنت</div></div>
+        <div class="cam-tile hidden" id="cam-1"><video autoplay playsinline></video><div class="cam-name"></div></div>
+        <div class="cam-tile hidden" id="cam-2"><video autoplay playsinline></video><div class="cam-name"></div></div>
+        <div class="cam-tile hidden" id="cam-3"><video autoplay playsinline></video><div class="cam-name"></div></div>
+      </div>
       <div class="bcast-host">
         <div class="av" id="host-av">👤</div>
         <div><div id="host-name" style="font-weight:800;font-size:13px"></div><div style="font-size:10px;color:var(--muted)">👥 <span id="viewers">1</span> يشاهدون</div></div>
@@ -224,18 +237,79 @@ function connectSocket() {
   if (socket) socket.disconnect();
   socket = io(API);
 }
+// ===== 4-camera grid management =====
+let camTiles = {}; // identity -> tile index
+let camCount = 0;
+
+function resetCams() {
+  camTiles = {}; camCount = 0;
+  for (let i = 0; i < 4; i++) {
+    const t = document.getElementById('cam-' + i);
+    if (i > 0) t.classList.add('hidden');
+    t.querySelector('video').srcObject = null;
+    t.querySelector('.cam-name').textContent = i === 0 ? 'أنت' : '';
+  }
+  updateGridMode();
+}
+function updateGridMode() {
+  const grid = document.getElementById('cam-grid');
+  grid.classList.toggle('one', camCount === 1);
+  grid.classList.toggle('two', camCount === 2);
+  grid.classList.toggle('three', camCount === 3);
+}
+function assignTile(identity, name) {
+  // Reuse existing tile if participant already has one
+  if (camTiles[identity] !== undefined) return camTiles[identity];
+  // Find free tile (0 is local, but local joins too)
+  for (let i = 0; i < 4; i++) {
+    if (Object.values(camTiles).indexOf(i) === -1) {
+      camTiles[identity] = i;
+      const t = document.getElementById('cam-' + i);
+      t.classList.remove('hidden');
+      t.querySelector('.cam-name').textContent = name || '';
+      camCount = Math.max(camCount, i + 1);
+      updateGridMode();
+      return i;
+    }
+  }
+  return -1; // 4 cameras full
+}
+function freeTile(identity) {
+  const i = camTiles[identity];
+  if (i === undefined) return;
+  delete camTiles[identity];
+  const t = document.getElementById('cam-' + i);
+  if (i > 0) t.classList.add('hidden');
+  t.querySelector('video').srcObject = null;
+  // Recompute count
+  camCount = 0;
+  for (let j = 0; j < 4; j++) if (!document.getElementById('cam-' + j).classList.contains('hidden')) camCount = j + 1;
+  updateGridMode();
+}
+
 async function goLive() {
   if (!me) return show('auth-screen');
   try {
     const { id, room } = await api('POST', '/api/broadcast/start', { title: 'بث ' + me.name });
     myBcast = id; roomName = room; myRole = 'host';
     openBroadcast();
+    resetCams();
     const lk = await api('POST', '/api/livekit/token', { room, role: 'host' });
     lkRoom = new LivekitClient.Room();
-    lkRoom.on('trackPublished', (pub) => {
-      if (pub.track) document.getElementById('bcast-video').srcObject = new MediaStream([pub.track]);
+    // Local participant tile (camera 0)
+    lkRoom.localParticipant?.on('trackPublished', (pub) => {
+      if (pub.track?.kind === 'video') {
+        assignTile(lkRoom.localParticipant.identity, me.name);
+        const i = camTiles[lkRoom.localParticipant.identity];
+        if (i !== undefined) document.getElementById('cam-' + i).querySelector('video').srcObject = new MediaStream([pub.track]);
+      }
     });
-    lkRoom.on('trackSubscribed', (tr) => { document.getElementById('bcast-video').srcObject = new MediaStream([tr]); });
+    lkRoom.on('trackSubscribed', (tr, pub, participant) => {
+      if (tr.kind !== 'video') return;
+      const i = assignTile(participant.identity, participant.name || 'ضيف');
+      if (i !== undefined) document.getElementById('cam-' + i).querySelector('video').srcObject = new MediaStream([tr]);
+    });
+    lkRoom.on('participantDisconnected', (participant) => freeTile(participant.identity));
     await lkRoom.connect(lk.url, lk.token);
     await lkRoom.localParticipant.setCameraEnabled(true);
     await lkRoom.localParticipant.setMicrophoneEnabled(true);
@@ -249,13 +323,19 @@ async function watchBroadcast(id, room, hostName, hostAv) {
   if (!me) return show('auth-screen');
   myBcast = id; roomName = room; myRole = 'viewer';
   openBroadcast();
+  resetCams();
   document.getElementById('host-name').textContent = hostName;
   document.getElementById('host-av').innerHTML = (hostAv && hostAv.startsWith('data:')) ? '<img src="' + hostAv + '">' : (hostAv || '👤');
   try {
     const lk = await api('POST', '/api/livekit/token', { room, role: 'viewer' });
     lkRoom = new LivekitClient.Room();
-    lkRoom.on('trackSubscribed', (tr) => { document.getElementById('bcast-video').srcObject = new MediaStream([tr]); });
-    lkRoom.on('trackUnsubscribed', () => { document.getElementById('bcast-video').srcObject = null; });
+    lkRoom.on('trackSubscribed', (tr, pub, participant) => {
+      if (tr.kind !== 'video') return;
+      const i = assignTile(participant.identity, participant.name || 'ضيف');
+      if (i !== undefined) document.getElementById('cam-' + i).querySelector('video').srcObject = new MediaStream([tr]);
+    });
+    lkRoom.on('trackUnsubscribed', (tr, pub, participant) => { freeTile(participant.identity); });
+    lkRoom.on('participantDisconnected', (participant) => freeTile(participant.identity));
     await lkRoom.connect(lk.url, lk.token);
     socket.emit('join_broadcast', { id, name: me.name });
   } catch(e) { toast('فشل المشاهدة: ' + e.message, false); }
@@ -273,7 +353,7 @@ async function leaveBroadcast() {
   if (lkRoom) { try { await lkRoom.disconnect(); } catch(e) {} lkRoom = null; }
   if (myRole === 'host' && myBcast) { try { await api('POST', '/api/broadcast/stop', { id: myBcast }); } catch(e) {} }
   myBcast = null; roomName = null; myRole = null;
-  document.getElementById('bcast-video').srcObject = null;
+  resetCams();
   show('home'); loadBroadcasts();
 }
 function sendChat() {
