@@ -627,10 +627,17 @@
               <div class="tt-host-avatar" id="tt-host-avatar">👤</div>
               <div>
                 <div class="tt-host-name"><span id="tt-host-level"></span> <span id="tt-host-name-text"></span></div>
-                <div class="tt-host-sub">👪 <span id="tt-host-family"></span> · 👥 <span id="tt-viewer-count">1</span></div>
+                <div class="tt-host-sub">👪 <span id="tt-host-family"></span> · <span id="tt-viewer-count">1</span> مشاهدة</div>
+                <button class="tt-follow-btn" onclick="showToast('❤️ متابعة قريباً!','success')">＋ متابعة</button>
               </div>
             </div>
-            <div class="tt-heart-btn" id="tt-heart-btn" onclick="sendTtHeart()">❤️</div>
+            <div class="tt-top-right">
+              <button class="tt-close-btn" onclick="askExitCall()" title="خروج">✕</button>
+            </div>
+            <div class="tt-bottom-right">
+              <div class="tt-heart-btn" id="tt-heart-btn" onclick="sendTtHeart()">❤️</div>
+              <div class="tt-like-count" id="tt-like-count">0</div>
+            </div>
             <div id="tt-hearts-layer" class="tt-hearts-layer"></div>
             <!-- TikTok chat overlay: comments over the black screen -->
             <div id="tiktok-chat" class="tiktok-chat">

@@ -2666,7 +2666,11 @@ function updateViewerCount() {
   if (el) el.textContent = (Object.keys(state.callMembers || {}).length + 1);
 }
 
+let ttLikes = 0;
 function sendTtHeart() {
+  ttLikes++;
+  const cnt = document.getElementById('tt-like-count');
+  if (cnt) cnt.textContent = ttLikes;
   const layer = document.getElementById('tt-hearts-layer');
   if (!layer) return;
   const heart = document.createElement('div');
