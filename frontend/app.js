@@ -448,7 +448,7 @@ function updateLevelUI() {
   const profLv = document.getElementById('profile-level');
   if (profLv) profLv.innerHTML = levelBadge(lv) + ' <span style="font-size:11px;color:var(--text-muted)">' + levelTierName(lv) + '</span>';
   const profPoints = document.getElementById('profile-level-points');
-  if (profPoints) profPoints.textContent = 'إجمالي الكونزات المشحونة: ' + ((state.user?.total_charged || 0)).toLocaleString('en');
+  if (profPoints) profPoints.textContent = 'الكونزات المصروفة على الدعم: ' + ((state.user?.support_spent || 0)).toLocaleString('en');
 }
 
 // العميل يضغط على مستواه → كم باقي للمستوى التالي
@@ -457,18 +457,18 @@ async function showLevelProgress() {
   if (!box) return;
   if (box.style.display !== 'none') { box.style.display = 'none'; return; }
   try {
-    const { level, charged, next, config } = await api('GET', '/api/levels');
+    const { level, spent, next, config } = await api('GET', '/api/levels');
     const currentCfg = (config || []).find(c => c.level === level);
     const lvImg = (lv) => (lv >= 0 && lv <= 100) ? '<img src="/assets/levels/level_' + lv + '.' + (lv <= 10 ? 'gif' : 'png') + '?v=2" style="width:44px;height:17px;vertical-align:middle">' : ('Lv ' + lv);
     let html = '<div style="font-weight:800;color:var(--gold);margin-bottom:6px">🎯 تقدم المستوى</div>' +
       '<div style="display:flex;justify-content:space-between;align-items:center"><span>مستواك الحالي</span><b>' + lvImg(level) + '</b></div>' +
-      '<div style="display:flex;justify-content:space-between"><span>إجمالي الكونزات المشحونة</span><b>' + (charged||0).toLocaleString('en') + '</b></div>';
+      '<div style="display:flex;justify-content:space-between"><span>الكونزات المصروفة على الدعم</span><b>' + (spent||0).toLocaleString('en') + '</b></div>';
     if (next) {
-      const remaining = Math.max(0, next.coins_needed - charged);
-      const pct = Math.min(100, Math.round(charged / next.coins_needed * 100));
+      const remaining = Math.max(0, next.coins_needed - (spent||0));
+      const pct = Math.min(100, Math.round((spent||0) / next.coins_needed * 100));
       html += '<div style="display:flex;justify-content:space-between;margin-top:6px;align-items:center"><span>المستوى التالي</span><b>' + lvImg(next.level) + ' — ' + next.coins_needed.toLocaleString('en') + ' كونزه</b></div>' +
         '<div style="height:8px;background:rgba(255,255,255,.12);border-radius:6px;margin-top:6px;overflow:hidden"><div style="height:100%;width:' + pct + '%;background:linear-gradient(90deg,#e8b830,#ffd75e);transition:width .5s"></div></div>' +
-        '<div style="color:var(--danger);font-weight:800;margin-top:6px">⏳ تبقى لك: ' + remaining.toLocaleString('en') + ' كونزه للمستوى ' + next.level + '</div>';
+        '<div style="color:var(--danger);font-weight:800;margin-top:6px">⏳ تبقى لك: ' + remaining.toLocaleString('en') + ' كونزه دعم للمستوى ' + next.level + '</div>';
     } else {
       html += '<div style="color:var(--gold);font-weight:800;margin-top:6px">👑 أنت في أعلى مستوى!</div>';
     }

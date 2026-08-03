@@ -76,6 +76,7 @@ async function initDb() {
   try { await run("ALTER TABLE violations ADD COLUMN IF NOT EXISTS by_user_name TEXT"); } catch(e) {}
   await run(`CREATE TABLE IF NOT EXISTS level_config (level INTEGER PRIMARY KEY, coins_needed INTEGER NOT NULL, image TEXT, created_at TEXT DEFAULT now())`);
   try { await run("ALTER TABLE users ADD COLUMN IF NOT EXISTS total_charged INTEGER DEFAULT 0"); } catch(e) {}
+  try { await run("ALTER TABLE users ADD COLUMN IF NOT EXISTS support_spent INTEGER DEFAULT 0"); } catch(e) {}
   await run(`CREATE TABLE IF NOT EXISTS pricing (feature TEXT PRIMARY KEY, name TEXT NOT NULL, price_sar INTEGER DEFAULT 0, status TEXT DEFAULT 'active', updated_at TEXT DEFAULT now())`);
   try { await run("ALTER TABLE pricing ADD COLUMN IF NOT EXISTS price_sar INTEGER DEFAULT 0"); } catch(e) {}
   try { await run("ALTER TABLE pricing ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active'"); } catch(e) {}
@@ -140,7 +141,7 @@ async function createUser(name, email, password, familyId, role = 'member') {
   return queryOne('SELECT id, name, email, family_id, role, points, avatar, created_at FROM users WHERE id = $1', [id]);
 }
 async function getUserByEmail(email) { return queryOne('SELECT * FROM users WHERE lower(email) = lower($1)', [email]); }
-async function getUserById(id) { return queryOne('SELECT id, name, email, phone, whatsapp, country, city, family_id, role, avatar, points, level, total_charged, stars, moderator_tier, can_open_diwaniya, last_seen, currency, public_id, created_at FROM users WHERE id = $1', [id]); }
+async function getUserById(id) { return queryOne('SELECT id, name, email, phone, whatsapp, country, city, family_id, role, avatar, points, level, total_charged, support_spent, stars, moderator_tier, can_open_diwaniya, last_seen, currency, public_id, created_at FROM users WHERE id = $1', [id]); }
 async function getFamilyMembers(familyId) { return query('SELECT id, name, email, phone, whatsapp, role, avatar, points, public_id, last_seen, can_open_diwaniya FROM users WHERE family_id = $1 ORDER BY role DESC, points DESC', [familyId]); }
 async function updateProfile(userId, data) {
   const { name, country, city, phone, whatsapp, avatar, currency } = data;
@@ -386,15 +387,21 @@ async function seedLevels() {
   }
 }
 async function computeUserLevel(userId) {
-  const u = await queryOne('SELECT total_charged FROM users WHERE id = $1', [userId]);
-  const charged = parseInt(u?.total_charged) || 0;
+  const u = await queryOne('SELECT support_spent FROM users WHERE id = $1', [userId]);
+  const spent = parseInt(u?.support_spent) || 0;
   const cfg = await getLevelConfig();
   let level = 0, next = null;
   for (const c of cfg) {
-    if (charged >= parseInt(c.coins_needed)) level = c.level;
+    if (spent >= parseInt(c.coins_needed)) level = c.level;
     else { next = c; break; }
   }
-  return { level, charged, next };
+  return { level, spent, next };
+}
+async function addUserSupport(userId, coins) {
+  await run('UPDATE users SET support_spent = support_spent + $1 WHERE id = $2', [coins, userId]);
+  const info = await computeUserLevel(userId);
+  await run('UPDATE users SET level = $1 WHERE id = $2', [info.level, userId]);
+  return info;
 }
 async function addUserCharged(userId, coins) {
   await run('UPDATE users SET total_charged = total_charged + $1 WHERE id = $2', [coins, userId]);
@@ -1187,7 +1194,7 @@ module.exports = {
   addAuctionLog, getAuctionLogs, getReportsData,
   getEffects, getEffectById, addEffect, getUserEffects, buyEffect, selectEffect, addFamilyBattleWin,
   getPricing, getPricingByFeature, setPricing, deletePricing, getSarToCoinsRate, setSarToCoinsRate, payWithCoins, settleAuction, getSiteTotalCoins,
-  addLevelPoints, getUserLevel, getLevelConfig, getLevelByNum, setLevelConfig, deleteLevelConfig, seedLevels, computeUserLevel, addUserCharged,
+  addLevelPoints, getUserLevel, getLevelConfig, getLevelByNum, setLevelConfig, deleteLevelConfig, seedLevels, computeUserLevel, addUserCharged, addUserSupport,
   getWithdrawFee, setWithdrawFee,
   isDiwaniyaRestricted, restrictFromDiwaniya, unrestrictFromDiwaniya, getDiwaniyaRestrictions,
   seedViolationTemplates, getViolationTemplates, getAllViolationTemplates, addViolationTemplate, deleteViolationTemplate, addFounderViolation,

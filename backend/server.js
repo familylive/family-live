@@ -199,7 +199,8 @@ app.post('/api/auth/login', async (req, res) => {
       points: user.points,
       public_id: user.public_id,
       level: user.level || 0,
-      total_charged: user.total_charged || 0
+      total_charged: user.total_charged || 0,
+      support_spent: user.support_spent || 0
     },
     family: user.family_id ? await db.getFamily(user.family_id) : null
   });
@@ -1524,6 +1525,11 @@ app.post('/api/gifts/send', authMiddleware, asyncHandler(async (req, res) => {
   }
   const result = await db.sendGift(req.user.id, toId, gift[0].coins, 'هدية: ' + gift[0].emoji + ' ' + gift[0].name);
   if (result.error) return res.status(400).json(result);
+  // Level up: support spent (gifts)
+  try {
+    const info = await db.addUserSupport(req.user.id, gift[0].coins);
+    if (info && info.level > 0) io.to(`user_${req.user.id}`).emit('level_up', { level: info.level, remaining: info.next ? Math.max(0, info.next.coins_needed - info.spent) : 0 });
+  } catch(e) {}
   // Broadcast gift animation to the session (with sender/recipient/family info)
   const toUser = await db.getUserById(toId);
   const sess = await db.getActiveDiwaniya(sessionId);
@@ -1604,11 +1610,7 @@ app.post('/api/admin/wallet/add-coins', authMiddleware, adminMiddleware, async (
   if (!target) return res.status(404).json({ error: 'العضو غير موجود' });
   const wallet = await db.addCoins(userId, amount);
   await db.runRaw("INSERT INTO coin_transactions (id, user_id, type, coins, detail, created_at) VALUES ($1,$2,'admin_credit',$3,$4,$5)", [require('crypto').randomUUID(), userId, amount, 'شحن من الإدارة بواسطة ' + req.user.name, new Date().toISOString()]);
-  // Level up: based on total coins charged
-  try {
-    const info = await db.addUserCharged(userId, amount);
-    if (info && info.level > 0) io.to(`user_${userId}`).emit('level_up', { level: info.level, remaining: info.next ? Math.max(0, info.next.coins_needed - info.charged) : 0 });
-  } catch(e) {}
+  // NOTE: charging does NOT raise level (anti-exploit) - only SUPPORT spending does
   // Live notification to the charged member
   io.to(`user_${userId}`).emit('coins_charged', { amount, byName: req.user.name });
   res.json({ message: '🪙 تم شحن ' + amount + ' كوينز إلى ' + target.name, wallet });
@@ -1816,17 +1818,12 @@ app.post('/api/admin/payments/confirm', authMiddleware, adminMiddleware, async (
       await db.enableSecretRoom(user.family_id);
     }
   }
-  // If buying coins, add coins to user wallet + level up (total charged)
+  // If buying coins, add coins to user wallet (charging does NOT raise level - anti-exploit)
   if (payment && payment.purpose && (payment.purpose.startsWith('شراء كوينزات') || payment.purpose.startsWith('شراء كونزات'))) {
     const coinsMatch = payment.purpose.match(/\((\d+)\)/);
     if (coinsMatch) {
       const coins = parseInt(coinsMatch[1]);
       await db.addCoins(payment.user_id, coins);
-      // Level up based on purchased coins
-      try {
-        const info = await db.addUserCharged(payment.user_id, coins);
-        if (info && info.level > 0) io.to(`user_${payment.user_id}`).emit('level_up', { level: info.level, remaining: info.next ? Math.max(0, info.next.coins_needed - info.charged) : 0 });
-      } catch(e) {}
     }
   }
   res.json({ message: '✅ تم تأكيد الدفع', payment });
@@ -2327,6 +2324,11 @@ app.post('/api/battles/support', authMiddleware, asyncHandler(async (req, res) =
   const wallet = await db.deductCoins(req.user.id, amount);
   if (!wallet) return res.status(400).json({ error: 'رصيدك لا يكفي' });
   await db.runRaw("INSERT INTO coin_transactions (id, user_id, type, coins, detail) VALUES ($1,$2,'battle_support',$3,$4)", [require('crypto').randomUUID(), req.user.id, amount, 'دعم في تحدي مباشر']);
+  // Level up: support spent (battle)
+  try {
+    const info = await db.addUserSupport(req.user.id, amount);
+    if (info && info.level > 0) io.to(`user_${req.user.id}`).emit('level_up', { level: info.level, remaining: info.next ? Math.max(0, info.next.coins_needed - info.spent) : 0 });
+  } catch(e) {}
   const updated = await db.supportBattle(battleId, side, amount);
   // Raise family support points (featured ranking) for the supported player's family
   const playerId = side === 'a' ? battle.player_a_id : battle.player_b_id;
