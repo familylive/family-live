@@ -141,6 +141,9 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',Tahoma,sans-s
         <div class="av" id="host-av">👤</div>
         <div><div id="host-name" style="font-weight:800;font-size:13px"></div><div style="font-size:10px;color:var(--muted)">👥 <span id="viewers">1</span> يشاهدون</div></div>
       </div>
+      <div style="position:absolute;top:50px;right:58px;display:flex;gap:8px;z-index:30">
+        <button class="bcast-close" onclick="shareBroadcast()" title="مشاركة البث">🔗</button>
+      </div>
       <button class="bcast-close" onclick="leaveBroadcast()">✕</button>
       <div class="comments" id="comments"></div>
       <div class="hearts" id="hearts"></div>
@@ -219,6 +222,11 @@ function afterAuth() {
   const isAdmin = ADMIN_EMAILS.includes(me.email);
   document.getElementById('admin-nav').style.display = isAdmin ? 'block' : 'none';
   show('home'); loadBroadcasts(); connectSocket();
+  if (window._autoWatch) {
+    const aw = window._autoWatch;
+    watchBroadcast(aw.id, aw.room, 'بث مباشر', '👤');
+    window._autoWatch = null;
+  }
 }
 function openProfile() {
   document.getElementById('p-av').textContent = me.avatar || '👤';
@@ -396,6 +404,29 @@ async function watchBroadcast(id, room, hostName, hostAv) {
     socket.emit('join_broadcast', { id, name: me.name });
   } catch(e) { toast('فشل المشاهدة: ' + e.message, false); }
 }
+async function shareBroadcast() {
+  if (!myBcast || !roomName) return toast('ابدأ البث أولاً');
+  const url = location.origin + '/?watch=' + myBcast + '&room=' + roomName;
+  const msg = '🎬 تعال شاهد البث معي الآن!\n' + url;
+  try {
+    if (navigator.share) { await navigator.share({ title: 'بث مباشر 24', text: msg, url }); return; }
+  } catch(e) {}
+  // بدون Web Share: نسخ
+  try { await navigator.clipboard.writeText(msg); toast('📋 نسخنا رابط البث - أرسله لأصحابك'); }
+  catch(e) { prompt('انسخ رابط البث:', msg); }
+}
+
+// عند فتح رابط مشاركة: مشاهدة تلقائية
+function checkWatchParam() {
+  const p = new URLSearchParams(location.search);
+  const watch = p.get('watch');
+  const room = p.get('room');
+  if (watch && room) {
+    // بعد الدخول، شاهد البث
+    window._autoWatch = { id: watch, room };
+  }
+}
+
 function openBroadcast() {
   show('bcast');
   document.getElementById('comments').innerHTML = '';
