@@ -140,14 +140,16 @@ app.get('/api/broadcasts', ah(async (req, res) => {
 // ============ COINS & GIFTS ============
 app.post('/api/gift', auth, ah(async (req, res) => {
   const { toId, coins, emoji } = req.body;
-  const amount = parseInt(coins);
-  if (!toId || !amount || amount <= 0) return res.status(400).json({ error: 'بيانات ناقصة' });
-  const u = await q1('SELECT coins FROM users WHERE id=$1', [req.user.id]);
-  if (!u || u.coins < amount) return res.status(400).json({ error: 'رصيدك لا يكفي' });
-  await q('UPDATE users SET coins=coins-$1 WHERE id=$2', [amount, req.user.id]);
-  await q('UPDATE users SET coins=coins+$1 WHERE id=$2', [amount, toId]);
+  const amount = parseInt(coins) || 0;
+  if (!toId || amount < 0) return res.status(400).json({ error: 'بيانات ناقصة' });
+  if (amount > 0) {
+    const u = await q1('SELECT coins FROM users WHERE id=$1', [req.user.id]);
+    if (!u || u.coins < amount) return res.status(400).json({ error: 'رصيدك لا يكفي' });
+    await q('UPDATE users SET coins=coins-$1 WHERE id=$2', [amount, req.user.id]);
+    await q('UPDATE users SET coins=coins+$1 WHERE id=$2', [amount, toId]);
+    await q("INSERT INTO coin_tx (id, user_id, coins, type, detail) VALUES ($1,$2,$3,'gift_out',$4)", [uuidv4(), req.user.id, amount, 'هدية']);
+  }
   await q('INSERT INTO gifts (id, from_user, to_user, coins, emoji) VALUES ($1,$2,$3,$4,$5)', [uuidv4(), req.user.id, toId, amount, emoji || '🎁']);
-  await q("INSERT INTO coin_tx (id, user_id, coins, type, detail) VALUES ($1,$2,$3,'gift_out',$4)", [uuidv4(), req.user.id, amount, 'هدية']);
   const me = await q1('SELECT coins FROM users WHERE id=$1', [req.user.id]);
   res.json({ message: '🎁 أرسلت هدية!', coins: me.coins });
 }));
