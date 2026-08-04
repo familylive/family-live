@@ -233,6 +233,16 @@ async function api(method, path, body) {
   return d;
 }
 function show(id) { ['auth-screen','home','profile','admin','bcast'].forEach(x => document.getElementById(x).classList.toggle('hidden', x !== id)); }
+
+// استرجاع الجلسة تلقائياً إذا في توكن محفوظ
+(async function autoRestore() {
+  if (!token) return;
+  try {
+    const d = await api('GET', '/api/me');
+    me = d.user;
+    afterAuth();
+  } catch(e) { token = ''; localStorage.removeItem('24_token'); }
+})();
 function toggleAuth() {
   const isLogin = document.getElementById('a-btn').textContent === 'تسجيل الدخول';
   document.getElementById('a-name').style.display = isLogin ? 'block' : 'none';
@@ -304,6 +314,13 @@ async function loadBroadcasts() {
 // عند دخول بث أو مغادرة: إيقاف المؤقت
 const origLeave = leaveBroadcast;
 leaveBroadcast = function() { clearTimeout(autoTimerH); if (document.getElementById('auto-timer')) document.getElementById('auto-timer').style.display = 'none'; return origLeave.apply(this, arguments); };
+
+// تحديث الرئيسية كل 10 ثواني لعرض البثوث الجديدة
+setInterval(() => {
+  const homeShown = !document.getElementById('home').classList.contains('hidden');
+  const inBcast = !document.getElementById('bcast').classList.contains('hidden');
+  if (homeShown && !inBcast && me) loadBroadcasts();
+}, 10000);
 function connectSocket() {
   if (socket) socket.disconnect();
   socket = io(API);
