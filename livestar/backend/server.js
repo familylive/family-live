@@ -143,9 +143,22 @@ app.get('/api/broadcasts', ah(async (req, res) => {
 
 // Bot starts a fake broadcast
 app.post('/api/bot/broadcast', ah(async (req, res) => {
-  if (!useDb) {
-    // نفتح بثاً وهمياً لبوت متاح
-    const live = mem.broadcasts.filter(b => b.status === 'live');
+  // نفتح بثاً وهمياً لبوت متاح (يعمل في الوضعين)
+  let live, allBots, bot;
+  if (useDb) {
+    live = await q("SELECT id FROM broadcasts WHERE status='live'");
+    if (live.length >= 10) return res.json({ message: 'مليان', count: live.length });
+    const used = new Set(live.map(b => b.id ? b.host_id : b.id));
+    allBots = await q("SELECT * FROM users WHERE id LIKE 'bot_%'");
+    bot = allBots.find(u => !used.has(u.id));
+    if (!bot) return res.json({ message: 'لا بوتات متاحة', count: live.length });
+    const id = uuidv4();
+    const room = uuidv4().slice(0, 8);
+    await q("INSERT INTO broadcasts (id, room_name, host_id, title, status) VALUES ($1,$2,$3,$4,'live')", [id, room, bot.id, 'بث ' + bot.name]);
+    if (!rooms[id]) rooms[id] = { viewers: new Map(), hearts: Math.floor(Math.random()*3000), support: Math.floor(Math.random()*12) };
+    return res.json({ message: '🎬 ' + bot.name + ' بدأ بثاً', count: live.length + 1 });
+  } else {
+    live = mem.broadcasts.filter(b => b.status === 'live');
     if (live.length >= 10) return res.json({ message: 'مليان', count: live.length });
     const usedHosts = new Set(live.map(b => b.host_id));
     const bot = mem.users.find(u => u.id.startsWith('bot_') && !usedHosts.has(u.id));
@@ -153,10 +166,9 @@ app.post('/api/bot/broadcast', ah(async (req, res) => {
     const id = uuidv4();
     const room = uuidv4().slice(0, 8);
     mem.broadcasts.push({ id, room_name: room, host_id: bot.id, title: 'بث ' + bot.name, status: 'live', started_at: new Date().toISOString(), host_name: bot.name, host_avatar: bot.avatar });
-    if (!rooms[id]) rooms[id] = { viewers: new Map(), hearts: Math.floor(Math.random()*2000), support: Math.floor(Math.random()*10) };
+    if (!rooms[id]) rooms[id] = { viewers: new Map(), hearts: Math.floor(Math.random()*3000), support: Math.floor(Math.random()*12) };
     return res.json({ message: '🎬 ' + bot.name + ' بدأ بثاً', count: mem.broadcasts.filter(b=>b.status==='live').length });
   }
-  res.json({ message: 'الوضع يحتاج ذاكرة' });
 }));
 
 // ============ STORE (شراء كونزات - تجريبي) ============
@@ -225,16 +237,20 @@ app.get('/api/admin/gifts', auth, ah(async (req, res) => {
 
 // ============ BOT BROADCASTS (تظاهر للتجربة) ============
 const BOT_NAMES = ['فارس', 'سعود', 'نورة', 'ريم', 'خالد', 'لمى', 'يوسف', 'سارة', 'عمر', 'هند'];
-function seedBots() {
-  if (useDb) return; // فقط وضع الذاكرة للتجربة
-  BOT_NAMES.forEach((n, i) => {
+async function seedBots() {
+  BOT_NAMES.forEach(async (n, i) => {
     const uid = 'bot_' + i;
-    if (!mem.users.find(u => u.id === uid)) {
-      mem.users.push({ id: uid, name: n, email: 'bot' + i + '@24.app', password: 'x', coins: 100000, avatar: '👤', followers: Math.floor(Math.random()*900)+100 });
+    if (useDb) {
+      const ex = await q1('SELECT id FROM users WHERE id=$1', [uid]);
+      if (!ex) await q('INSERT INTO users (id, name, email, password, coins, followers) VALUES ($1,$2,$3,$4,100000,$5)', [uid, n, 'bot' + i + '@24.app', 'x', Math.floor(Math.random()*900)+100]);
+    } else {
+      if (!mem.users.find(u => u.id === uid)) {
+        mem.users.push({ id: uid, name: n, email: 'bot' + i + '@24.app', password: 'x', coins: 100000, avatar: '👤', followers: Math.floor(Math.random()*900)+100 });
+      }
     }
   });
 }
-seedBots();
+setTimeout(() => seedBots(), 3000);
 
 // ============ SOCKETS ============
 const rooms = {}; // room -> { viewers: Map, hearts, support }
@@ -280,14 +296,19 @@ io.on('connection', (socket) => {
 });
 
 // فتح 10 بثوث روبوت تلقائياً بعد الإقلاع
-setTimeout(async () => {
+async function openBotBroadcasts() {
   try {
+    let count = 0;
     for (let i = 0; i < 10; i++) {
-      await fetch('http://localhost:' + (process.env.PORT || 10001) + '/api/bot/broadcast', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      const r = await fetch('http://localhost:' + (process.env.PORT || 10001) + '/api/bot/broadcast', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }).then(x => x.json()).catch(() => ({}));
+      if (r.count) count = r.count;
     }
-    console.log('🤖 فُتحت 10 بثوث روبوت للتجربة');
-  } catch(e) { console.log('Bot broadcast error:', e.message); }
-}, 1500);
+    console.log('🤖 بثوث الروبوت: ' + count);
+  } catch(e) { console.log('Bot error:', e.message); }
+}
+// فتح البثوث بعد تجهّز النظام (8 ثواني) + إعادة محاولة
+setTimeout(openBotBroadcasts, 8000);
+setTimeout(openBotBroadcasts, 15000);
 
 const PORT = process.env.PORT || 10001;
 server.listen(PORT, () => console.log('🎬 24 live on ' + PORT));
