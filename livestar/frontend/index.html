@@ -362,7 +362,11 @@ async function goLive() {
       if (tr.kind !== 'video') return;
       const isHost = !hostIdentity || participant.identity === lkRoom.localParticipant?.identity;
       const i = assignTile(participant.identity, participant.name || 'ضيف', isHost);
-      if (i !== undefined) document.getElementById('cam-' + i).querySelector('video').srcObject = new MediaStream([tr]);
+      if (i !== undefined) {
+        const vid = document.getElementById('cam-' + i).querySelector('video');
+        vid.srcObject = new MediaStream([tr]);
+        if (participant.identity !== lkRoom.localParticipant?.identity) vid.muted = false;
+      }
     });
     lkRoom.on('participantDisconnected', (participant) => freeTile(participant.identity));
     await lkRoom.connect(lk.url, lk.token);
@@ -408,7 +412,11 @@ async function watchBroadcast(id, room, hostName, hostAv) {
       const isHost = !hostAssigned;
       if (isHost) hostAssigned = true;
       const i = assignTile(participant.identity, participant.name || 'ضيف', isHost);
-      if (i !== undefined) document.getElementById('cam-' + i).querySelector('video').srcObject = new MediaStream([tr]);
+      if (i !== undefined) {
+        const vid = document.getElementById('cam-' + i).querySelector('video');
+        vid.srcObject = new MediaStream([tr]);
+        if (participant.identity !== lkRoom.localParticipant?.identity) vid.muted = false;
+      }
     });
     lkRoom.on('trackUnsubscribed', (tr, pub, participant) => { freeTile(participant.identity); });
     lkRoom.on('participantDisconnected', (participant) => freeTile(participant.identity));
@@ -484,7 +492,9 @@ async function joinAsGuest(d) {
         const i = assignTile(participant.identity, participant.name || 'ضيف', isHost);
         if (i !== undefined) {
           const tile = document.getElementById('cam-' + i);
-          tile.querySelector('video').srcObject = new MediaStream([tr]);
+          const gvid = tile.querySelector('video');
+          gvid.srcObject = new MediaStream([tr]);
+          if (participant.identity !== lkRoom.localParticipant?.identity) gvid.muted = false;
           tile.querySelector('video').style.display = 'block';
           tile.querySelector('.cam-avatar').style.display = 'none';
         }
