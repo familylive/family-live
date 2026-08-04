@@ -188,21 +188,30 @@ app.get('/api/admin/gifts', auth, ah(async (req, res) => {
 }));
 
 // ============ SOCKETS ============
-const rooms = {}; // room -> { viewers: Set }
+const rooms = {}; // room -> { viewers: Map(socketId -> name) }
 io.on('connection', (socket) => {
   socket.on('join_broadcast', ({ id, name }) => {
     socket.join('broadcast_' + id);
-    if (!rooms[id]) rooms[id] = { viewers: new Set() };
-    rooms[id].viewers.add(name || 'زائر');
+    if (!rooms[id]) rooms[id] = { viewers: new Map() };
+    rooms[id].viewers.set(socket.id, name || 'زائر');
+    const names = [...rooms[id].viewers.values()];
     io.to('broadcast_' + id).emit('viewers', rooms[id].viewers.size);
+    io.to('broadcast_' + id).emit('viewers_list', names);
   });
-  socket.on('leave_broadcast', ({ id, name }) => {
+  socket.on('leave_broadcast', ({ id }) => {
     socket.leave('broadcast_' + id);
-    if (rooms[id]) { rooms[id].viewers.delete(name || 'زائر'); io.to('broadcast_' + id).emit('viewers', rooms[id].viewers.size); }
+    if (rooms[id]) { rooms[id].viewers.delete(socket.id); io.to('broadcast_' + id).emit('viewers', rooms[id].viewers.size); io.to('broadcast_' + id).emit('viewers_list', [...rooms[id].viewers.values()]); }
   });
   socket.on('chat', (d) => { io.to('broadcast_' + d.id).emit('chat', d); });
   socket.on('heart', (d) => { io.to('broadcast_' + d.id).emit('heart', d); });
   socket.on('gift', (d) => { io.to('broadcast_' + d.id).emit('gift', d); });
+  // Host invites a viewer to join as guest (camera)
+  socket.on('invite_guest', ({ id, viewerName, hostName, room }) => {
+    if (!rooms[id]) return;
+    let target = null;
+    for (const [sid, name] of rooms[id].viewers.entries()) { if (name === viewerName) { target = sid; break; } }
+    if (target) io.to(target).emit('guest_invite', { id, room, hostName });
+  });
 });
 
 const PORT = process.env.PORT || 10001;
