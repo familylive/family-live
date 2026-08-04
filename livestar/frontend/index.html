@@ -106,18 +106,30 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',Tahoma,sans-s
   </div>
 
   <div id="home" class="hidden">
-    <div class="header">
-      <div class="logo">24</div>
-      <div class="me"><span id="my-name">—</span> <span id="my-coins">🪙0</span></div>
+    <div class="home-header">
+      <div class="home-top">
+        <button class="home-icon" onclick="toast('بحث قريباً')">🔍</button>
+        <div class="logo">24</div>
+        <button class="home-icon" onclick="toast('🔔 إشعارات')">🔔</button>
+      </div>
+      <div class="home-tabs">
+        <span class="tab active">بث</span>
+        <span class="tab" onclick="toast('ألعاب قريباً')">ألعاب</span>
+        <span class="tab" onclick="toast('ترفيه قريباً')">ترفيه</span>
+        <span class="tab" onclick="toast('صوتي قريباً')">صوتي</span>
+      </div>
+      <div class="me-line"><span id="my-name">—</span> <span id="my-coins">🪙0</span></div>
     </div>
     <div class="auto-timer" id="auto-timer"></div>
-    <div class="live-grid" id="live-grid"><div style="color:var(--muted);grid-column:span 2;text-align:center;padding:40px">لا توجد بثوث الآن</div></div>
-    <button class="btn btn-primary" style="position:fixed;bottom:64px;left:50%;transform:translateX(-50%);width:auto;padding:12px 34px;z-index:45" onclick="goLive()">🎥 ابدأ البث</button>
-    <div class="nav">
-      <button class="active" onclick="show('home');loadBroadcasts()">🏠</button>
-      <button onclick="goLive()">🎥</button>
-      <button onclick="openProfile()">👤</button>
-      <button id="admin-nav" style="display:none" onclick="openAdmin()">⚙️</button>
+    <div class="story-row" id="story-row" style="display:none"></div>
+    <div class="live-grid2" id="live-grid"><div style="color:var(--muted);text-align:center;padding:40px">لا توجد بثوث الآن</div></div>
+    <div class="nav2">
+      <button class="active" onclick="show('home');loadBroadcasts()"><span class="nicon">🏠</span><span>الرئيسية</span></button>
+      <button onclick="loadBroadcasts();show('home')"><span class="nicon">🔴</span><span>المباشر</span></button>
+      <button class="plus" onclick="goLive()">＋</button>
+      <button onclick="toast('المتابعة قريباً')"><span class="nicon">⭐</span><span>المتابعة</span></button>
+      <button onclick="openProfile()"><span class="nicon">👤</span><span>حسابي</span></button>
+      <button id="admin-nav" style="display:none" onclick="openAdmin()"><span class="nicon">⚙️</span><span>الإدارة</span></button>
     </div>
   </div>
 
