@@ -48,11 +48,11 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',Tahoma,sans-s
 .bcast-host .av{width:36px;height:36px;border-radius:50%;border:2px solid var(--gold);display:flex;align-items:center;justify-content:center;overflow:hidden;background:#333;font-size:18px}
 .bcast-host .av img{width:100%;height:100%;object-fit:cover}
 .bcast-close{position:absolute;top:50px;right:12px;width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,.4);background:rgba(0,0,0,.5);color:#fff;font-size:16px;cursor:pointer}
-.comments{position:absolute;top:120px;right:10px;width:70%;display:flex;flex-direction:column;gap:6px;pointer-events:none}
-.cmt{background:rgba(0,0,0,.55);border-radius:16px;padding:6px 12px;font-size:13px;animation:cmtIn .3s,cmtOut .4s 5s forwards}
+.comments{position:absolute;bottom:8px;left:10px;width:70%;max-height:55%;display:flex;flex-direction:column-reverse;gap:6px;overflow-y:auto;scrollbar-width:none;z-index:20}
+.comments::-webkit-scrollbar{display:none}
+.cmt{background:rgba(0,0,0,.55);border-radius:16px;padding:6px 12px;font-size:13px;animation:cmtIn .3s;pointer-events:auto}
 .cmt .n{color:var(--gold);font-weight:800}
-@keyframes cmtIn{from{transform:translateX(40px);opacity:0}to{transform:none;opacity:1}}
-@keyframes cmtOut{to{opacity:0}}
+@keyframes cmtIn{from{transform:translateY(14px);opacity:0}to{transform:none;opacity:1}}
 .hearts{position:absolute;inset:0;pointer-events:none;overflow:hidden}
 .heart{position:absolute;bottom:20%;font-size:34px;animation:hfly 2s ease-out forwards}
 @keyframes hfly{0%{transform:translateY(0) scale(.5);opacity:0}15%{opacity:1;transform:translateY(-30px) scale(1.2)}100%{transform:translateY(-400px) scale(1.6);opacity:0}}
@@ -418,9 +418,10 @@ function addComment(name, text) {
   const el = document.createElement('div');
   el.className = 'cmt';
   el.innerHTML = '<span class="n">' + name + '</span> ' + text;
+  // column-reverse: الجديد تحت والقديم يرتفع — نثبّت العرض على الأحدث
   c.appendChild(el);
-  while (c.children.length > 8) c.removeChild(c.firstChild);
-  setTimeout(() => el.remove(), 5500);
+  while (c.children.length > 30) c.removeChild(c.firstChild);
+  c.scrollTop = 0; // يظهر الأحدث (تحت) ويمكن التمرير للأعلى لرؤية القديم
 }
 function sendHeart() {
   likes++;
