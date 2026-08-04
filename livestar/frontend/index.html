@@ -34,11 +34,13 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',Tahoma,sans-s
 .bcast{position:fixed;inset:0;background:#000;z-index:60;display:flex;flex-direction:column}
 .bcast-video{flex:1;position:relative;overflow:hidden}
 .bcast-video video{width:100%;height:100%;object-fit:cover}
-.cam-grid{position:absolute;inset:0;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
+.cam-grid{position:absolute;inset:0;display:grid;gap:0}
 .cam-grid.one{grid-template-columns:1fr;grid-template-rows:1fr}
 .cam-grid.two{grid-template-columns:1fr 1fr;grid-template-rows:1fr}
 .cam-grid.three{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
-.cam-tile{position:relative;background:#000;overflow:hidden;border:1px solid #1a2240}
+.cam-grid.three .cam-tile:nth-child(1){grid-row:span 2}
+.cam-grid.four{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
+.cam-tile{position:relative;background:#000;overflow:hidden}
 .cam-tile video{width:100%;height:100%;object-fit:cover}
 .cam-tile .cam-name{position:absolute;bottom:6px;right:8px;font-size:11px;font-weight:800;background:rgba(0,0,0,.55);padding:2px 8px;border-radius:8px}
 .cam-tile .cam-off{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:40px;background:#0a0d18}
@@ -253,9 +255,11 @@ function resetCams() {
 }
 function updateGridMode() {
   const grid = document.getElementById('cam-grid');
-  grid.classList.toggle('one', camCount === 1);
-  grid.classList.toggle('two', camCount === 2);
-  grid.classList.toggle('three', camCount === 3);
+  ['one','two','three','four'].forEach(x => grid.classList.remove(x));
+  if (camCount === 1) grid.classList.add('one');
+  else if (camCount === 2) grid.classList.add('two');
+  else if (camCount === 3) grid.classList.add('three');
+  else grid.classList.add('four');
 }
 let hostIdentity = null;
 
@@ -325,15 +329,17 @@ async function goLive() {
     });
     lkRoom.on('participantDisconnected', (participant) => freeTile(participant.identity));
     await lkRoom.connect(lk.url, lk.token);
-    await lkRoom.localParticipant.setCameraEnabled(true);
-    await lkRoom.localParticipant.setMicrophoneEnabled(true);
-    // Attach local camera directly (safety)
-    const camPub = lkRoom.localParticipant.getTrackPublication(LivekitClient.Track.Source.Camera);
-    if (camPub && camPub.track) {
-      assignTile(lkRoom.localParticipant.identity, me.name, true);
-      const i = camTiles[lkRoom.localParticipant.identity];
-      if (i !== undefined) document.getElementById('cam-' + i).querySelector('video').srcObject = new MediaStream([camPub.track]);
-    }
+    // احصل على الكاميرا بنفسي ومررها مباشرة (أضمن ظهورها)
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+    const vTrack = stream.getVideoTracks()[0];
+    const aTrack = stream.getAudioTracks()[0];
+    const meIdentity = lkRoom.localParticipant.identity;
+    // بطاقتي أولاً (المضيف)
+    assignTile(meIdentity, me.name, true);
+    const myTile = document.getElementById('cam-' + (camTiles[meIdentity] ?? 0));
+    if (myTile) myTile.querySelector('video').srcObject = stream;
+    if (vTrack) await lkRoom.localParticipant.setCameraEnabled(true, vTrack);
+    if (aTrack) await lkRoom.localParticipant.setMicrophoneEnabled(true, aTrack);
     document.getElementById('bcast-title').textContent = '🎬 أنت تبث الآن';
     socket.emit('join_broadcast', { id, name: me.name });
     socket.emit('chat', { id, name: me.name, text: '🎬 بدأت البث!' });
