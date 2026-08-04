@@ -42,6 +42,11 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',Tahoma,sans-s
 .cam-grid.four{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
 .cam-tile{position:relative;background:#000;overflow:hidden}
 .cam-tile video{width:100%;height:100%;object-fit:cover}
+.cam-avatar{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 40%,#141a2e,#0a0d18)}
+.cam-avatar .av{width:90px;height:90px;border-radius:50%;border:3px solid var(--gold);display:flex;align-items:center;justify-content:center;font-size:44px;background:#1e2747;box-shadow:0 0 24px rgba(232,184,48,.3)}
+.cam-avatar .av img{width:100%;height:100%;border-radius:50%;object-fit:cover}
+.cam-toggle{width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.35);color:#fff;font-size:16px;cursor:pointer}
+.cam-toggle.off{background:rgba(255,0,80,.25);border-color:var(--pink)}
 .cam-tile .cam-name{position:absolute;bottom:6px;right:8px;font-size:11px;font-weight:800;background:rgba(0,0,0,.55);padding:2px 8px;border-radius:8px}
 .cam-tile .cam-off{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:40px;background:#0a0d18}
 .bcast-host{position:absolute;top:50px;left:12px;display:flex;align-items:center;gap:8px;background:rgba(0,0,0,.55);padding:6px 12px 6px 6px;border-radius:20px}
@@ -67,7 +72,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',Tahoma,sans-s
 .gift-item{min-width:60px;text-align:center;background:#141a2e;border-radius:10px;padding:8px 4px;cursor:pointer}
 .gift-item .e{font-size:26px}
 .gift-item .c{font-size:10px;color:var(--gold);font-weight:800}
-.gift-float{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;font-size:90px;animation:giftBig 2s forwards}
+.gift-float{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;font-size:150px;animation:giftBig 2.5s forwards;filter:drop-shadow(0 0 30px rgba(255,215,0,.7))}
 @keyframes giftBig{0%{transform:scale(0) rotate(-20deg);opacity:0}20%{transform:scale(1.4);opacity:1}80%{opacity:1}100%{transform:scale(1);opacity:0}}
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--card);border:1px solid var(--gold);color:#fff;padding:10px 18px;border-radius:12px;z-index:99;font-size:13px}
 .nav{position:fixed;bottom:0;left:0;right:0;background:var(--card);display:flex;justify-content:space-around;padding:10px 0;border-top:1px solid #232c47;z-index:40}
@@ -127,10 +132,10 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',Tahoma,sans-s
   <div id="bcast" class="bcast hidden">
     <div class="bcast-video" id="bcast-video">
       <div class="cam-grid" id="cam-grid">
-        <div class="cam-tile" id="cam-0"><video autoplay playsinline muted></video><div class="cam-name">أنت</div></div>
-        <div class="cam-tile hidden" id="cam-1"><video autoplay playsinline></video><div class="cam-name"></div></div>
-        <div class="cam-tile hidden" id="cam-2"><video autoplay playsinline></video><div class="cam-name"></div></div>
-        <div class="cam-tile hidden" id="cam-3"><video autoplay playsinline></video><div class="cam-name"></div></div>
+        <div class="cam-tile" id="cam-0"><video autoplay playsinline muted></video><div class="cam-avatar">👤</div><div class="cam-name">أنت</div></div>
+        <div class="cam-tile hidden" id="cam-1"><video autoplay playsinline></video><div class="cam-avatar">👤</div><div class="cam-name"></div></div>
+        <div class="cam-tile hidden" id="cam-2"><video autoplay playsinline></video><div class="cam-avatar">👤</div><div class="cam-name"></div></div>
+        <div class="cam-tile hidden" id="cam-3"><video autoplay playsinline></video><div class="cam-avatar">👤</div><div class="cam-name"></div></div>
       </div>
       <div class="bcast-host">
         <div class="av" id="host-av">👤</div>
@@ -143,7 +148,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',Tahoma,sans-s
     </div>
     <div class="bcast-bottom">
       <div class="bcast-actions">
-        <div style="font-size:12px;color:var(--gold)" id="bcast-title">بث مباشر</div>
+        <div style="display:flex;align-items:center;gap:8px"><div style="font-size:12px;color:var(--gold)" id="bcast-title">بث مباشر</div><button class="cam-toggle" id="cam-toggle-btn" onclick="toggleCam24()">🎥</button></div>
         <div style="display:flex;align-items:center;gap:6px"><div class="like-count" id="like-count">0</div><button class="heart-btn" onclick="sendHeart()">❤️</button></div>
       </div>
       <div class="gift-bar" id="gift-bar"></div>
