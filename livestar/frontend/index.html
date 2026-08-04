@@ -274,10 +274,18 @@ async function loadBroadcasts() {
     const { broadcasts } = await api('GET', '/api/broadcasts');
     const grid = document.getElementById('live-grid');
     if (!broadcasts.length) { grid.innerHTML = '<div style="color:var(--muted);text-align:center;padding:40px">لا توجد بثوث الآن</div>'; return; }
-    grid.innerHTML = broadcasts.map((b, idx) => `
-      <div class="live-card" onclick="watchBroadcast('${b.id}','${b.room_name}','${b.host_name}','${b.host_avatar || '👤'}')">
-        <div class="live-badge">🔴 مباشر</div>
-        <div class="live-info"><div class="live-name">${b.host_name}</div><div class="live-viewers">اضغط للدخول</div></div>
+    const story = document.getElementById('story-row');
+    if (story && broadcasts.length) {
+      story.style.display = 'flex';
+      story.innerHTML = broadcasts.slice(0, 8).map(b =>
+        '<div class="story-item" onclick="watchBroadcast(\'' + b.id + '\',\'' + b.room_name + '\',\'' + b.host_name + '\',\'' + (b.host_avatar || '👤') + '\')"><div class="story-ring"><div class="sav">' + (b.host_avatar && b.host_avatar.startsWith('data:') ? '<img src="' + b.host_avatar + '">' : '👤') + '</div></div><div class="story-name">' + b.host_name + '</div></div>'
+      ).join('');
+    }
+    grid.innerHTML = broadcasts.map(b => `
+      <div class="live-card2" onclick="watchBroadcast('${b.id}','${b.room_name}','${b.host_name}','${b.host_avatar || '👤'}')">
+        <div class="live-badge2">LIVE</div>
+        <div class="ph">🎥</div>
+        <div class="live-info2"><div class="iav">${b.host_avatar && b.host_avatar.startsWith('data:') ? '<img src="' + b.host_avatar + '">' : '👤'}</div><div class="iname">${b.host_name}</div></div>
       </div>`).join('');
     // مؤقت الدخول التلقائي: إذا ما ضغط خلال 10 ثواني -> ادخل أول بث
     const timer = document.getElementById('auto-timer');
