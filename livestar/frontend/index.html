@@ -151,9 +151,10 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',Tahoma,sans-s
     </div>
     <div class="bcast-bottom">
       <div class="bcast-actions">
-        <div style="display:flex;align-items:center;gap:8px"><div style="font-size:12px;color:var(--gold)" id="bcast-title">بث مباشر</div><button class="cam-toggle" id="cam-toggle-btn" onclick="toggleCam24()">🎥</button></div>
+        <div style="display:flex;align-items:center;gap:8px"><div style="font-size:12px;color:var(--gold)" id="bcast-title">بث مباشر</div><button class="cam-toggle" id="cam-toggle-btn" onclick="toggleCam24()">🎥</button><button class="cam-toggle" id="invite-btn" onclick="toggleGuestList()" style="display:none">👥</button></div>
         <div style="display:flex;align-items:center;gap:6px"><div class="like-count" id="like-count">0</div><button class="heart-btn" onclick="sendHeart()">❤️</button></div>
       </div>
+      <div id="guest-list" style="display:none;background:rgba(20,26,46,.95);border-radius:12px;padding:8px;font-size:12px;max-height:120px;overflow-y:auto"></div>
       <div class="gift-bar" id="gift-bar"></div>
       <div class="cmt-input">
         <input id="cmt-text" placeholder="اكتب تعليقاً..." onkeydown="if(event.key==='Enter')sendChat()">
@@ -176,12 +177,12 @@ let likes = 0;
 const ADMIN_EMAILS = ['admin@familylive.com'];
 
 const GIFT_ITEMS = [
-  { e: '🌹', n: 'ورد', c: 10 }, { e: '❤️', n: 'قلب', c: 20 }, { e: '🎉', n: 'تصفيق', c: 50 },
-  { e: '👑', n: 'تاج', c: 100 }, { e: '💎', n: 'ماسة', c: 200 }, { e: '🚗', n: 'سيارة', c: 500 }, { e: '🏰', n: 'قلعة', c: 1000 }
+  { e: '🌹', n: 'ورد', c: 10, img: '/gifts/rose.gif' }, { e: '❤️', n: 'قلب', c: 20, img: '/gifts/heart.gif' }, { e: '🎉', n: 'تصفيق', c: 50, img: '/gifts/party.gif' },
+  { e: '👑', n: 'تاج', c: 100, img: '/gifts/crown.gif' }, { e: '💎', n: 'ماسة', c: 200, img: '/gifts/diamond.gif' }, { e: '🚗', n: 'سيارة', c: 500, img: '/gifts/car.gif' }, { e: '🏰', n: 'قلعة', c: 1000, img: '/gifts/castle.gif' }
 ];
 function renderGifts() {
   document.getElementById('gift-bar').innerHTML = GIFT_ITEMS.map(g =>
-    '<div class="gift-item" onclick="sendGift(\'' + g.e + '\',' + g.c + ')"><div class="e">' + g.e + '</div><div class="c">🪙' + g.c + '</div></div>').join('');
+    '<div class="gift-item" onclick="sendGift(\'' + g.e + '\',' + g.c + ',\'' + g.img + '\')"><img src="' + g.img + '" style="width:40px;height:40px;object-fit:contain"><div class="c">🪙' + g.c + '</div></div>').join('');
 }
 function toast(m, ok = true) {
   const t = document.getElementById('toast');
@@ -256,12 +257,23 @@ function connectSocket() {
   socket.on('gift', (d) => {
     if (d.id === myBcast) {
       const gf = document.getElementById('gift-float');
-      gf.innerHTML = '<div class="gift-float">' + d.emoji + '</div>';
-      setTimeout(() => gf.innerHTML = '', 2000);
+      gf.innerHTML = d.img
+        ? '<div class="gift-float"><img src="' + d.img + '" style="width:230px;height:230px;object-fit:contain"></div>'
+        : '<div class="gift-float">' + d.emoji + '</div>';
+      setTimeout(() => gf.innerHTML = '', 5000);
       addComment(d.name, 'أرسل هدية ' + d.emoji);
     }
   });
   socket.on('viewers', (n) => { document.getElementById('viewers').textContent = n; });
+  socket.on('viewers_list', (names) => {
+    viewersNames = names || [];
+    const btn = document.getElementById('invite-btn');
+    if (btn) btn.style.display = (myRole === 'host') ? 'block' : 'none';
+  });
+  socket.on('guest_invite', (d) => {
+    const ok = confirm('🎥 دعاك ' + (d.hostName || 'المضيف') + ' للصعود بالكاميرا في البث!\nهل توافق؟');
+    if (ok) joinAsGuest(d);
+  });
   socket.on('broadcast_ended', () => { if (myRole !== 'host') leaveBroadcast(); });
 }
 // ===== 4-camera grid management =====
@@ -427,6 +439,74 @@ function checkWatchParam() {
   }
 }
 
+let myCamOff = false;
+let viewersNames = [];
+function toggleCam24() {
+  myCamOff = !myCamOff;
+  const btn = document.getElementById('cam-toggle-btn');
+  if (btn) btn.classList.toggle('off', myCamOff);
+  if (lkRoom && lkRoom.localParticipant) lkRoom.localParticipant.setCameraEnabled(!myCamOff).catch(() => {});
+  const meId = lkRoom?.localParticipant?.identity;
+  const i = meId !== undefined ? camTiles[meId] : 0;
+  const tile = document.getElementById('cam-' + (i ?? 0));
+  if (tile) {
+    const v = tile.querySelector('video');
+    const av = tile.querySelector('.cam-avatar');
+    if (myCamOff) { if (v) v.style.display = 'none'; if (av) { av.style.display = 'flex'; av.innerHTML = '<div class="av">' + (me?.avatar || '👤') + '</div>'; } }
+    else { if (v) v.style.display = 'block'; if (av) av.style.display = 'none'; }
+  }
+  toast(myCamOff ? '🚫 أوقفت الكاميرا - صورتك ظاهرة' : '🎥 فتحت الكاميرا');
+}
+function toggleGuestList() {
+  const gl = document.getElementById('guest-list');
+  if (!gl) return;
+  if (gl.style.display !== 'none') { gl.style.display = 'none'; return; }
+  const others = (viewersNames || []).filter(n => n !== me?.name && n !== (lkRoom?.localParticipant?.name || ''));
+  gl.innerHTML = others.length
+    ? others.map(n => '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 2px;border-bottom:1px solid #232c47"><span>👤 ' + n + '</span><button style="background:var(--gold);border:none;border-radius:8px;padding:4px 10px;font-size:11px;font-weight:800;cursor:pointer" onclick="inviteGuest(\'' + n + '\')">🎥 دعوة</button></div>').join('')
+    : '<div style="color:var(--muted);padding:4px">لا يوجد مشاهدون آخرون</div>';
+  gl.style.display = 'block';
+}
+function inviteGuest(viewerName) {
+  if (!socket) return;
+  socket.emit('invite_guest', { id: myBcast, viewerName, hostName: me?.name, room: roomName });
+  toast('📨 أرسلت دعوة لـ ' + viewerName);
+  document.getElementById('guest-list').style.display = 'none';
+}
+async function joinAsGuest(d) {
+  try {
+    if (!lkRoom) {
+      const lk = await api('POST', '/api/livekit/token', { room: d.room, role: 'viewer' });
+      lkRoom = new LivekitClient.Room();
+      lkRoom.on('trackSubscribed', (tr, pub, participant) => {
+        if (tr.kind !== 'video') return;
+        const isHost = participant.identity === lkRoom.localParticipant?.identity;
+        const i = assignTile(participant.identity, participant.name || 'ضيف', isHost);
+        if (i !== undefined) {
+          const tile = document.getElementById('cam-' + i);
+          tile.querySelector('video').srcObject = new MediaStream([tr]);
+          tile.querySelector('video').style.display = 'block';
+          tile.querySelector('.cam-avatar').style.display = 'none';
+        }
+      });
+      await lkRoom.connect(lk.url, lk.token);
+      socket.emit('join_broadcast', { id: d.id, name: me?.name });
+    }
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+    const v = stream.getVideoTracks()[0];
+    const a = stream.getAudioTracks()[0];
+    const meId = lkRoom.localParticipant.identity;
+    assignTile(meId, me.name, false);
+    const i = camTiles[meId];
+    const tile = document.getElementById('cam-' + (i ?? 1));
+    if (tile) tile.querySelector('video').srcObject = stream;
+    if (v) await lkRoom.localParticipant.setCameraEnabled(true, v);
+    if (a) await lkRoom.localParticipant.setMicrophoneEnabled(true, a);
+    myRole = 'guest';
+    toast('🎥 صعدت للكاميرا!');
+    socket.emit('chat', { id: d.id, name: me?.name, text: '🎥 صعدت للكاميرا!' });
+  } catch(e) { toast('فشل الصعود: ' + e.message, false); }
+}
 function openBroadcast() {
   show('bcast');
   document.getElementById('comments').innerHTML = '';
@@ -469,17 +549,25 @@ function sendHeart() {
   setTimeout(() => h.remove(), 2000);
   if (myBcast) socket.emit('heart', { id: myBcast });
 }
-async function sendGift(emoji, coins) {
+async function sendGift(emoji, coins, img) {
   if (!myBcast || !me) return;
-  const gf = document.getElementById('gift-float');
-  gf.innerHTML = '<div class="gift-float">' + emoji + '</div>';
-  setTimeout(() => gf.innerHTML = '', 2000);
+  showGiftBig(img || emoji);
   try {
     const r = await api('POST', '/api/gift', { toId: me.id, coins, emoji });
     me.coins = r.coins;
     document.getElementById('my-coins').textContent = '🪙' + me.coins;
-    socket.emit('gift', { id: myBcast, name: me.name, emoji });
+    socket.emit('gift', { id: myBcast, name: me.name, emoji, img: img || null });
   } catch(e) { toast(e.message, false); }
+}
+
+// الهدية تظهر كبيرة متحركة 5 ثواني
+function showGiftBig(src) {
+  const gf = document.getElementById('gift-float');
+  const isImg = String(src).endsWith('.gif');
+  gf.innerHTML = isImg
+    ? '<div class="gift-float"><img src="' + src + '" style="width:230px;height:230px;object-fit:contain"></div>'
+    : '<div class="gift-float">' + src + '</div>';
+  setTimeout(() => gf.innerHTML = '', 5000);
 }
 // ===== ADMIN =====
 async function openAdmin() {
