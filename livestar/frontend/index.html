@@ -24,7 +24,10 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',Tahoma,sans-s
 .header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--card)}
 .header .logo{font-size:22px;font-weight:900;color:var(--gold)}
 .header .me{display:flex;align-items:center;gap:8px;font-size:13px}
-.live-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:12px}
+.live-grid{display:flex;flex-direction:column;gap:12px;padding:12px;height:calc(100vh - 120px);overflow-y:auto;scroll-snap-type:y mandatory}
+.live-card{aspect-ratio:9/16;width:100%;min-height:60vh;flex-shrink:0;scroll-snap-align:center;position:relative;border-radius:16px;overflow:hidden;background:#000;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.live-card .ph{font-size:80px;opacity:.5}
+.auto-timer{position:fixed;top:70px;left:50%;transform:translateX(-50%);z-index:45;background:rgba(255,0,50,.85);color:#fff;font-size:12px;font-weight:800;padding:6px 14px;border-radius:14px;display:none}
 .live-card{position:relative;aspect-ratio:9/16;border-radius:14px;overflow:hidden;background:#000;cursor:pointer;display:flex;align-items:center;justify-content:center}
 .live-card .ph{font-size:50px;opacity:.5}
 .live-badge{position:absolute;top:8px;right:8px;background:rgba(255,0,50,.9);font-size:10px;font-weight:900;padding:3px 8px;border-radius:10px}
@@ -72,7 +75,9 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',Tahoma,sans-s
 .gift-item{min-width:60px;text-align:center;background:#141a2e;border-radius:10px;padding:8px 4px;cursor:pointer}
 .gift-item .e{font-size:26px}
 .gift-item .c{font-size:10px;color:var(--gold);font-weight:800}
-.gift-float{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;font-size:150px;animation:giftBig 2.5s forwards;filter:drop-shadow(0 0 30px rgba(255,215,0,.7))}
+.gift-float{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;font-size:150px;animation:giftBig 1.2s forwards}
+.gift-run-img{width:100%;height:100%;object-fit:contain;-webkit-mask-image:radial-gradient(ellipse at center, black 55%, transparent 95%);mask-image:radial-gradient(ellipse at center, black 55%, transparent 95%);filter:drop-shadow(0 10px 40px rgba(0,0,0,.5));animation:giftPulse 2s ease-in-out infinite}
+@keyframes giftPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
 @keyframes giftBig{0%{transform:scale(0) rotate(-20deg);opacity:0}20%{transform:scale(1.4);opacity:1}80%{opacity:1}100%{transform:scale(1);opacity:0}}
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--card);border:1px solid var(--gold);color:#fff;padding:10px 18px;border-radius:12px;z-index:99;font-size:13px}
 .nav{position:fixed;bottom:0;left:0;right:0;background:var(--card);display:flex;justify-content:space-around;padding:10px 0;border-top:1px solid #232c47;z-index:40}
@@ -101,6 +106,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',Tahoma,sans-s
       <div class="logo">24</div>
       <div class="me"><span id="my-name">—</span> <span id="my-coins">🪙0</span></div>
     </div>
+    <div class="auto-timer" id="auto-timer"></div>
     <div class="live-grid" id="live-grid"><div style="color:var(--muted);grid-column:span 2;text-align:center;padding:40px">لا توجد بثوث الآن</div></div>
     <button class="btn btn-primary" style="position:fixed;bottom:64px;left:50%;transform:translateX(-50%);width:auto;padding:12px 34px;z-index:45" onclick="goLive()">🎥 ابدأ البث</button>
     <div class="nav">
@@ -237,18 +243,32 @@ function openProfile() {
   show('profile');
 }
 function logout() { token = ''; localStorage.removeItem('24_token'); me = null; show('auth-screen'); }
+let autoTimerH = null;
 async function loadBroadcasts() {
   try {
     const { broadcasts } = await api('GET', '/api/broadcasts');
     const grid = document.getElementById('live-grid');
-    if (!broadcasts.length) { grid.innerHTML = '<div style="color:var(--muted);grid-column:span 2;text-align:center;padding:40px">لا توجد بثوث الآن</div>'; return; }
-    grid.innerHTML = broadcasts.map(b => `
+    if (!broadcasts.length) { grid.innerHTML = '<div style="color:var(--muted);text-align:center;padding:40px">لا توجد بثوث الآن</div>'; return; }
+    grid.innerHTML = broadcasts.map((b, idx) => `
       <div class="live-card" onclick="watchBroadcast('${b.id}','${b.room_name}','${b.host_name}','${b.host_avatar || '👤'}')">
-        <div class="live-badge">🔴 مباشر</div><div class="ph">🎥</div>
-        <div class="live-info"><div class="live-name">${b.host_name}</div><div class="live-viewers">اضغط للمشاهدة</div></div>
+        <div class="live-badge">🔴 مباشر</div>
+        <div class="live-info"><div class="live-name">${b.host_name}</div><div class="live-viewers">اضغط للدخول</div></div>
       </div>`).join('');
+    // مؤقت الدخول التلقائي: إذا ما ضغط خلال 10 ثواني -> ادخل أول بث
+    const timer = document.getElementById('auto-timer');
+    if (timer) { timer.textContent = '⏳ ستدخل البث تلقائياً...'; timer.style.display = 'block'; }
+    clearTimeout(autoTimerH);
+    autoTimerH = setTimeout(() => {
+      if (timer) timer.style.display = 'none';
+      if (broadcasts.length && !document.getElementById('bcast').classList.contains('hidden')) return;
+      const first = broadcasts[0];
+      if (first) watchBroadcast(first.id, first.room_name, first.host_name, first.host_avatar || '👤');
+    }, 10000);
   } catch(e) {}
 }
+// عند دخول بث أو مغادرة: إيقاف المؤقت
+const origLeave = leaveBroadcast;
+leaveBroadcast = function() { clearTimeout(autoTimerH); if (document.getElementById('auto-timer')) document.getElementById('auto-timer').style.display = 'none'; return origLeave.apply(this, arguments); };
 function connectSocket() {
   if (socket) socket.disconnect();
   socket = io(API);
@@ -257,10 +277,15 @@ function connectSocket() {
   socket.on('gift', (d) => {
     if (d.id === myBcast) {
       const gf = document.getElementById('gift-float');
+      const heartsL = document.getElementById('hearts');
+      if (heartsL) heartsL.style.display = 'none';
       gf.innerHTML = d.img
-        ? '<div class="gift-float"><img src="' + d.img + '" style="width:230px;height:230px;object-fit:contain"></div>'
+        ? '<div class="gift-float"><img src="' + d.img + '" class="gift-run-img"></div>'
         : '<div class="gift-float">' + d.emoji + '</div>';
-      setTimeout(() => gf.innerHTML = '', 5000);
+      setTimeout(() => {
+        gf.innerHTML = '';
+        if (heartsL) heartsL.style.display = '';
+      }, 10000);
       addComment(d.name, 'أرسل هدية ' + d.emoji);
     }
   });
@@ -570,14 +595,23 @@ async function sendGift(emoji, coins, img) {
   } catch(e) { toast(e.message, false); }
 }
 
-// الهدية تظهر كبيرة متحركة 5 ثواني
+// الهدية تظهر كبيرة متحركة 10 ثواني - شفافة الأطراف تندمج مع البث
 function showGiftBig(src) {
   const gf = document.getElementById('gift-float');
+  const heartsL = document.getElementById('hearts');
+  const likeBtn = document.querySelector('.heart-btn');
   const isImg = String(src).endsWith('.gif');
+  // إخفاء القلوب أثناء الهدية
+  if (heartsL) heartsL.style.display = 'none';
+  if (likeBtn) likeBtn.style.display = 'none';
   gf.innerHTML = isImg
-    ? '<div class="gift-float"><img src="' + src + '" style="width:230px;height:230px;object-fit:contain"></div>'
+    ? '<div class="gift-float"><img src="' + src + '" class="gift-run-img"></div>'
     : '<div class="gift-float">' + src + '</div>';
-  setTimeout(() => gf.innerHTML = '', 5000);
+  setTimeout(() => {
+    gf.innerHTML = '';
+    if (heartsL) heartsL.style.display = '';
+    if (likeBtn) likeBtn.style.display = '';
+  }, 10000);
 }
 // ===== ADMIN =====
 async function openAdmin() {
