@@ -125,11 +125,24 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',Tahoma,sans-s
     <div class="live-grid2" id="live-grid"><div style="color:var(--muted);text-align:center;padding:40px">لا توجد بثوث الآن</div></div>
     <div class="nav2">
       <button class="active" onclick="show('home');loadBroadcasts()"><span class="nicon">🏠</span><span>الرئيسية</span></button>
-      <button onclick="loadBroadcasts();show('home')"><span class="nicon">🔴</span><span>المباشر</span></button>
+      <button onclick="show('home');loadBroadcasts();toast('🎬 الفيديوهات')"><span class="nicon">🎬</span><span>الفيديوهات</span></button>
       <button class="plus" onclick="goLive()">＋</button>
-      <button onclick="toast('المتابعة قريباً')"><span class="nicon">⭐</span><span>المتابعة</span></button>
-      <button onclick="openProfile()"><span class="nicon">👤</span><span>حسابي</span></button>
+      <button onclick="openStore()"><span class="nicon">🛍️</span><span>المتجر</span></button>
+      <button onclick="openProfile()"><span class="nicon">👤</span><span>ملفي</span></button>
       <button id="admin-nav" style="display:none" onclick="openAdmin()"><span class="nicon">⚙️</span><span>الإدارة</span></button>
+    </div>
+
+    <!-- صفحة المتجر -->
+    <div id="store" class="hidden">
+      <div class="header"><div class="logo">🛍️ متجر الكونزات</div><button class="btn-ghost" style="width:auto;padding:8px 16px" onclick="show('home')">← رجوع</button></div>
+      <div class="admin-card" style="text-align:center">
+        <div style="font-size:26px;font-weight:900;color:var(--gold)" id="store-coins">🪙 0</div>
+        <div style="font-size:12px;color:var(--muted)">رصيدك الحالي</div>
+      </div>
+      <div class="admin-card"><h3>📦 الباقات</h3><div id="store-packages"></div></div>
+      <div style="padding:0 12px 20px">
+        <button class="btn btn-ghost" onclick="show('home')">← العودة للرئيسية</button>
+      </div>
     </div>
   </div>
 
@@ -271,6 +284,26 @@ function afterAuth() {
     watchBroadcast(aw.id, aw.room, 'بث مباشر', '👤');
     window._autoWatch = null;
   }
+}
+const STORE_PACKAGES = [
+  { coins: 1000, price: 20 }, { coins: 5000, price: 90 }, { coins: 10000, price: 180 }, { coins: 25000, price: 450 }
+];
+function openStore() {
+  show('store');
+  if (me) document.getElementById('store-coins').textContent = '🪙 ' + me.coins;
+  document.getElementById('store-packages').innerHTML = STORE_PACKAGES.map((p, i) =>
+    '<div class="admin-row"><span>🪙 ' + p.coins + ' كونزه</span><span style="color:var(--gold);font-weight:800">' + p.price + ' ريال</span><button onclick="buyCoinsStore(' + p.coins + ')">💳 شراء</button></div>'
+  ).join('');
+}
+async function buyCoinsStore(coins) {
+  if (!me) return show('auth-screen');
+  try {
+    const r = await api('POST', '/api/store/buy', { coins });
+    me.coins = r.coins;
+    document.getElementById('store-coins').textContent = '🪙 ' + me.coins;
+    document.getElementById('my-coins').textContent = '🪙' + me.coins;
+    toast(r.message);
+  } catch(e) { toast(e.message, false); }
 }
 function openProfile() {
   document.getElementById('p-av').textContent = me.avatar || '👤';

@@ -139,6 +139,18 @@ app.get('/api/broadcasts', ah(async (req, res) => {
   res.json({ broadcasts: list, top5: list.slice(0, 5) });
 }));
 
+// ============ STORE (شراء كونزات - تجريبي) ============
+app.post('/api/store/buy', auth, ah(async (req, res) => {
+  const { coins } = req.body;
+  const amount = parseInt(coins);
+  const allowed = [1000, 5000, 10000, 25000];
+  if (!allowed.includes(amount)) return res.status(400).json({ error: 'الباقة غير متاحة' });
+  await q('UPDATE users SET coins=coins+$1 WHERE id=$2', [amount, req.user.id]);
+  await q("INSERT INTO coin_tx (id, user_id, coins, type, detail) VALUES ($1,$2,$3,'store_buy',$4)", [uuidv4(), req.user.id, amount, 'شراء من المتجر']);
+  const me = await q1('SELECT coins FROM users WHERE id=$1', [req.user.id]);
+  res.json({ message: '🪙 اشتريت ' + amount + ' كونزه', coins: me.coins });
+}));
+
 // ============ COINS & GIFTS ============
 app.post('/api/gift', auth, ah(async (req, res) => {
   const { toId, coins, emoji } = req.body;
