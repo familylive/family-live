@@ -238,6 +238,18 @@ async function loadBroadcasts() {
 function connectSocket() {
   if (socket) socket.disconnect();
   socket = io(API);
+  socket.on('chat', (d) => { if (d.id === myBcast) addComment(d.name, d.text); });
+  socket.on('heart', (d) => { if (d.id === myBcast) sendHeart(); });
+  socket.on('gift', (d) => {
+    if (d.id === myBcast) {
+      const gf = document.getElementById('gift-float');
+      gf.innerHTML = '<div class="gift-float">' + d.emoji + '</div>';
+      setTimeout(() => gf.innerHTML = '', 2000);
+      addComment(d.name, 'أرسل هدية ' + d.emoji);
+    }
+  });
+  socket.on('viewers', (n) => { document.getElementById('viewers').textContent = n; });
+  socket.on('broadcast_ended', () => { if (myRole !== 'host') leaveBroadcast(); });
 }
 // ===== 4-camera grid management =====
 let camTiles = {}; // identity -> tile index
@@ -341,6 +353,15 @@ async function goLive() {
     if (vTrack) await lkRoom.localParticipant.setCameraEnabled(true, vTrack);
     if (aTrack) await lkRoom.localParticipant.setMicrophoneEnabled(true, aTrack);
     document.getElementById('bcast-title').textContent = '🎬 أنت تبث الآن';
+    // بعد ثانية تحقق: إذا الفيديو أسود، نعيد ربطه
+    setTimeout(() => {
+      const t = document.getElementById('cam-' + (camTiles[meIdentity] ?? 0));
+      const v = t ? t.querySelector('video') : null;
+      if (v && !(v.srcObject && v.srcObject.getVideoTracks().length)) {
+        v.srcObject = stream;
+        v.play().catch(() => {});
+      }
+    }, 1500);
     socket.emit('join_broadcast', { id, name: me.name });
     socket.emit('chat', { id, name: me.name, text: '🎬 بدأت البث!' });
     loadBroadcasts();
@@ -423,20 +444,6 @@ async function sendGift(emoji, coins) {
     socket.emit('gift', { id: myBcast, name: me.name, emoji });
   } catch(e) { toast(e.message, false); }
 }
-// Socket listeners
-socket?.on('chat', (d) => { if (d.id === myBcast) addComment(d.name, d.text); });
-socket?.on('heart', (d) => { if (d.id === myBcast) sendHeart(); });
-socket?.on('gift', (d) => {
-  if (d.id === myBcast) {
-    const gf = document.getElementById('gift-float');
-    gf.innerHTML = '<div class="gift-float">' + d.emoji + '</div>';
-    setTimeout(() => gf.innerHTML = '', 2000);
-    addComment(d.name, 'أرسل هدية ' + d.emoji);
-  }
-});
-socket?.on('viewers', (n) => { document.getElementById('viewers').textContent = n; });
-socket?.on('broadcast_ended', () => { if (myRole !== 'host') leaveBroadcast(); });
-
 // ===== ADMIN =====
 async function openAdmin() {
   show('admin');
