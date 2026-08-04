@@ -52,7 +52,11 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',Tahoma,sans-s
 .cam-toggle.off{background:rgba(255,0,80,.25);border-color:var(--pink)}
 .cam-tile .cam-name{position:absolute;bottom:6px;right:8px;font-size:11px;font-weight:800;background:rgba(0,0,0,.55);padding:2px 8px;border-radius:8px}
 .cam-tile .cam-off{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:40px;background:#0a0d18}
-.bcast-host{position:absolute;top:50px;left:12px;display:flex;align-items:center;gap:8px;background:rgba(0,0,0,.55);padding:6px 12px 6px 6px;border-radius:20px}
+.bcast-host{position:absolute;top:52px;right:12px;display:flex;align-items:center;gap:8px;background:rgba(0,0,0,.55);padding:6px 12px 6px 6px;border-radius:20px}
+.bcast-coins{position:absolute;top:52px;left:12px;z-index:30;background:rgba(0,0,0,.55);color:var(--gold);font-weight:900;font-size:14px;padding:6px 12px;border-radius:16px;border:1px solid rgba(232,184,48,.4)}
+.toolbar{display:flex;justify-content:space-around;align-items:flex-end;padding:8px 6px}
+.tool-item{display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer}
+.gift-panel-title{color:var(--gold);font-weight:900}
 .bcast-host .av{width:36px;height:36px;border-radius:50%;border:2px solid var(--gold);display:flex;align-items:center;justify-content:center;overflow:hidden;background:#333;font-size:18px}
 .bcast-host .av img{width:100%;height:100%;object-fit:cover}
 .bcast-close{position:absolute;top:50px;right:12px;width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,.4);background:rgba(0,0,0,.5);color:#fff;font-size:16px;cursor:pointer}
@@ -143,32 +147,41 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',Tahoma,sans-s
         <div class="cam-tile hidden" id="cam-2"><video autoplay playsinline></video><div class="cam-avatar">👤</div><div class="cam-name"></div></div>
         <div class="cam-tile hidden" id="cam-3"><video autoplay playsinline></video><div class="cam-avatar">👤</div><div class="cam-name"></div></div>
       </div>
+      <!-- الخروج أعلى يسار -->
+      <button class="bcast-close" onclick="leaveBroadcast()">✕</button>
+      <!-- الاسم + المشاهدين يمين -->
       <div class="bcast-host">
         <div class="av" id="host-av">👤</div>
-        <div><div id="host-name" style="font-weight:800;font-size:13px"></div><div style="font-size:10px;color:var(--muted)">👥 <span id="viewers">1</span> يشاهدون</div></div>
+        <div><div id="host-name" style="font-weight:800;font-size:14px"></div><div style="font-size:10px;color:var(--muted)">👥 <span id="viewers">1</span> يشاهدون</div></div>
       </div>
-      <div style="position:absolute;top:50px;right:58px;display:flex;gap:8px;z-index:30">
-        <button class="bcast-close" onclick="shareBroadcast()" title="مشاركة البث">🔗</button>
-      </div>
-      <button class="bcast-close" onclick="leaveBroadcast()">✕</button>
+      <!-- الكوينزات المكتسبة أثناء البث يسار -->
+      <div class="bcast-coins" id="bcast-coins">🪙 0</div>
       <div class="comments" id="comments"></div>
       <div class="hearts" id="hearts"></div>
       <div id="gift-float"></div>
     </div>
     <div class="bcast-bottom">
-      <div class="bcast-actions">
-        <div style="display:flex;align-items:center;gap:8px"><div style="font-size:12px;color:var(--gold)" id="bcast-title">بث مباشر</div><button class="cam-toggle" id="cam-toggle-btn" onclick="toggleCam24()">🎥</button><button class="cam-toggle" id="invite-btn" onclick="toggleGuestList()" style="display:none">👥</button></div>
-        <div style="display:flex;align-items:center;gap:6px"><div class="like-count" id="like-count">0</div><button class="heart-btn" onclick="sendHeart()">❤️</button></div>
-      </div>
-      <div id="guest-list" style="display:none;background:rgba(20,26,46,.95);border-radius:12px;padding:8px;font-size:12px;max-height:120px;overflow-y:auto"></div>
-      <div class="gift-bar" id="gift-bar"></div>
       <div class="cmt-input">
         <input id="cmt-text" placeholder="اكتب تعليقاً..." onkeydown="if(event.key==='Enter')sendChat()">
         <button onclick="sendChat()">إرسال</button>
       </div>
+      <!-- شريط الأدوات: قلب + هدية + مشاركة + دعوة + كاميرا -->
+      <div class="toolbar">
+        <div class="tool-item" onclick="sendHeart()"><div class="heart-btn">❤️</div><div class="like-count" id="like-count">0</div></div>
+        <div class="tool-item" onclick="openGiftPanel()"><div class="heart-btn">🎁</div></div>
+        <div class="tool-item" onclick="shareBroadcast()"><div class="heart-btn">🔗</div></div>
+        <div class="tool-item" id="invite-tool" onclick="toggleGuestList()" style="display:none"><div class="heart-btn">👥</div></div>
+        <div class="tool-item" onclick="toggleCam24()"><div class="heart-btn" id="cam-toggle-btn">🎥</div></div>
+      </div>
+      <div id="guest-list" style="display:none;background:rgba(20,26,46,.95);border-radius:12px;padding:8px;font-size:12px;max-height:120px;overflow-y:auto"></div>
+    </div>
+    <!-- لوحة الهدايا (تنفتح عند 🎁) -->
+    <div id="gift-panel" style="display:none;position:absolute;bottom:0;left:0;right:0;background:rgba(10,13,24,.97);border-radius:16px 16px 0 0;padding:14px;z-index:80">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><b style="color:var(--gold)">🎁 الهدايا</b><button class="bcast-close" onclick="document.getElementById('gift-panel').style.display='none'">✕</button></div>
+      <div class="gift-bar" id="gift-bar"></div>
+      <button class="btn btn-ghost" style="width:100%;margin-top:10px" onclick="toggleGuestList();document.getElementById('gift-panel').style.display='none'">👥 دعوة ضيف للكاميرا</button>
     </div>
   </div>
-</div>
 <div class="toast" id="toast" style="display:none"></div>
 <script>
 const API = '';
@@ -286,6 +299,8 @@ function connectSocket() {
         gf.innerHTML = '';
         if (heartsL) heartsL.style.display = '';
       }, 10000);
+      // كوينزات البث تزيد (المكسب يظهر يسار الشاشة)
+      if (d.coins && typeof addBcastCoins === 'function') addBcastCoins(d.coins);
       addComment(d.name, 'أرسل هدية ' + d.emoji);
     }
   });
@@ -542,6 +557,16 @@ async function joinAsGuest(d) {
     socket.emit('chat', { id: d.id, name: me?.name, text: '🎥 صعدت للكاميرا!' });
   } catch(e) { toast('فشل الصعود: ' + e.message, false); }
 }
+let bcastCoins = 0;
+function openGiftPanel() {
+  const p = document.getElementById('gift-panel');
+  if (p) p.style.display = p.style.display === 'none' ? 'block' : 'none';
+}
+function addBcastCoins(n) {
+  bcastCoins += n;
+  const el = document.getElementById('bcast-coins');
+  if (el) el.textContent = '🪙 ' + bcastCoins;
+}
 function openBroadcast() {
   show('bcast');
   document.getElementById('comments').innerHTML = '';
@@ -591,7 +616,7 @@ async function sendGift(emoji, coins, img) {
     const r = await api('POST', '/api/gift', { toId: me.id, coins, emoji });
     me.coins = r.coins;
     document.getElementById('my-coins').textContent = '🪙' + me.coins;
-    socket.emit('gift', { id: myBcast, name: me.name, emoji, img: img || null });
+    socket.emit('gift', { id: myBcast, name: me.name, emoji, img: img || null, coins });
   } catch(e) { toast(e.message, false); }
 }
 
