@@ -18,8 +18,8 @@ app.use(express.json({ limit: '5mb' }));
 app.use(express.static(path.join(__dirname, '..', 'frontend')));
 
 const JWT_SECRET = process.env.JWT_SECRET || 'livestar-24-secret';
-const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY || 'APIj9zp2ZvZviH6';
-const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET || '7VL0TwtiCnACUWA3h604mL4d9EInFjULZ2EdOrDoE4P';
+const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY || 'APIVim8Hu9raqSQ';
+const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET || '6Le1bVEjKpwJCxqpfVuK1CibDLSHpfMn7fJIyn3qd6cC';
 const LIVEKIT_URL = process.env.LIVEKIT_URL || 'wss://familylive-vitm3l6f.livekit.cloud/';
 
 // In-memory fallback when DATABASE_URL missing OR unreachable (app always works)
