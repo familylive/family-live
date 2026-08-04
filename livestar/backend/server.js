@@ -29,12 +29,20 @@ const dbUrl = (process.env.DATABASE_URL || '').trim();
 let pool = null;
 if (dbUrl) {
   try {
-    pool = new Pool({ connectionString: dbUrl, ssl: { rejectUnauthorized: false }, connectionTimeoutMillis: 5000 });
+    pool = new Pool({ connectionString: dbUrl, ssl: { rejectUnauthorized: false }, connectionTimeoutMillis: 2000 });
     useDb = true;
   } catch(e) { useDb = false; }
 }
-async function q(sql, p = []) { if (!useDb) return []; const r = await pool.query(sql, p); return r.rows; }
-async function q1(sql, p = []) { if (!useDb) return null; const r = await pool.query(sql, p); return r.rows[0] || null; }
+async function q(sql, p = []) {
+  if (!useDb) return [];
+  try { const r = await pool.query(sql, p); return r.rows; }
+  catch(e) { useDb = false; console.log('💾 تحول للذاكرة المؤقتة (' + e.message + ')'); return []; }
+}
+async function q1(sql, p = []) {
+  if (!useDb) return null;
+  try { const r = await pool.query(sql, p); return r.rows[0] || null; }
+  catch(e) { useDb = false; console.log('💾 تحول للذاكرة المؤقتة (' + e.message + ')'); return null; }
+}
 
 async function initDb() {
   if (!useDb) { console.log('💾 24 يعمل بذاكرة مؤقتة (بدون قاعدة) - أضف DATABASE_URL للتخزين الدائم'); return; }
@@ -309,6 +317,9 @@ async function openBotBroadcasts() {
 // فتح البثوث بعد تجهّز النظام (8 ثواني) + إعادة محاولة
 setTimeout(openBotBroadcasts, 8000);
 setTimeout(openBotBroadcasts, 15000);
+
+process.on('unhandledRejection', (r) => console.log('⚠️', r?.message || r));
+process.on('uncaughtException', (e) => console.log('⚠️', e.message));
 
 const PORT = process.env.PORT || 10001;
 server.listen(PORT, () => console.log('🎬 24 live on ' + PORT));
