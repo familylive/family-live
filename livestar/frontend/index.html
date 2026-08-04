@@ -152,7 +152,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',Tahoma,sans-s
   </div>
 
   <div id="bcast" class="bcast hidden">
-    <div class="bcast-video" id="bcast-video">
+    <div class="bcast-video" id="bcast-video" onclick="tapHeart(event)">
       <div class="cam-grid" id="cam-grid">
         <div class="cam-tile" id="cam-0"><video autoplay playsinline muted></video><div class="cam-avatar">👤</div><div class="cam-name">أنت</div></div>
         <div class="cam-tile hidden" id="cam-1"><video autoplay playsinline></video><div class="cam-avatar">👤</div><div class="cam-name"></div></div>
@@ -168,6 +168,8 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',Tahoma,sans-s
       </div>
       <!-- الكوينزات المكتسبة أثناء البث يسار -->
       <div class="bcast-coins" id="bcast-coins">🪙 0</div>
+      <div class="bcast-coins" id="bcast-hearts" style="top:100px">❤️ 0</div>
+      <div class="bcast-coins" id="bcast-support" style="top:148px;color:#ff9f43">🔥 ترند 0</div>
       <div class="comments" id="comments"></div>
       <div class="hearts" id="hearts"></div>
       <div id="gift-float"></div>
@@ -307,6 +309,16 @@ function connectSocket() {
   socket = io(API);
   socket.on('chat', (d) => { if (d.id === myBcast) addComment(d.name, d.text); });
   socket.on('heart', (d) => { if (d.id === myBcast) sendHeart(); });
+  socket.on('hearts_count', (n) => {
+    const el = document.getElementById('bcast-hearts');
+    if (el) el.textContent = '❤️ ' + n;
+  });
+  socket.on('support', (d) => {
+    if (d.id === myBcast || true) {
+      const el = document.getElementById('bcast-support');
+      if (el) el.textContent = '🔥 ترند: ' + d.support;
+    }
+  });
   socket.on('gift', (d) => {
     if (d.id === myBcast) {
       const gf = document.getElementById('gift-float');
@@ -618,6 +630,11 @@ function addComment(name, text) {
   c.appendChild(el);
   while (c.children.length > 30) c.removeChild(c.firstChild);
   c.scrollTop = 0; // يظهر الأحدث (تحت) ويمكن التمرير للأعلى لرؤية القديم
+}
+function tapHeart(e) {
+  // تجاهل الضغط على الأزرار والحقول
+  if (e.target.closest('button,input,.cmt-input,.toolbar,.gift-bar,.bcast-host,.bcast-coins,.comments')) return;
+  sendHeart();
 }
 function sendHeart() {
   likes++;

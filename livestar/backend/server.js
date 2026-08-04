@@ -133,8 +133,10 @@ app.post('/api/broadcast/stop', auth, ah(async (req, res) => {
   res.json({ ok: true });
 }));
 app.get('/api/broadcasts', ah(async (req, res) => {
-  const bs = await q(`SELECT b.*, u.name as host_name, u.avatar as host_avatar FROM broadcasts b JOIN users u ON b.host_id=u.id WHERE b.status='live' ORDER BY b.started_at DESC`);
-  res.json({ broadcasts: bs });
+  const bs = await q(`SELECT b.*, u.name as host_name, u.avatar as host_avatar FROM broadcasts b JOIN users u ON b.host_id=u.id WHERE b.status='live'`);
+  const list = bs.map(b => ({ ...b, support: rooms[b.id]?.support || 0, hearts: rooms[b.id]?.hearts || 0 }));
+  list.sort((a, b) => (b.support || 0) - (a.support || 0)); // الترند أولاً
+  res.json({ broadcasts: list, top5: list.slice(0, 5) });
 }));
 
 // ============ COINS & GIFTS ============
@@ -190,11 +192,12 @@ app.get('/api/admin/gifts', auth, ah(async (req, res) => {
 }));
 
 // ============ SOCKETS ============
-const rooms = {}; // room -> { viewers: Map(socketId -> name) }
+const rooms = {}; // room -> { viewers: Map, hearts, support }
+const HEARTS_PER_COIN = 500;
 io.on('connection', (socket) => {
   socket.on('join_broadcast', ({ id, name }) => {
     socket.join('broadcast_' + id);
-    if (!rooms[id]) rooms[id] = { viewers: new Map() };
+    if (!rooms[id]) rooms[id] = { viewers: new Map(), hearts: 0, support: 0 };
     rooms[id].viewers.set(socket.id, name || 'زائر');
     const names = [...rooms[id].viewers.values()];
     io.to('broadcast_' + id).emit('viewers', rooms[id].viewers.size);
@@ -205,7 +208,22 @@ io.on('connection', (socket) => {
     if (rooms[id]) { rooms[id].viewers.delete(socket.id); io.to('broadcast_' + id).emit('viewers', rooms[id].viewers.size); io.to('broadcast_' + id).emit('viewers_list', [...rooms[id].viewers.values()]); }
   });
   socket.on('chat', (d) => { io.to('broadcast_' + d.id).emit('chat', d); });
-  socket.on('heart', (d) => { io.to('broadcast_' + d.id).emit('heart', d); });
+  socket.on('heart', async (d) => {
+    if (!rooms[d.id]) return;
+    rooms[d.id].hearts = (rooms[d.id].hearts || 0) + 1;
+    const hearts = rooms[d.id].hearts;
+    // كل 500 تكبيسة = +1 كونزه لصاحب البث
+    if (hearts % HEARTS_PER_COIN === 0) {
+      rooms[d.id].support = (rooms[d.id].support || 0) + 1;
+      try {
+        const b = await q1('SELECT host_id FROM broadcasts WHERE id=$1 AND status=\'live\'', [d.id]);
+        if (b) { await q('UPDATE users SET coins=coins+1 WHERE id=$1', [b.host_id]); }
+      } catch(e) {}
+      io.to('broadcast_' + d.id).emit('support', { support: rooms[d.id].support });
+    }
+    io.to('broadcast_' + d.id).emit('heart', d);
+    io.to('broadcast_' + d.id).emit('hearts_count', hearts);
+  });
   socket.on('gift', (d) => { io.to('broadcast_' + d.id).emit('gift', d); });
   // Host invites a viewer to join as guest (camera)
   socket.on('invite_guest', ({ id, viewerName, hostName, room }) => {
