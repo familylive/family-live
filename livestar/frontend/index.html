@@ -75,9 +75,9 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',Tahoma,sans-s
 .gift-item{min-width:60px;text-align:center;background:#141a2e;border-radius:10px;padding:8px 4px;cursor:pointer}
 .gift-item .e{font-size:26px}
 .gift-item .c{font-size:10px;color:var(--gold);font-weight:800}
-.gift-float{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;font-size:150px;animation:giftBig 1.2s forwards}
-.gift-run-img{width:100%;height:100%;object-fit:contain;-webkit-mask-image:radial-gradient(ellipse at center, black 55%, transparent 95%);mask-image:radial-gradient(ellipse at center, black 55%, transparent 95%);filter:drop-shadow(0 10px 40px rgba(0,0,0,.5));animation:giftPulse 2s ease-in-out infinite}
-@keyframes giftPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+.gift-float{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;font-size:150px;animation:giftBig 3s cubic-bezier(.2,.8,.2,1) forwards}
+.gift-run-img{width:100%;height:100%;object-fit:contain;-webkit-mask-image:radial-gradient(ellipse at center, black 55%, transparent 95%);mask-image:radial-gradient(ellipse at center, black 55%, transparent 95%);filter:drop-shadow(0 10px 40px rgba(0,0,0,.5));animation:giftPulse 4s ease-in-out infinite}
+@keyframes giftPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.03)}}
 @keyframes giftBig{0%{transform:scale(0) rotate(-20deg);opacity:0}20%{transform:scale(1.4);opacity:1}80%{opacity:1}100%{transform:scale(1);opacity:0}}
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--card);border:1px solid var(--gold);color:#fff;padding:10px 18px;border-radius:12px;z-index:99;font-size:13px}
 .nav{position:fixed;bottom:0;left:0;right:0;background:var(--card);display:flex;justify-content:space-around;padding:10px 0;border-top:1px solid #232c47;z-index:40}
