@@ -245,16 +245,30 @@ async function api(method, path, body) {
   if (!r.ok) throw new Error(d.error || 'خطأ');
   return d;
 }
-function show(id) { ['auth-screen','home','profile','admin','bcast'].forEach(x => document.getElementById(x).classList.toggle('hidden', x !== id)); }
+function show(id) { ['auth-screen','home','profile','admin','bcast','store'].forEach(x => document.getElementById(x).classList.toggle('hidden', x !== id)); }
 
-// استرجاع الجلسة تلقائياً إذا في توكن محفوظ
+// دخول تلقائي: جلسة محفوظة أو زائر جديد (بدون شاشة تسجيل)
 (async function autoRestore() {
-  if (!token) return;
+  if (token) {
+    try {
+      const d = await api('GET', '/api/me');
+      me = d.user;
+      afterAuth();
+      return;
+    } catch(e) { token = ''; localStorage.removeItem('24_token'); }
+  }
+  // زائر: حساب وهمي تلقائي
   try {
-    const d = await api('GET', '/api/me');
+    const guest = 'زائر' + Math.floor(Math.random() * 9999);
+    const d = await api('POST', '/api/auth/register', { name: guest, email: 'guest' + Date.now() + '@24.app', password: 'guest12345' });
+    token = d.token; localStorage.setItem('24_token', token);
     me = d.user;
     afterAuth();
-  } catch(e) { token = ''; localStorage.removeItem('24_token'); }
+  } catch(e) {
+    // لو فشل التسجيل (شبكة) - ادخل بالواجهة بدون حساب (العرض فقط)
+    me = { name: 'زائر', coins: 0, avatar: '👤', followers: 0 };
+    afterAuth();
+  }
 })();
 function toggleAuth() {
   const isLogin = document.getElementById('a-btn').textContent === 'تسجيل الدخول';
@@ -274,6 +288,7 @@ async function doAuth() {
   } catch(e) { toast(e.message, false); }
 }
 function afterAuth() {
+  if (!document.getElementById('home').classList.contains('hidden')) return;
   document.getElementById('my-name').textContent = me.name;
   document.getElementById('my-coins').textContent = '🪙' + me.coins;
   const isAdmin = ADMIN_EMAILS.includes(me.email);
@@ -468,7 +483,7 @@ function freeTile(identity) {
 }
 
 async function goLive() {
-  if (!me) return show('auth-screen');
+  if (!me) { me = { name: 'زائر', coins: 0, avatar: '👤', followers: 0 }; }
   try {
     const { id, room } = await api('POST', '/api/broadcast/start', { title: 'بث ' + me.name });
     myBcast = id; roomName = room; myRole = 'host';
@@ -523,7 +538,7 @@ async function goLive() {
 }
 let quranAudio = null;
 async function watchBroadcast(id, room, hostName, hostAv, isQuran) {
-  if (!me) return show('auth-screen');
+  if (!me) { me = { name: 'زائر', coins: 0, avatar: '👤', followers: 0 }; }
   myBcast = id; roomName = room; myRole = 'viewer';
   openBroadcast();
   resetCams();
