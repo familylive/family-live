@@ -3214,8 +3214,8 @@ function updateAudioCallUI(inCall) {
     btn.className = 'btn btn-danger btn-full';
     document.getElementById('call-controls').style.display = 'block';
     document.getElementById('video-grid').style.display = 'grid';
-    // فتح البث برا الصفحة تلقائياً (يغطي الشاشة)
-    setTimeout(() => { try { popOutCallGrid(); } catch(e) {} }, 500);
+    // البث شاشة منفصلة تغطي كل الشاشة (بدون مغادرة الصفحة)
+    document.body.classList.add('bcast-open');
     // Show my local video
     const myVideo = document.getElementById('my-video');
     if (myVideo && localStream) {
@@ -3227,6 +3227,8 @@ function updateAudioCallUI(inCall) {
     btn.className = 'btn btn-accent btn-full';
     document.getElementById('call-controls').style.display = 'none';
     document.getElementById('video-grid').style.display = 'none';
+    document.body.classList.remove('bcast-open');
+    closePopOut();
   }
 }
 
