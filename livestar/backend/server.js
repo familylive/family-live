@@ -26,42 +26,52 @@ const LIVEKIT_URL = process.env.LIVEKIT_URL || 'wss://familylive-vitm3l6f.liveki
 let mem = { users: [], broadcasts: [], gifts: [], tx: [] };
 let useDb = false;
 const dbUrl = (process.env.DATABASE_URL || '').trim();
+console.log('🔌 24 DATABASE_URL:', dbUrl ? 'YES (host ' + (dbUrl.match(/@([^\/]+)/) || ['','?'])[1] + ')' : 'NO ❌');
 let pool = null;
 if (dbUrl) {
   try {
-    pool = new Pool({ connectionString: dbUrl, ssl: { rejectUnauthorized: false }, connectionTimeoutMillis: 15000 });
+    pool = new Pool({ connectionString: dbUrl, ssl: { rejectUnauthorized: false }, connectionTimeoutMillis: 30000 });
     useDb = true;
   } catch(e) { useDb = false; }
 }
+let dbFailCount = 0;
 async function q(sql, p = []) {
   if (!useDb) return [];
-  try { const r = await pool.query(sql, p); return r.rows; }
-  catch(e) { useDb = false; console.log('💾 تحول للذاكرة المؤقتة (' + e.message + ')'); return []; }
+  try { const r = await pool.query(sql, p); dbFailCount = 0; return r.rows; }
+  catch(e) {
+    dbFailCount++;
+    if (dbFailCount > 10) { useDb = false; console.log('💾 تحول للذاكرة المؤقتة (إخفاقات متكررة)'); }
+    return [];
+  }
 }
 async function q1(sql, p = []) {
   if (!useDb) return null;
-  try { const r = await pool.query(sql, p); return r.rows[0] || null; }
-  catch(e) { useDb = false; console.log('💾 تحول للذاكرة المؤقتة (' + e.message + ')'); return null; }
+  try { const r = await pool.query(sql, p); dbFailCount = 0; return r.rows[0] || null; }
+  catch(e) {
+    dbFailCount++;
+    if (dbFailCount > 10) { useDb = false; console.log('💾 تحول للذاكرة المؤقتة (إخفاقات متكررة)'); }
+    return null;
+  }
 }
 
 async function initDb() {
   if (!useDb) { console.log('💾 24 يعمل بذاكرة مؤقتة (بدون قاعدة) - أضف DATABASE_URL للتخزين الدائم'); return; }
   // Test the connection quickly; if unreachable -> fall back to memory
-  for (let attempt = 1; attempt <= 4; attempt++) {
+  for (let attempt = 1; attempt <= 6; attempt++) {
     try {
       await Promise.race([
         pool.query('SELECT 1'),
-        new Promise((_, rej) => setTimeout(() => rej(new Error('DB timeout')), 15000))
+        new Promise((_, rej) => setTimeout(() => rej(new Error('DB timeout')), 60000))
       ]);
       break;
     } catch(e) {
-      if (attempt === 4) {
+      if (attempt === 6) {
         useDb = false;
         console.log('💾 قاعدة البيانات غير متاحة - يعمل بذاكرة مؤقتة (' + e.message + ')');
         return;
       }
       console.log('⏳ محاولة الاتصال ' + attempt + '... (' + e.message + ')');
-      await new Promise(r => setTimeout(r, 4000));
+      await new Promise(r => setTimeout(r, 5000));
     }
   }
   await pool.query(`CREATE TABLE IF NOT EXISTS users (
