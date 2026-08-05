@@ -72,6 +72,8 @@ async function initDb() {
   await pool.query(`CREATE TABLE IF NOT EXISTS coin_tx (
     id TEXT PRIMARY KEY, user_id TEXT NOT NULL, coins INTEGER DEFAULT 0, type TEXT, detail TEXT, created_at TEXT DEFAULT now()
   )`);
+  // إعادة تعيين البثوث القديمة العالقة (بداية جديدة لكل إقلاع)
+  try { await pool.query("UPDATE broadcasts SET status='ended' WHERE status='live'"); } catch(e) {}
   console.log('✅ 24 DB ready');
 }
 initDb().catch(e => { console.log('DB error:', e.message); });

@@ -23,3 +23,7 @@ services:
     buildCommand: cd backend && npm install
     startCommand: cd backend && node server.js
     healthCheckPath: /
+
+    envVars:
+      - key: DATABASE_URL
+        value: postgresql://neondb_owner:npg_lU5kMRCmKSP6@ep-autumn-hill-axbd5hw6.c-4.us-east-2.aws.neon.tech/livestar?sslmode=require
