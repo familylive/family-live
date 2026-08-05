@@ -93,7 +93,7 @@ async function initDb() {
   try { await pool.query("UPDATE broadcasts SET status='ended' WHERE status='live'"); } catch(e) {}
   console.log('✅ 24 DB ready');
 }
-initDb().catch(e => { console.log('DB error:', e.message); });
+const dbReady = initDb().catch(e => { console.log('DB error:', e.message); });
 
 // Memory helpers (when no DB)
 function memUsers() { return useDb ? [] : mem.users; }
@@ -277,7 +277,8 @@ async function seedBots() {
     }
   });
 }
-setTimeout(() => seedBots(), 3000);
+setTimeout(() => seedBots().then(() => {}), 1500);
+setTimeout(() => seedBots().then(() => {}), 90000);
 
 // ============ SOCKETS ============
 const rooms = {}; // room -> { viewers: Map, hearts, support }
@@ -324,6 +325,7 @@ io.on('connection', (socket) => {
 
 // فتح 10 بثوث روبوت تلقائياً بعد الإقلاع
 async function openBotBroadcasts() {
+  await dbReady; // انتظر جاهزية القاعدة أولاً
   try {
     let count = 0;
     for (let i = 0; i < 10; i++) {
@@ -333,9 +335,9 @@ async function openBotBroadcasts() {
     console.log('🤖 بثوث الروبوت: ' + count);
   } catch(e) { console.log('Bot error:', e.message); }
 }
-// فتح البثوث بعد تجهّز النظام (8 ثواني) + إعادة محاولة
-setTimeout(openBotBroadcasts, 8000);
-setTimeout(openBotBroadcasts, 15000);
+// فتح البثوث بعد جاهزية القاعدة (مع حد أقصى 90 ثانية)
+setTimeout(openBotBroadcasts, 1500);
+setTimeout(openBotBroadcasts, 120000);
 
 process.on('unhandledRejection', (r) => console.log('⚠️', r?.message || r));
 process.on('uncaughtException', (e) => console.log('⚠️', e.message));
