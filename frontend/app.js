@@ -2370,16 +2370,20 @@ let activeFilter = '';
 
 async function applyFilterToFeed(filterClass) {
   const myVideo = document.getElementById('my-video');
-  if (!myVideo || !localStream) return;
+  if (!myVideo) return;
+  activeFilter = filterClass || '';
+  const filterCss = activeFilter ? (CSS_FILTERS[activeFilter] || '') : '';
+  // 1) فلتر CSS مباشر على الصورة - تغيير فوري مضمون على الشاشة
+  myVideo.style.filter = filterCss;
+  if (!localStream) { updateTileFilterUI(); return; }
   const videoTrack = localStream.getVideoTracks()[0];
-  if (!videoTrack) return;
+  // إيقاف لوحة الرسم السابقة
   if (filterPipeline) {
     clearInterval(filterPipeline.timer);
     if (filterPipeline.srcVideo) filterPipeline.srcVideo.remove();
     filterPipeline = null;
   }
-  if (!filterClass) {
-    activeFilter = '';
+  if (!activeFilter) {
     myVideo.srcObject = localStream;
     Object.values(peerConnections).forEach(pc => {
       const s = pc.getSenders().find(s => s.track && s.track.kind === 'video');
@@ -2388,32 +2392,39 @@ async function applyFilterToFeed(filterClass) {
     updateTileFilterUI();
     return;
   }
-  activeFilter = filterClass;
-  const srcVideo = document.createElement('video');
-  srcVideo.srcObject = localStream;
-  srcVideo.autoplay = true;
-  srcVideo.playsInline = true;
-  srcVideo.muted = true;
-  srcVideo.style.display = 'none';
-  document.body.appendChild(srcVideo);
-  const w = videoTrack.getSettings?.().width || 640;
-  const h = videoTrack.getSettings?.().height || 480;
-  const canvas = document.createElement('canvas');
-  canvas.width = w; canvas.height = h;
-  const ctx = canvas.getContext('2d');
-  const canvasStream = canvas.captureStream(24);
-  const newTrack = canvasStream.getVideoTracks()[0];
-  const draw = () => {
-    try { ctx.filter = CSS_FILTERS[filterClass] || 'none'; ctx.drawImage(srcVideo, 0, 0, w, h); } catch(e) {}
-  };
-  draw();
-  const timer = setInterval(draw, 70);
-  myVideo.srcObject = canvasStream;
-  Object.values(peerConnections).forEach(pc => {
-    const s = pc.getSenders().find(s => s.track && s.track.kind === 'video');
-    if (s) s.replaceTrack(newTrack).catch(() => {});
-  });
-  filterPipeline = { timer, srcVideo };
+  if (!videoTrack) { updateTileFilterUI(); return; }
+  // 2) للبث المرسل للجميع: لوحة رسم (إن دعم المتصفح) - وإلا يبقى الفلتر محلي فقط
+  try {
+    const srcVideo = document.createElement('video');
+    srcVideo.srcObject = localStream;
+    srcVideo.autoplay = true;
+    srcVideo.playsInline = true;
+    srcVideo.muted = true;
+    srcVideo.style.display = 'none';
+    document.body.appendChild(srcVideo);
+    const w = videoTrack.getSettings?.().width || 640;
+    const h = videoTrack.getSettings?.().height || 480;
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx.filter) throw new Error('no ctx.filter');
+    const canvasStream = canvas.captureStream(24);
+    const newTrack = canvasStream.getVideoTracks()[0];
+    const draw = () => {
+      try { ctx.filter = CSS_FILTERS[activeFilter] || 'none'; ctx.drawImage(srcVideo, 0, 0, w, h); } catch(e) {}
+    };
+    draw();
+    const timer = setInterval(draw, 70);
+    myVideo.srcObject = canvasStream;
+    Object.values(peerConnections).forEach(pc => {
+      const s = pc.getSenders().find(s => s.track && s.track.kind === 'video');
+      if (s) s.replaceTrack(newTrack).catch(() => {});
+    });
+    filterPipeline = { timer, srcVideo };
+  } catch(e) {
+    // المتصفح لا يدعم لوحة الرسم المفلترة - الفلتر محلي على شاشتك فقط
+    myVideo.srcObject = localStream;
+  }
   updateTileFilterUI();
 }
 
