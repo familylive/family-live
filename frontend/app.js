@@ -2114,34 +2114,75 @@ function stopCallWatermark() {
   if (wm) { wm.style.display = 'none'; wm.textContent = ''; }
 }
 
-// ==================== CALL FULLSCREEN (tap camera to zoom) ====================
-function toggleCallFullscreen() {
+// ==================== CALL POP-OUT (outside the page, covers full screen) ====================
+let pipWin = null; // نافذة البث المنبثقة
+
+function isPipActive() { return !!pipWin && !pipWin.closed; }
+
+// البث يطلع برا الصفحة: نافذة منبثقة على الكمبيوتر، ملء الشاشة على الجوال
+async function popOutCallGrid() {
   const grid = document.getElementById('video-grid');
   if (!grid) return;
-  const btn = document.getElementById('fullscreen-toggle-btn');
-  // Fullscreen API
+  // 1) نافذة منبثقة حقيقية خارج المتصفح (Chrome/Edge على الكمبيوتر)
+  if (window.documentPictureInPicture && !isPipActive()) {
+    try {
+      const w = await documentPictureInPicture.requestWindow({ width: 420, height: 760 });
+      w.document.head.innerHTML = document.head.innerHTML; // نسخ كل التنسيقات
+      const holder = document.createElement('div');
+      holder.id = 'video-grid-pip-holder';
+      holder.style.cssText = 'width:100%;min-height:280px;background:#000;color:#888;display:flex;align-items:center;justify-content:center;border-radius:14px;padding:24px;text-align:center;font-size:15px;flex-direction:column;gap:12px';
+      holder.innerHTML = '🖥️ البث مفتوح في نافذة منفصلة تغطي الشاشة<br><button class="btn btn-accent" style="margin-top:6px" onclick="closePipBack()">↩️ الرجوع للصفحة</button>';
+      grid.parentNode.insertBefore(holder, grid);
+      w.document.body.appendChild(grid); // نقل الشبكة (الفيديو يكمل)
+      // جسر: أزرار النافذة المنبثقة تعمل عبر الصفحة الأم
+      const bridge = w.document.createElement('script');
+      bridge.textContent = "for (const f of ['sendTtHeart','sendTikTokChat','askExitCall','toggleCallFullscreen','closePipBack','toggleTileFilterBar','tileSelectFilter']) window[f] = (...a) => window.opener && window.opener[f] ? window.opener[f](...a) : null;";
+      w.document.body.appendChild(bridge);
+      pipWin = w;
+      // عند إغلاق النافذة: إرجاع البث للصفحة
+      w.addEventListener('pagehide', () => {
+        const h = document.getElementById('video-grid-pip-holder');
+        if (h) h.replaceWith(grid);
+        pipWin = null;
+      });
+      const btn = document.getElementById('fullscreen-toggle-btn');
+      if (btn) { btn.textContent = '🪟'; btn.title = 'إغلاق النافذة المنبثقة'; btn.classList.add('zoom'); }
+      showToast('🪟 البث فتح بنافذة منفصلة تغطي الشاشة', 'success');
+      return;
+    } catch(e) { /* المستخدم رفض أو غير مدعوم - ننتقل لملء الشاشة */ }
+  }
+  // 2) ملء الشاشة الكامل (الجوال: يغطي كل الشاشة)
   if (document.fullscreenElement) {
     document.exitFullscreen().catch(() => {});
-    if (btn) btn.classList.remove('zoom');
-    grid.classList.remove('video-zoom');
+    if (btn0()) btn0().classList.remove('zoom');
     return;
   }
+  function btn0() { return document.getElementById('fullscreen-toggle-btn'); }
   if (grid.requestFullscreen) {
-    grid.requestFullscreen().catch(() => {
-      grid.classList.toggle('video-zoom');
-      if (btn) btn.classList.toggle('zoom', grid.classList.contains('video-zoom'));
-    });
-    document.addEventListener('fullscreenchange', function fs() {
-      if (!document.fullscreenElement) {
-        grid.classList.remove('video-zoom');
-        if (btn) btn.classList.remove('zoom');
-        document.removeEventListener('fullscreenchange', fs);
-      }
-    });
+    grid.requestFullscreen().then(() => {
+      const b = btn0(); if (b) { b.textContent = '⛶'; b.classList.add('zoom'); }
+    }).catch(() => {});
   } else {
     grid.classList.toggle('video-zoom');
-    if (btn) btn.classList.toggle('zoom', grid.classList.contains('video-zoom'));
+    const b = btn0(); if (b) b.classList.toggle('zoom', grid.classList.contains('video-zoom'));
   }
+}
+function closePipBack() { if (isPipActive()) pipWin.close(); }
+
+function toggleCallFullscreen() {
+  // إغلاق النافذة المنبثقة
+  if (isPipActive()) return closePipBack();
+  popOutCallGrid();
+}
+// خروج من النافذة المنبثقة أو ملء الشاشة عند خروج المكالمة
+function closePopOut() {
+  if (isPipActive()) { try { pipWin.close(); } catch(e) {} pipWin = null; }
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  const h = document.getElementById('video-grid-pip-holder');
+  const grid = document.getElementById('video-grid');
+  if (h && grid && !grid.parentNode) h.replaceWith(grid);
+  const btn = document.getElementById('fullscreen-toggle-btn');
+  if (btn) { btn.textContent = '⛶'; btn.classList.remove('zoom'); btn.title = 'تكبير الشاشة'; }
 }
 // ==================== BATTLES (live support challenge) ====================
 let currentBattle = null;
@@ -2405,6 +2446,7 @@ function confirmExitCall(go) {
     if (socket?.connected && leftSession && leftUser) {
       socket.emit('diwaniya_leave', { sessionId: leftSession, userId: leftUser });
     }
+    closePopOut();
     leaveLiveAudio();
     // Close the diwaniya FOR ME (others keep theirs)
     state.diwaniyaOpen = false;
@@ -3172,6 +3214,8 @@ function updateAudioCallUI(inCall) {
     btn.className = 'btn btn-danger btn-full';
     document.getElementById('call-controls').style.display = 'block';
     document.getElementById('video-grid').style.display = 'grid';
+    // فتح البث برا الصفحة تلقائياً (يغطي الشاشة)
+    setTimeout(() => { try { popOutCallGrid(); } catch(e) {} }, 500);
     // Show my local video
     const myVideo = document.getElementById('my-video');
     if (myVideo && localStream) {
