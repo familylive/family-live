@@ -26,11 +26,13 @@ const LIVEKIT_URL = process.env.LIVEKIT_URL || 'wss://familylive-vitm3l6f.liveki
 let mem = { users: [], broadcasts: [], gifts: [], tx: [] };
 let useDb = false;
 const dbUrl = (process.env.DATABASE_URL || '').trim();
-console.log('🔌 24 DATABASE_URL:', dbUrl ? 'YES (host ' + (dbUrl.match(/@([^\/]+)/) || ['','?'])[1] + ')' : 'NO ❌');
+console.log('🔌 24 DATABASE_URL:', dbUrl ? 'YES | ' + dbUrl.replace(/:[^@]*@/, ':***@') : 'NO ❌');
 let pool = null;
 if (dbUrl) {
   try {
-    pool = new Pool({ connectionString: dbUrl, ssl: { rejectUnauthorized: false }, connectionTimeoutMillis: 30000 });
+    pool = new Pool({ connectionString: dbUrl, ssl: { rejectUnauthorized: false } });
+// نبض كل 60 ثانية لإبقاء قاعدة Neon يقظة
+setInterval(() => { if (useDb) pool.query('SELECT 1').catch(() => {}); }, 60000);
     useDb = true;
   } catch(e) { useDb = false; }
 }
@@ -61,7 +63,7 @@ async function initDb() {
     try {
       await Promise.race([
         pool.query('SELECT 1'),
-        new Promise((_, rej) => setTimeout(() => rej(new Error('DB timeout')), 60000))
+        new Promise((_, rej) => setTimeout(() => rej(new Error('DB timeout')), 120000))
       ]);
       break;
     } catch(e) {
