@@ -182,9 +182,9 @@ app.post('/api/bot/broadcast', ah(async (req, res) => {
   // نفتح بثاً وهمياً لبوت متاح (يعمل في الوضعين)
   let live, allBots, bot;
   if (useDb) {
-    live = await q("SELECT id FROM broadcasts WHERE status='live'");
+    live = await q("SELECT id, host_id FROM broadcasts WHERE status='live'");
     if (live.length >= 10) return res.json({ message: 'مليان', count: live.length });
-    const used = new Set(live.map(b => b.id ? b.host_id : b.id));
+    const used = new Set(live.map(b => b.host_id));
     allBots = await q("SELECT * FROM users WHERE id LIKE 'bot_%'");
     bot = allBots.find(u => !used.has(u.id));
     if (!bot) return res.json({ message: 'لا بوتات متاحة', count: live.length });
