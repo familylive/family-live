@@ -25,8 +25,15 @@ const LIVEKIT_URL = process.env.LIVEKIT_URL || 'wss://familylive-vitm3l6f.liveki
 // In-memory fallback when DATABASE_URL missing OR unreachable (app always works)
 let mem = { users: [], broadcasts: [], gifts: [], tx: [] };
 let useDb = false;
-const dbUrl = (process.env.DATABASE_URL || '').trim();
-console.log('🔌 24 DATABASE_URL:', dbUrl ? 'YES | ' + dbUrl.replace(/:[^@]*@/, ':***@') : 'NO ❌');
+// قاعدة 24 الرسمية (Neon) — تُستخدم تلقائياً إذا كان متغير البيئة غير صالح
+const FALLBACK_DB = 'postgresql://neondb_owner:npg_lU5kMRCmKSP6@ep-autumn-hill-axbd5hw6.c-4.us-east-2.aws.neon.tech/livestar?sslmode=require';
+let rawUrl = (process.env.DATABASE_URL || '').trim();
+if (!/postgres/i.test(rawUrl)) {
+  console.log('⚠️ متغير DATABASE_URL غير صالح (' + (rawUrl || 'فارغ') + ') — استخدام قاعدة 24 الرسمية تلقائياً');
+  rawUrl = FALLBACK_DB;
+}
+const dbUrl = rawUrl;
+console.log('🔌 24 DB:', dbUrl.replace(/:[^@]*@/, ':***@'));
 let pool = null;
 if (dbUrl) {
   try {
