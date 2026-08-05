@@ -29,7 +29,7 @@ const dbUrl = (process.env.DATABASE_URL || '').trim();
 let pool = null;
 if (dbUrl) {
   try {
-    pool = new Pool({ connectionString: dbUrl, ssl: { rejectUnauthorized: false }, connectionTimeoutMillis: 2000 });
+    pool = new Pool({ connectionString: dbUrl, ssl: { rejectUnauthorized: false }, connectionTimeoutMillis: 15000 });
     useDb = true;
   } catch(e) { useDb = false; }
 }
@@ -47,15 +47,22 @@ async function q1(sql, p = []) {
 async function initDb() {
   if (!useDb) { console.log('💾 24 يعمل بذاكرة مؤقتة (بدون قاعدة) - أضف DATABASE_URL للتخزين الدائم'); return; }
   // Test the connection quickly; if unreachable -> fall back to memory
-  try {
-    await Promise.race([
-      pool.query('SELECT 1'),
-      new Promise((_, rej) => setTimeout(() => rej(new Error('DB timeout')), 5000))
-    ]);
-  } catch(e) {
-    useDb = false;
-    console.log('💾 قاعدة البيانات غير متاحة - يعمل بذاكرة مؤقتة (' + e.message + ')');
-    return;
+  for (let attempt = 1; attempt <= 4; attempt++) {
+    try {
+      await Promise.race([
+        pool.query('SELECT 1'),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('DB timeout')), 15000))
+      ]);
+      break;
+    } catch(e) {
+      if (attempt === 4) {
+        useDb = false;
+        console.log('💾 قاعدة البيانات غير متاحة - يعمل بذاكرة مؤقتة (' + e.message + ')');
+        return;
+      }
+      console.log('⏳ محاولة الاتصال ' + attempt + '... (' + e.message + ')');
+      await new Promise(r => setTimeout(r, 4000));
+    }
   }
   await pool.query(`CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, password TEXT NOT NULL,
