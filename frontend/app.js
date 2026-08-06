@@ -1740,7 +1740,7 @@ async function setVideoLimit() {
   if (!sessionId) return;
   try {
     await api('POST', '/api/diwaniya/video-limit', { sessionId, limit });
-    document.getElementById('video-limit-display').textContent = limit;
+    const vld = document.getElementById('video-limit-display'); if (vld) vld.textContent = limit;
     showToast('🎥 عدد الكاميرات: ' + limit, 'success');
   } catch(e) { showToast(e.message, 'error'); }
 }
