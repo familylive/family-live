@@ -1639,9 +1639,11 @@ function updateCallPresence() {
     const av = (ava.startsWith('data:') || ava.startsWith('http') || ava.startsWith('/')) ? '<img src="' + ava + '">' : (ava && ava.length <= 4 ? ava : '👤');
     const supported = !p.self && (sessionGiftCoins[p.id] || 0) > 0;
     const isHost = state.isFounder || state.user?.role === 'admin';
+    // شارة كتم المايك على دائرة صاحب البث (أعلى اليمين)
+    const muteBadge = p.self && micMuted ? '<span class="mic-muted-badge">🎤✕</span>' : '';
     return '<div class="call-participant"><div class="call-avatar-circle' + (p.self ? ' self' : '') + (supported ? ' supported' : '') + '" ' +
       (isHost && !p.self ? 'onclick="memberCircleAction(\'' + p.id + '\',\'' + p.name.replace(/'/g, '') + '\')"' : '') +
-      ' title="' + p.name + '">' + av + '<span class="ca-name">' + p.name + '</span></div></div>';
+      ' title="' + p.name + '">' + av + muteBadge + '<span class="ca-name">' + p.name + '</span></div></div>';
   }).join('') + (rest > 0 ? '<div class="call-more" title="' + rest + ' آخرون">+' + rest + '</div>' : '');
 }
 // المضيف: الضغط على دائرة عضو = طرد / تقييد
@@ -1692,6 +1694,7 @@ function toggleMic() {
     tileState.classList.toggle('muted-state', micMuted);
   }
   showToast(micMuted ? '🔇 كتمت المايك - ما يسمعونك' : '🎤 فتحت المايك', micMuted ? 'error' : 'success');
+  updateCallPresence();
 }
 
 function toggleCamera() {

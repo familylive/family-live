@@ -3393,6 +3393,16 @@ body.bcast-open .modal-overlay { z-index: 2500 !important; }
 
 /* ===== إخفاء المؤقت ===== */
 #call-timer { display: none !important; }
+/* حد الكاميرات: إزالة نهائية من الشاشة */
+#video-limit-control { display: none !important; }
+/* عداد المتواجدين: إزالة نهائية */
+.call-limit { display: none !important; }
+/* صندوق أعلى يسار: شفاف (فقط الدوائر) */
+#call-controls {
+  background: transparent !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+}
 
 /* ===== دوائر المتواجدين (أول 3 + الأكثر دعماً أولاً) ===== */
 .call-participants {
@@ -3429,6 +3439,16 @@ body.bcast-open .modal-overlay { z-index: 2500 !important; }
 }
 .call-avatar-circle:hover .ca-name { display: block; }
 .call-avatar-circle.self { border-color: #22c55e; }
+.mic-muted-badge {
+  position: absolute; top: -7px; right: -7px;
+  background: rgba(220,38,38,.95);
+  border-radius: 50%;
+  width: 20px; height: 20px;
+  font-size: 11px;
+  display: flex; align-items: center; justify-content: center;
+  border: 1.5px solid #fff;
+  z-index: 3;
+}
 .call-more {
   width: 34px; height: 34px;
   border-radius: 50%;
