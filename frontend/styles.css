@@ -3352,3 +3352,14 @@ body.bcast-open .modal-overlay { z-index: 2500 !important; }
   0%, 100% { box-shadow: 0 2px 12px rgba(225,29,72,.5); }
   50% { box-shadow: 0 2px 22px rgba(225,29,72,.9); }
 }
+
+/* محمّل دوار سريع */
+.splash-spinner {
+  width: 34px; height: 34px;
+  margin-top: 18px;
+  border: 3px solid rgba(232,184,48,.25);
+  border-top-color: #e8b830;
+  border-radius: 50%;
+  animation: splashSpin .7s linear infinite;
+}
+@keyframes splashSpin { to { transform: rotate(360deg); } }

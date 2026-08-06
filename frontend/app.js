@@ -56,7 +56,7 @@ window.addEventListener('storage', (e) => {
       const invInput = document.getElementById('reg-invite-token');
       if (invInput) invInput.value = token;
       showToast('🔗 تم تجهيز الدعوة - أكمل التسجيل للانضمام للعائلة', 'success');
-    }, 2600);
+    }, 800);
   } else if (token && !isInvitePage) {
     localStorage.setItem('token', token);
     // Clean URL after saving token
@@ -70,26 +70,28 @@ window.addEventListener('storage', (e) => {
     } catch(e) { localStorage.removeItem('token'); }
   }
   
-  // Wait for splash, then check auth
-  await new Promise(r => setTimeout(r, 1500));
-  const splash = document.getElementById('splash-screen');
-  if (splash) splash.classList.add('hide');
-  await new Promise(r => setTimeout(r, 600));
-  document.getElementById('app').classList.add('visible');
-  if (splash) splash.style.display = 'none';
-  
+  // فتح التطبيق فوراً (بدون انتظار ثابت) - سرعة فائقة
+  function revealApp() {
+    const splash = document.getElementById('splash-screen');
+    document.getElementById('app').classList.add('visible');
+    if (splash) splash.classList.add('hide');
+    setTimeout(() => { if (splash) splash.style.display = 'none'; }, 600);
+  }
   const savedToken = localStorage.getItem('token') || sessionStorage.getItem('token');
   if (savedToken) {
     try {
       const { user, family } = await api('GET', '/api/auth/verify');
+      revealApp();
       await loadApp(user, family);
     } catch(e) {
       localStorage.removeItem('token');
       sessionStorage.removeItem('token');
+      revealApp();
       showAuth('landing');
       loadLandingPage();
     }
   } else {
+    revealApp();
     showAuth('landing');
     loadLandingPage();
     updateMenuVisibility();
