@@ -3197,11 +3197,10 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  background: rgba(0,0,0,.45);
-  border-radius: 16px;
-  padding: 3px 10px 3px 3px;
-  backdrop-filter: blur(4px);
-  max-width: 42vw;
+  background: transparent;
+  border-radius: 0;
+  padding: 0;
+  max-width: 44vw;
 }
 .tt-host-avatar { width: 26px; height: 26px; font-size: 13px; }
 .tt-host-name { font-size: 11px; }
@@ -3322,9 +3321,9 @@ body.bcast-open { overflow: hidden; }
   background: #000;
 }
 #call-controls {
-  position: absolute !important; top: 12px; left: 12px; z-index: 2100;
-  background: rgba(0,0,0,.55); border-radius: 12px; padding: 6px 12px;
-  color: #fff; font-size: 12px; margin: 0;
+  position: absolute !important; top: 46px; left: 12px; z-index: 2100;
+  background: transparent; padding: 0; color: #fff; font-size: 12px; margin: 0;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
 }
 .call-buttons {
   position: absolute !important; bottom: 100px; left: 50%; transform: translateX(-50%);
@@ -3332,11 +3331,11 @@ body.bcast-open { overflow: hidden; }
   padding: 6px 10px; margin: 0; gap: 10px;
 }
 .battle-start-box {
-  position: absolute !important; top: 14px; left: 50%; transform: translateX(-50%);
+  position: absolute !important; top: 8px; left: 12px;
   z-index: 2100; margin: 0;
 }
 #battle-bar {
-  position: absolute !important; top: 56px; left: 50%; transform: translateX(-50%);
+  position: absolute !important; top: 44px; left: 50%; transform: translateX(-50%);
   z-index: 2200; background: rgba(0,0,0,.65); border-radius: 14px; padding: 8px; width: 94%; margin: 0;
 }
 #video-limit-control {
@@ -3374,6 +3373,19 @@ body.bcast-open .modal-overlay { z-index: 2500 !important; }
 
 /* إزالة شارة مباشر الحمراء القديمة */
 .tt-live-badge { display: none !important; }
+
+/* عداد القلوب العلوي (قلب صغير + رقم) */
+.tt-top-count {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  margin-bottom: 4px;
+  text-shadow: 0 1px 4px rgba(0,0,0,.8);
+}
+.tt-heart-mini { font-size: 15px; }
 
 /* ===== شارة مباشر الصغيرة (بدون إطار) + لمبة خضراء ===== */
 .live-badge-plain {

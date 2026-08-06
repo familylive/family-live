@@ -2780,6 +2780,8 @@ function sendTtHeart() {
   ttLikes++;
   const cnt = document.getElementById('tt-like-count');
   if (cnt) cnt.textContent = ttLikes;
+  const cntTop = document.getElementById('tt-top-count-num');
+  if (cntTop) cntTop.textContent = ttLikes;
   const layer = document.getElementById('tt-hearts-layer');
   if (!layer) return;
   const heart = document.createElement('div');
