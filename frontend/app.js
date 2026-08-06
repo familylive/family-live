@@ -3216,6 +3216,25 @@ function removeRemoteAudio(peerId) {
   if (pc) { pc.close(); delete peerConnections[peerId]; }
 }
 
+let bcastMoved = [];
+function moveControlsIntoGrid() {
+  const grid = document.getElementById('video-grid');
+  if (!grid) return;
+  const ids = ['call-controls', 'battle-section', 'video-limit-control'];
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (el && !grid.contains(el)) { bcastMoved.push({ el, parent: el.parentNode, next: el.nextSibling }); grid.appendChild(el); }
+  });
+  const cb = document.querySelector('.call-buttons');
+  if (cb && !grid.contains(cb)) { bcastMoved.push({ el: cb, parent: cb.parentNode, next: cb.nextSibling }); grid.appendChild(cb); }
+}
+function restoreMovedControls() {
+  while (bcastMoved.length) {
+    const m = bcastMoved.pop();
+    try { m.parent.insertBefore(m.el, m.next); } catch(e) {}
+  }
+}
+
 function updateAudioCallUI(inCall) {
   const btn = document.getElementById('join-audio-btn');
   if (!btn) return;
@@ -3227,6 +3246,7 @@ function updateAudioCallUI(inCall) {
     document.getElementById('video-grid').style.display = 'grid';
     // البث شاشة منفصلة تغطي كل الشاشة (بدون مغادرة الصفحة)
     document.body.classList.add('bcast-open');
+    moveControlsIntoGrid();
     // Show my local video
     const myVideo = document.getElementById('my-video');
     if (myVideo && localStream) {
@@ -3238,6 +3258,7 @@ function updateAudioCallUI(inCall) {
     btn.className = 'btn btn-accent btn-full';
     document.getElementById('call-controls').style.display = 'none';
     document.getElementById('video-grid').style.display = 'none';
+    restoreMovedControls();
     document.body.classList.remove('bcast-open');
     closePopOut();
   }
