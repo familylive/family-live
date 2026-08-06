@@ -3309,29 +3309,29 @@ body {
 
 /* ===== بث منفصل عن الويب: شاشة كاملة ===== */
 body.bcast-open { overflow: hidden; }
-body.bcast-open #video-grid {
+#video-grid {
   position: fixed !important;
   top: 0; left: 0; right: 0; bottom: 0;
   width: 100vw; height: 100vh;
   z-index: 2000; margin: 0; border-radius: 0;
   background: #000;
 }
-body.bcast-open #call-controls {
+#call-controls {
   position: absolute !important; top: 12px; left: 12px; z-index: 2100;
   background: rgba(0,0,0,.55); border-radius: 12px; padding: 6px 12px;
   color: #fff; font-size: 12px; margin: 0;
 }
-body.bcast-open .call-buttons {
+.call-buttons {
   position: absolute !important; bottom: 100px; left: 50%; transform: translateX(-50%);
   z-index: 2100; background: rgba(10,16,32,.7); border-radius: 999px;
   padding: 6px 10px; margin: 0; gap: 10px;
 }
-body.bcast-open .battle-start-box { position: absolute !important; top: 60px; right: 12px; z-index: 2100; margin: 0; }
-body.bcast-open #battle-bar {
+.battle-start-box { position: absolute !important; top: 60px; right: 12px; z-index: 2100; margin: 0; }
+#battle-bar {
   position: absolute !important; top: 10px; left: 50%; transform: translateX(-50%);
   z-index: 2200; background: rgba(0,0,0,.65); border-radius: 14px; padding: 8px; width: 94%; margin: 0;
 }
-body.bcast-open #video-limit-control {
+#video-limit-control {
   position: absolute !important; bottom: 66px; left: 50%; transform: translateX(-50%);
   z-index: 2100; background: rgba(0,0,0,.5); border-radius: 10px; padding: 4px 10px;
 }

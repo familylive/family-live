@@ -1993,7 +1993,11 @@ function leaveLiveAudio() {
   const ctrl = document.getElementById('call-controls');
   const grid = document.getElementById('video-grid');
   if (ctrl) ctrl.style.display = 'none';
-  if (grid) { grid.style.display = 'none'; grid.innerHTML = ''; }
+  if (grid) {
+    grid.style.display = 'none';
+    // مسح بلاطات الفيديو فقط - الحفاظ على أدوات البث الثابتة
+    grid.querySelectorAll('.video-tile').forEach(t => { if (t.id !== 'my-video-tile') t.remove(); });
+  }
   // Reset my video
   const myVideo = document.getElementById('my-video');
   if (myVideo) { myVideo.srcObject = null; myVideo.style.display = 'none'; }
@@ -3216,6 +3220,17 @@ function removeRemoteAudio(peerId) {
   if (pc) { pc.close(); delete peerConnections[peerId]; }
 }
 
+// نقل أدوات البث داخل الشبكة بشكل دائم (يعمل على كل المتصفحات)
+document.addEventListener('DOMContentLoaded', function() {
+  const grid = document.getElementById('video-grid');
+  if (!grid) return;
+  ['call-controls', 'battle-section', 'video-limit-control'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && !grid.contains(el)) grid.appendChild(el);
+  });
+  const cb = document.querySelector('.call-buttons');
+  if (cb && !grid.contains(cb)) grid.appendChild(cb);
+});
 let bcastMoved = [];
 function moveControlsIntoGrid() {
   const grid = document.getElementById('video-grid');
