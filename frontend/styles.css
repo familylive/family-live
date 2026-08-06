@@ -3196,12 +3196,17 @@ body {
   z-index: 50;
   display: flex;
   align-items: center;
-  gap: 8px;
-  background: rgba(0,0,0,.55);
-  border-radius: 20px;
-  padding: 5px 12px 5px 5px;
+  gap: 6px;
+  background: rgba(0,0,0,.45);
+  border-radius: 16px;
+  padding: 3px 10px 3px 3px;
   backdrop-filter: blur(4px);
+  max-width: 42vw;
 }
+.tt-host-avatar { width: 26px; height: 26px; font-size: 13px; }
+.tt-host-name { font-size: 11px; }
+.tt-host-sub { font-size: 9px; }
+.tt-follow-btn { font-size: 9px; padding: 1px 6px; }
 .tt-host-avatar {
   width: 32px; height: 32px;
   border-radius: 50%;
@@ -3367,6 +3372,9 @@ body.bcast-open .modal-overlay { z-index: 2500 !important; }
 }
 @keyframes splashSpin { to { transform: rotate(360deg); } }
 
+/* إزالة شارة مباشر الحمراء القديمة */
+.tt-live-badge { display: none !important; }
+
 /* ===== شارة مباشر الصغيرة (بدون إطار) + لمبة خضراء ===== */
 .live-badge-plain {
   background: none;
@@ -3412,9 +3420,10 @@ body.bcast-open .modal-overlay { z-index: 2500 !important; }
 .call-participants {
   display: flex;
   align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+  gap: 6px;
+  flex-wrap: nowrap;
   padding: 0;
+  max-width: 46vw;
 }
 .call-participant {
   list-style: none;
@@ -3466,7 +3475,7 @@ body.bcast-open .modal-overlay { z-index: 2500 !important; }
 /* شارة الدعم الذهبية على الدائرة */
 .call-avatar-circle.supported::after {
   content: '🔥';
-  position: absolute; top: -6px; right: -6px;
+  position: absolute; top: -6px; left: -6px;
   font-size: 11px;
   filter: drop-shadow(0 1px 2px rgba(0,0,0,.8));
 }
