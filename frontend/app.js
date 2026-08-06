@@ -275,7 +275,7 @@ function updateAllUI() {
   if (state.user?.avatar && state.user.avatar.startsWith('data:')) {
     menuAv.innerHTML = '<img src="' + state.user.avatar + '" style="width:100%;height:100%;border-radius:50%;object-fit:cover">';
   } else {
-    menuAv.textContent = state.user?.avatar || '👤';
+    setAvatarEl(menuAv, state.user?.avatar, '👤');
   }
   document.getElementById('points-display').textContent = state.points || 0;
   const headerCoins = document.getElementById('header-coins');
@@ -297,7 +297,7 @@ function updateAllUI() {
   const greeting = document.getElementById('dashboard-greeting');
   const familyName = document.getElementById('welcome-family');
   const avatar = document.getElementById('welcome-avatar');
-  if (avatar) avatar.textContent = state.user?.avatar || state.user?.name?.charAt(0) || '👤';
+  if (avatar) setAvatarEl(avatar, state.user?.avatar, state.user?.name?.charAt(0) || '👤');
   
   if (state.family) {
     if (greeting) greeting.textContent = '👋 مرحباً بك ' + (state.user?.name || '') + ' 🏡';
@@ -344,7 +344,7 @@ function updateAllUI() {
   const founder = state.members?.find(m => m.role === 'founder');
   if (founder) {
     document.getElementById('founder-name').textContent = founder.name;
-    document.getElementById('founder-avatar').textContent = founder.avatar || founder.name?.charAt(0) || '👤';
+    setAvatarEl(document.getElementById('founder-avatar'), founder.avatar, founder.name?.charAt(0) || '👤');
   }
   updateMembersList();
   updateInvitations();
@@ -2982,6 +2982,16 @@ async function loadFamilyPageData() {
   populateManagerSelect();
 }
 
+// عرض الصورة بشكل صحيح (base64/رابط/إيموجي) في أي عنصر
+function setAvatarEl(el, avatar, fallback) {
+  if (!el) return;
+  const av = avatar || '';
+  if (av.startsWith('data:') || av.startsWith('http') || av.startsWith('/')) {
+    el.innerHTML = '<img src="' + av + '" alt="">';
+  } else {
+    el.textContent = av || fallback || '👤';
+  }
+}
 function avatarHtml(avatar) {
   if (avatar && avatar.startsWith('data:')) return '<img src="' + avatar + '" alt="">';
   return '<div class="avatar-emoji">' + (avatar || '👤') + '</div>';
