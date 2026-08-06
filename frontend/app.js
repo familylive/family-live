@@ -2501,6 +2501,12 @@ function askExitCall() {
 function confirmExitCall(go) {
   document.getElementById('exit-call-modal').style.display = 'none';
   if (go) {
+    // المؤسس/فاتح البث: ✕ يغلق البث للجميع
+    if (isSessionHost() && state.activeSession?.id) {
+      closePopOut();
+      closeDiwaniya();
+      return;
+    }
     const leftSession = state.activeSession?.id;
     const leftUser = state.user?.id;
     // Tell everyone in the chat that I left
