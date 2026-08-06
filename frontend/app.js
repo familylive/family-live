@@ -583,6 +583,9 @@ function connectSocket() {
   socket.on('family_notification', (data) => {
     showFamilyNotification(data.title, data.message);
   });
+  socket.on('gift_on_camera', (d) => {
+    if (d && d.toId) { sessionGiftCoins[d.toId] = (sessionGiftCoins[d.toId] || 0) + (d.giftCoins || 0); updateCallPresence(); }
+  });
   socket.on('diwaniya_message', (msg) => {
     addChatMessage(msg.user_name, msg.message, msg.user_id === state.user?.id, msg.avatar, msg.user_level);
     const tk = document.getElementById('tiktok-chat');
@@ -1612,24 +1615,38 @@ function showEntryBanner(name, avatar, subText) {
   }, 6500);
 }
 
-// Presence: members currently in the call
+// دعم الجلسة: { userId -> كونزات الهدايا التي استقبلها } لترتيب الأكثر دعماً أولاً
+let sessionGiftCoins = {};
+// Presence: members currently in the call - دوائر (أول 3 دخولاً، والأكثر دعماً يتقدم)
 function updateCallPresence() {
   const countEl = document.getElementById('call-count');
   if (countEl) countEl.textContent = (Object.keys(state.callMembers || {}).length + 1);
   const list = document.getElementById('call-participants');
   if (!list) return;
-  let html = '<div class="call-participant"><span class="call-dot"></span> أنت</div>';
-  Object.entries(state.callMembers || {}).forEach(([id, name]) => {
-    const lv = (peerLevels || {})[id] || 0;
-    const lvHtml = (parseInt(lv) >= 0 && parseInt(lv) <= 100)
-      ? '<img src="/assets/levels/level_' + lv + '.' + (lv >= 1 && lv <= 10 ? 'gif' : 'png') + '?v=3" style="width:34px;height:13px;vertical-align:middle;margin-right:3px">' : '';
-    html += '<div class="call-participant" id="participant-' + id + '"><span class="call-dot"></span> ' + name + ' ' + lvHtml +
-      (state.isFounder || state.user?.role === 'admin' ?
-        ' <button class="member-action-btn" title="طرد من الديوانية" onclick="kickFromDiwaniya(\'' + id + '\')">⛔</button>' +
-        '<button class="member-action-btn" title="تقييد (يستمع فقط)" onclick="restrictMember(\'' + id + '\')">🙊</button>' : '') +
-    '</div>';
-  });
-  list.innerHTML = html;
+  // الترتيب: الأكثر دعماً أولاً، ثم ترتيب الدخول
+  const entries = Object.entries(state.callMembers || {});
+  entries.sort((a, b) => (sessionGiftCoins[b[0]] || 0) - (sessionGiftCoins[a[0]] || 0));
+  const all = [{ id: state.user?.id || 'me', name: 'أنت', avatar: state.user?.avatar || '👤', self: true }].concat(
+    entries.map(([id, name]) => {
+      const m = (state.members || []).find(mm => mm.id === id);
+      return { id, name, avatar: m?.avatar || peerAvatars[id] || '👤', self: false };
+    })
+  );
+  const visible = all.slice(0, 3);
+  const rest = all.length - 3;
+  list.innerHTML = visible.map(p => {
+    const av = p.avatar && p.avatar.startsWith('data:') ? '<img src="' + p.avatar + '">' : (p.avatar && p.avatar.length <= 4 ? p.avatar : '👤');
+    const supported = !p.self && (sessionGiftCoins[p.id] || 0) > 0;
+    const isHost = state.isFounder || state.user?.role === 'admin';
+    return '<div class="call-participant"><div class="call-avatar-circle' + (p.self ? ' self' : '') + (supported ? ' supported' : '') + '" ' +
+      (isHost && !p.self ? 'onclick="memberCircleAction(\'' + p.id + '\',\'' + p.name.replace(/'/g, '') + '\')"' : '') +
+      ' title="' + p.name + '">' + av + '<span class="ca-name">' + p.name + '</span></div></div>';
+  }).join('') + (rest > 0 ? '<div class="call-more" title="' + rest + ' آخرون">+' + rest + '</div>' : '');
+}
+// المضيف: الضغط على دائرة عضو = طرد / تقييد
+function memberCircleAction(id, name) {
+  const act = confirm('👤 ' + name + '\n\n✅ موافق = طرد من الديوانية\n❌ إلغاء = رجوع');
+  if (act) kickFromDiwaniya(id);
 }
 
 // ==================== CALL CONTROLS ====================
@@ -1990,6 +2007,7 @@ function leaveLiveAudio() {
       userId: state?.user?.id || null
     });
   }
+    sessionGiftCoins = {};
   updateAudioCallUI(false);
   // Force-hide call UI even if updateAudioCallUI failed
   const ctrl = document.getElementById('call-controls');
@@ -3234,6 +3252,16 @@ document.addEventListener('DOMContentLoaded', function() {
   const cb = document.querySelector('.call-buttons');
   if (cb) grid.appendChild(cb);
 });
+let callExtrasOpen = false;
+function toggleCallExtras() {
+  const row = document.querySelector('.call-buttons');
+  callExtrasOpen = !callExtrasOpen;
+  if (row) row.classList.toggle('extras-open', callExtrasOpen);
+  const btn = document.getElementById('call-settings-btn');
+  if (btn) btn.textContent = callExtrasOpen ? '✕' : '⚙️';
+  const giftBtn = document.getElementById('gift-box-btn');
+  if (giftBtn) giftBtn.style.display = callExtrasOpen ? 'none' : 'flex';
+}
 let bcastMoved = [];
 function moveControlsIntoGrid() {
   const grid = document.getElementById('video-grid');
@@ -3265,6 +3293,10 @@ function updateAudioCallUI(inCall) {
     // البث شاشة منفصلة تغطي كل الشاشة (بدون مغادرة الصفحة)
     document.body.classList.add('bcast-open');
     moveControlsIntoGrid();
+    // زر الإعدادات يظهر للمضيف فقط (المؤسس أو فاتح البث)
+    const host = state.isFounder || state.user?.role === 'admin' || (state.activeSession && state.activeSession.opened_by === state.user?.id);
+    const sBtn = document.getElementById('call-settings-btn');
+    if (sBtn) sBtn.style.display = host ? 'flex' : 'none';
     // Show my local video
     const myVideo = document.getElementById('my-video');
     if (myVideo && localStream) {

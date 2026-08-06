@@ -660,7 +660,7 @@
           <!-- Battle challenge UI -->
           <div id="battle-section" style="margin-top:8px">
             <div id="battle-start-box" class="battle-start-box">
-              <button class="btn btn-sm btn-danger" onclick="openBattleModal()" title="تحدي مباشر" style="font-weight:800;letter-spacing:.5px">🔴 مباشر</button>
+              <button class="live-badge-plain" onclick="openBattleModal()" title="تحدي مباشر"><span class="live-bulb"></span>مباشر</button>
             </div>
             <div id="battle-bar" style="display:none">
               <div class="battle-vs">
@@ -690,6 +690,7 @@
               </select>
             </div>
                         <div class="call-buttons" style="display:flex;gap:12px;justify-content:center;margin-top:14px">
+              <button class="call-control-btn" id="call-settings-btn" onclick="toggleCallExtras()" title="المزيد من الأدوات" style="display:none">⚙️</button>
               <button class="call-control-btn" id="effects-btn" onclick="openEffectsModal()" title="المؤثرات">
                 <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 5.6L20 10l-5.6 2.4L12 18l-2.4-5.6L4 10l5.6-2.4z"/><circle cx="19" cy="19" r="2"/><path d="M5 18l1.2 2.8L9 22l-2.8 1.2L5 26l-1.2-2.8L1 22l2.8-1.2z" transform="scale(.75)"/></svg>
               </button>
