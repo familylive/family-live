@@ -3336,3 +3336,19 @@ body.bcast-open { overflow: hidden; }
   z-index: 2100; background: rgba(0,0,0,.5); border-radius: 10px; padding: 4px 10px;
 }
 body.bcast-open .modal-overlay { z-index: 2500 !important; }
+
+/* شارة مباشر الحمراء */
+.battle-start-box .btn-danger {
+  background: linear-gradient(135deg, #e63946, #c1121f);
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: 6px 16px;
+  font-size: 13px;
+  box-shadow: 0 2px 12px rgba(225, 29, 72, .5);
+  animation: livePulse 1.6s ease-in-out infinite;
+}
+@keyframes livePulse {
+  0%, 100% { box-shadow: 0 2px 12px rgba(225,29,72,.5); }
+  50% { box-shadow: 0 2px 22px rgba(225,29,72,.9); }
+}
