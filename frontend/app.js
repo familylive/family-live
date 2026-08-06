@@ -1635,7 +1635,8 @@ function updateCallPresence() {
   const visible = all.slice(0, 3);
   const rest = all.length - 3;
   list.innerHTML = visible.map(p => {
-    const av = p.avatar && p.avatar.startsWith('data:') ? '<img src="' + p.avatar + '">' : (p.avatar && p.avatar.length <= 4 ? p.avatar : '👤');
+    const ava = p.avatar || '';
+    const av = (ava.startsWith('data:') || ava.startsWith('http') || ava.startsWith('/')) ? '<img src="' + ava + '">' : (ava && ava.length <= 4 ? ava : '👤');
     const supported = !p.self && (sessionGiftCoins[p.id] || 0) > 0;
     const isHost = state.isFounder || state.user?.role === 'admin';
     return '<div class="call-participant"><div class="call-avatar-circle' + (p.self ? ' self' : '') + (supported ? ' supported' : '') + '" ' +
@@ -1652,6 +1653,28 @@ function memberCircleAction(id, name) {
 // ==================== CALL CONTROLS ====================
 let micMuted = false;
 let camOff = false;
+
+// تبديل الكاميرا (أمامية/خلفية) - تعمل الآن
+async function flipCamera() {
+  if (!localStream) return showToast('ادخل المكالمة أولاً', 'error');
+  state.cameraFacing = state.cameraFacing === 'environment' ? 'user' : 'environment';
+  try {
+    const newVideo = await navigator.mediaDevices.getUserMedia({ video: { facingMode: state.cameraFacing, width: { ideal: 1280 }, height: { ideal: 720 } } });
+    const videoTrack = newVideo.getVideoTracks()[0];
+    localStream.getVideoTracks().forEach(t => { try { localStream.removeTrack(t); t.stop(); } catch(e) {} });
+    localStream.addTrack(videoTrack);
+    const myVideo = document.getElementById('my-video');
+    if (myVideo) myVideo.srcObject = localStream;
+    // إعادة إرسال المسار الجديد للجميع
+    Object.values(peerConnections).forEach(pc => {
+      const s = pc.getSenders().find(s => s.track && s.track.kind === 'video');
+      if (s) s.replaceTrack(videoTrack).catch(() => {});
+    });
+    // إعادة تطبيق الفلتر إن كان مفعلاً
+    if (activeFilter) applyFilterToFeed(activeFilter);
+    showToast('🔄 بدلت الكاميرا (' + (state.cameraFacing === 'environment' ? 'خلفية' : 'أمامية') + ')', 'success');
+  } catch(e) { showToast('فشل تبديل الكاميرا: ' + (e.message || ''), 'error'); }
+}
 
 function toggleMic() {
   if (!localStream) return;

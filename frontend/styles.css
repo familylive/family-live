@@ -3448,9 +3448,22 @@ body.bcast-open .modal-overlay { z-index: 2500 !important; }
 }
 
 /* ===== الأدوات: هدية فقط + ⚙️ إعدادات (المضيف) ===== */
+.call-buttons {
+  max-width: 92vw;
+}
 .call-buttons .call-control-btn { display: none; }
 .call-buttons #gift-box-btn { display: flex; }
+.call-buttons.extras-open {
+  flex-wrap: wrap;
+  justify-content: center;
+}
 .call-buttons.extras-open .call-control-btn { display: flex; }
+.call-buttons.extras-open #call-settings-btn {
+  width: 52px; height: 52px;
+  background: radial-gradient(circle at 32% 28%, #7f1d1d, #3f0d0d 70%);
+  border: 1.5px solid rgba(255,80,80,.6);
+  order: 100;
+}
 #call-settings-btn {
   width: 46px; height: 46px;
   background: rgba(255,255,255,.08);
