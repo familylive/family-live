@@ -3228,8 +3228,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const el = document.getElementById(id);
     if (el && !grid.contains(el)) grid.appendChild(el);
   });
+  // أزرار الأدوات: طفل مباشر للشبكة (تخرج من أي تداخل)
   const cb = document.querySelector('.call-buttons');
-  if (cb && !grid.contains(cb)) grid.appendChild(cb);
+  if (cb) grid.appendChild(cb);
 });
 let bcastMoved = [];
 function moveControlsIntoGrid() {
