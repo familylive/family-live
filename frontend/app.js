@@ -1457,8 +1457,12 @@ function setupChatMode(mode) {
     document.getElementById('chat-input-field')?.remove();
     document.getElementById('chat-send-btn')?.remove();
   } else if (mode === 'video') {
-    // Video only - hide text input, video call via join button
-    chatInput.innerHTML = '';
+    // فيديو: الدردشة النصية تبقى ظاهرة (بجانب المكالمة)
+    chatInput.innerHTML = `
+      <input class="form-input" id="chat-input-field" type="text" placeholder="اكتب رسالتك...">
+      <button class="btn btn-primary" id="chat-send-btn" onclick="sendChat()">إرسال</button>
+    `;
+    enableChat(true);
   } else if (mode === 'both' || mode === 'all') {
     // Both - keep text input + add mic button
     const sendBtn = chatInput.querySelector('#chat-send-btn');
