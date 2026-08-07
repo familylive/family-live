@@ -3311,6 +3311,16 @@ body {
 }
 .tt-like-count { color: #fff; font-size: 12px; font-weight: 800; text-shadow: 0 1px 3px rgba(0,0,0,.6); }
 
+/* صور الأفاتارات: حجمها مضبوط داخل دائرتها (كانت تظهر بحجمها الطبيعي!) */
+.welcome-avatar img,
+.menu-avatar img,
+.founder-avatar img,
+.tt-host-avatar img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
 /* ===== بث منفصل عن الويب: شاشة كاملة ===== */
 body.bcast-open { overflow: hidden; }
 #video-grid {
