@@ -2462,7 +2462,7 @@ async function loadDashboardAuctions() {
     list.innerHTML = auctions.slice(0, 4).map(a =>
       '<div class="dash-auction-item">' +
         '<span class="dash-auction-code">🏷️ <span class="rainbow-text">' + a.code + '</span></span>' +
-        '<span class="dash-auction-price">💰 ' + fmtPrice(a.current_price || a.starting_price) + '</span>' +
+        '<span class="dash-auction-price"><img src="/assets/coin.png" class="coin-ico" alt="كونزه"> ' + (a.current_coins || (a.current_price || a.starting_price) * (a.rate || 50)) + '</span>' +
         '<button class="btn btn-sm btn-accent" onclick="navigateTo(\'auctions\')">شارك</button>' +
       '</div>'
     ).join('');
