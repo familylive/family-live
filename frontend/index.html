@@ -2027,8 +2027,8 @@ async function loadLandingAuctions() {
       return '<div class="auction-card compact">' +
         '<div class="auction-header"><span class="auction-code">🏷️ <span class="rainbow-text">' + a.code + '</span></span><span class="auction-live">🔴 مباشر</span></div>' +
         '<div class="auction-timer" data-end="' + end + '" data-id="' + a.id + '"><span class="timer-icon">⏱️</span> <span class="countdown">--:--:--</span></div>' +
-        '<div class="auction-price">💰 <span class="current-price">' + fmtPrice(a.current_price || a.starting_price) + '</span></div>' +
-        '<div class="auction-meta"><span>رسوم الدخول: ' + a.entry_fee + ' ريال</span></div>' +
+        '<div class="auction-price"><img src="/assets/coin.png" class="coin-ico" alt="كونزه"> <span class="current-price">' + (a.current_coins || 0) + '</span></div>' +
+        '<div class="auction-meta"><span>رسوم الدخول: <img src="/assets/coin.png" class="coin-ico" alt=""> ' + (a.entry_coins || 0) + '</span></div>' +
         '<button class="btn btn-accent btn-full" onclick="landingBidClick()">' + (state.isLoggedIn ? '💥 مزايدة' : '🔐 سجل للمزايدة') + '</button>' +
       '</div>';
     }).join('') + '</div>';
