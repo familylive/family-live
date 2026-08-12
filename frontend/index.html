@@ -1184,6 +1184,14 @@
         </div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:6px">التصدير يحفظ كل البيانات بملف · الإعادة تستبدل البيانات الحالية بالملف</div>
       </div>
+      <div class="card" style="border:1.5px solid rgba(34,197,94,.4)">
+        <div class="card-title">💳 شحن الموقع</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input class="form-input" id="site-charge-input" type="number" min="1" placeholder="عدد الكونزات (مثال: 50000)" style="flex:1">
+          <button class="btn btn-success" onclick="chargeSite()">💳 شحن</button>
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:6px">يضيف كونزات إلى رصيد الموقع الكلي (يظهر في التقارير)</div>
+      </div>
       <div class="page-subtitle">إدارة جميع العوائل</div>
       
       <div class="card" id="admin-auction-section">

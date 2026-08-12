@@ -298,6 +298,15 @@ function adminOrModerator(req, res, next) {
   next();
 }
 
+// شحن رصيد الموقع (أدمن فقط)
+app.post('/api/admin/site-charge', authMiddleware, adminMiddleware, asyncHandler(async (req, res) => {
+  const coins = parseInt(req.body.coins);
+  if (!coins || coins <= 0 || coins > 100000000) return res.status(400).json({ error: 'أدخل عدد كونزات صحيح (1 - 100,000,000)' });
+  const cur = await db.getSiteTotalCoins().catch(() => 0);
+  await db.runRaw("INSERT INTO settings (key, value) VALUES ('site_total_coins', $1) ON CONFLICT (key) DO UPDATE SET value = $1", [String(cur + coins)]);
+  res.json({ message: '💳 شُحن رصيد الموقع: ' + coins.toLocaleString('en') + ' كونزه', siteCoins: cur + coins });
+}));
+
 // =============== ADMIN: FAMILY MANAGEMENT ===============
 
 // List all families (admin)
