@@ -3624,3 +3624,42 @@ function coinVal(coins) {
   return '<span class="coin-val"><img src="/assets/coin.png" class="coin-ico" alt="كونزه"> <b>' + c.toLocaleString('en') + '</b>' +
     '<span class="coin-sar">= ' + sar + ' ريال</span></span>';
 }
+
+// ==================== ADMIN: شحن الموقع + النسخ الاحتياطي ====================
+async function chargeSite() {
+  const input = document.getElementById('site-charge-input');
+  if (!input) return;
+  const coins = parseInt(input.value);
+  if (!coins || coins <= 0) return showToast('أدخل عدد الكونزات أولاً', 'error');
+  if (!confirm('💳 شحن رصيد الموقع بـ ' + coins.toLocaleString('en') + ' كونزه؟')) return;
+  try {
+    const r = await api('POST', '/api/admin/site-charge', { coins });
+    showToast(r.message, 'success');
+    input.value = '';
+    if (typeof loadReportsPage === 'function') loadReportsPage();
+  } catch(e) { showToast(e.message || 'فشل الشحن', 'error'); }
+}
+async function exportBackup() {
+  try {
+    const data = await api('GET', '/api/admin/backup');
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'family_backup_' + new Date().toISOString().slice(0, 10) + '.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    showToast('📥 نُزّلت النسخة الاحتياطية', 'success');
+  } catch(e) { showToast('فشل التصدير: ' + (e.message || ''), 'error'); }
+}
+async function restoreBackup(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  if (!confirm('📤 استبدال كل البيانات الحالية بالنسخة من الملف؟ (لا يمكن التراجع)')) { input.value = ''; return; }
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+    const r = await api('POST', '/api/admin/restore', data);
+    showToast(r.message || '✅ تمت الاستعادة', 'success');
+    setTimeout(() => location.reload(), 1200);
+  } catch(e) { showToast('فشل الاستعادة: ' + (e.message || ''), 'error'); }
+}
