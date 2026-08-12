@@ -38,6 +38,10 @@ window.addEventListener('storage', (e) => {
 });
 
 (async function init() {
+  // انتظار اكتمال الصفحة قبل لمس DOM (كان سبب الشاشة البيضاء للزوار)
+  if (document.readyState === 'loading') {
+    await new Promise(r => document.addEventListener('DOMContentLoaded', r, { once: true }));
+  }
   // Check for auto-login token in URL (query param or hash)
   const params = new URLSearchParams(window.location.search);
   const hash = window.location.hash;
