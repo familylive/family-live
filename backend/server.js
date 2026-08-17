@@ -51,11 +51,12 @@ function serveIndex(req, res) {
   } catch(e) { res.status(500).send('خطأ في تحميل الواجهة'); }
 }
 
+// Index + invite pages: serve SPA with fresh version fingerprint
+// (مُسجَّل قبل الملفات الثابتة حتى يتفوق على express.static ويتجدد ?v= في كل تحميل)
+app.get(['/', '/index.html', '/invite', '/invite/'], serveIndex);
+
 // Serve static frontend files
 app.use(express.static(path.join(__dirname, '..', 'frontend')));
-
-// Index + invite pages: serve SPA with fresh version fingerprint
-app.get(['/', '/index.html', '/invite', '/invite/'], serveIndex);
 
 // Auth middleware
 function authMiddleware(req, res, next) {

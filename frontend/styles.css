@@ -3504,9 +3504,13 @@ body {
 /* لوحة الهدايا: شريحة سفلية + شرائح المستلمين */
 .gift-bar-balance {
   color: var(--gold);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 800;
   display: flex; align-items: center; gap: 4px;
+  background: rgba(232,184,48,.15);
+  border: 1px solid rgba(232,184,48,.35);
+  border-radius: 14px;
+  padding: 3px 10px;
 }
 .gift-recipient-chips {
   display: flex; gap: 6px;

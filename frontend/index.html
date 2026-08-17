@@ -1981,7 +1981,7 @@
       <div class="gift-tiktok-bar" onclick="event.stopPropagation()">
         <div class="gift-bar-header">
           <span style="color:var(--gold);font-weight:900">🎁 الهدايا</span>
-          <div class="gift-bar-balance" id="gift-bar-balance"></div>
+          <div class="gift-bar-balance" id="gift-bar-balance"><span style="opacity:.8;font-size:11px">الرصيد:</span> 🪙 ...</div>
           <button class="gift-bar-close" onclick="document.getElementById('gift-box-modal').style.display='none'">✕</button>
         </div>
         <select class="form-input gift-bar-recipient" id="gift-recipient" style="display:none"><option value="">المرسل إليه...</option></select>
@@ -3828,7 +3828,7 @@ async function openGiftBox() {
   // الرصيد الحالي (محدث من الخادم)
   await refreshWalletHeader().catch(() => {});
   const bal = document.getElementById('gift-bar-balance');
-  if (bal) bal.innerHTML = '<img src="/assets/coin.png" class="coin-ico" alt="كونزه"> ' + (state.coins || 0);
+  if (bal) bal.innerHTML = '<span style="opacity:.8;font-size:11px">الرصيد:</span> <img src="/assets/coin.png" class="coin-ico" alt="كونزه"> <b>' + (state.coins || 0) + '</b>';
   // المستلمون: في PK → الفريقان؛ خارج PK → المشاركون (الافتراضي: صاحب البث)
   const sel = document.getElementById('gift-recipient');
   sel.innerHTML = '<option value="">اختر العضو...</option>';
@@ -3953,7 +3953,7 @@ async function quickSelfSupport(side) {
 async function updateGiftBarBalance() {
   await refreshWalletHeader().catch(() => {});
   const bal = document.getElementById('gift-bar-balance');
-  if (bal) bal.innerHTML = '<img src="/assets/coin.png" class="coin-ico" alt="كونزه"> ' + (state.coins || 0);
+  if (bal) bal.innerHTML = '<span style="opacity:.8;font-size:11px">الرصيد:</span> <img src="/assets/coin.png" class="coin-ico" alt="كونزه"> <b>' + (state.coins || 0) + '</b>';
 }
 
 async function sendGiftItem(giftId) {
