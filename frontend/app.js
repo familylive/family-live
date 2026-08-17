@@ -4200,7 +4200,8 @@ function fvTierLabel(tier) { return (FV_TIERS[tier] && FV_TIERS[tier].label) || 
 function levelImgHtml(lv) {
   const level = parseInt(lv);
   if (isNaN(level) || level < 0 || level > 100) return '';
-  return '<img src="/assets/levels/level_' + level + '.' + (level <= 10 ? 'gif' : 'png') + '?v=3" style="width:34px;height:13px;vertical-align:middle;margin:0 3px">';
+  // المستوى 0 والمرتفعة صور PNG — المستويات 1-10 صور GIF
+  return '<img src="/assets/levels/level_' + level + '.' + (level >= 1 && level <= 10 ? 'gif' : 'png') + '?v=3" style="width:34px;height:13px;vertical-align:middle;margin:0 3px">';
 }
 
 // ==================== ADMIN: شحن الموقع + النسخ الاحتياطي ====================

@@ -3825,9 +3825,10 @@ async function openGiftBox() {
     const { gifts } = await api('GET', '/api/gifts/items');
     giftItems = gifts || [];
   } catch(e) { giftItems = []; }
-  // الرصيد الحالي
+  // الرصيد الحالي (محدث من الخادم)
+  await refreshWalletHeader().catch(() => {});
   const bal = document.getElementById('gift-bar-balance');
-  if (bal) bal.innerHTML = '<img src="/assets/coin.png" class="coin-ico" alt="كونزه"> ' + (state.user?.coins || 0);
+  if (bal) bal.innerHTML = '<img src="/assets/coin.png" class="coin-ico" alt="كونزه"> ' + (state.coins || 0);
   // المستلمون: في PK → الفريقان؛ خارج PK → المشاركون (الافتراضي: صاحب البث)
   const sel = document.getElementById('gift-recipient');
   sel.innerHTML = '<option value="">اختر العضو...</option>';
@@ -3866,29 +3867,24 @@ async function openGiftBox() {
     chips.querySelectorAll('.gift-recipient-chip').forEach(ch => {
       sel.innerHTML += '<option value="' + ch.dataset.id + '">' + ch.textContent.trim() + '</option>';
     });
+    // افتراضي: صاحب البث — أو نفسي إن كنت المؤسس
+    const hostId = state.activeSession?.opened_by;
+    let defaultChip = null;
+    if (hostId === state.user?.id) defaultChip = chips.querySelector('[data-id="' + state.user.id + '"]');
+    else defaultChip = chips.querySelector('[data-id="' + hostId + '"]') || chips.querySelector('.gift-recipient-chip');
+    if (defaultChip) selectGiftRecipientChip(defaultChip, defaultChip.dataset.id);
   }
   // Load gift items grid
   const grid = document.getElementById('gift-items-list');
   let selectedGiftId = null;
-  window._giftTapCount = {};
   window._selectGift = (id, el) => {
-    // نقرة أولى: تحديد — نقرة ثانية: إرسال فوري (نمط تيك توك)
-    if (selectedGiftId === id) {
-      sendSelectedGift();
-      selectedGiftId = null;
-      return;
-    }
-    selectedGiftId = id;
+    // إرسال فوري بلمسة واحدة (نمط تيك توك) — مع إشارة سريعة
     const g = giftItems.find(x => x.id === id);
     document.querySelectorAll('.gift-item').forEach(el2 => el2.classList.remove('selected'));
     const clicked = document.getElementById('gift-item-' + id);
     if (clicked) clicked.classList.add('selected');
-    const area = document.getElementById('gift-send-area');
-    const label = document.getElementById('gift-selected-label');
-    if (area && g) {
-      area.style.display = 'block';
-      if (label) label.innerHTML = 'الهدية: ' + (g.gift_image ? '' : g.emoji + ' ') + g.name + ' · <img src="/assets/coin.png" class="coin-ico" alt="🪙"> ' + g.coins + ' <span style="opacity:.7">(اضغط مرة أخرى للإرسال)</span>';
-    }
+    setTimeout(() => { if (clicked) clicked.classList.remove('selected'); }, 400);
+    sendGiftItem(id);
   };
   window._sendSelectedGift = () => {
     if (!selectedGiftId) return showToast('اختر الهدية أولاً', 'error');
@@ -3953,6 +3949,13 @@ async function quickSelfSupport(side) {
   } catch(e) { showToast(e.message || 'فشل الدعم الذاتي', 'error'); }
 }
 
+// تحديث رصيد شريحة الهدايا دون إغلاقها
+async function updateGiftBarBalance() {
+  await refreshWalletHeader().catch(() => {});
+  const bal = document.getElementById('gift-bar-balance');
+  if (bal) bal.innerHTML = '<img src="/assets/coin.png" class="coin-ico" alt="كونزه"> ' + (state.coins || 0);
+}
+
 async function sendGiftItem(giftId) {
   const g = giftItems.find(x => x.id === giftId);
   const sel = document.getElementById('gift-recipient');
@@ -3968,8 +3971,7 @@ async function sendGiftItem(giftId) {
     try {
       const r = await api('POST', '/api/battles/support', { battleId: currentBattle.id, side, coins: g.coins });
       showToast(r.message || '🎁 دعمت الفريق!', 'success');
-      refreshWalletHeader();
-      document.getElementById('gift-box-modal').style.display = 'none';
+      updateGiftBarBalance();
       showGiftOnCamera({ giftName: g.name, giftEmoji: g.emoji, giftCoins: g.coins, giftImage: g.gift_image || null, fromName: state.user?.name, toName: side === 'a' ? currentBattle.player_a_name : currentBattle.player_b_name, familyName: '', toId: toId, fromId: state.user?.id });
       return;
     } catch(e) { return showToast(e.message || 'فشل الإرسال', 'error'); }
@@ -3985,8 +3987,7 @@ async function sendGiftItem(giftId) {
   try {
     const result = await api('POST', '/api/gifts/send', { giftId, toId, sessionId: state.activeSession.id });
     showToast(result.message, 'success');
-    refreshWalletHeader();
-    document.getElementById('gift-box-modal').style.display = 'none';
+    updateGiftBarBalance();
   } catch(e) { showToast(e.message || 'فشل إرسال الهدية', 'error'); }
 }
 

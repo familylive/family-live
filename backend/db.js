@@ -145,7 +145,7 @@ async function createUser(name, email, password, familyId, role = 'member') {
   return queryOne('SELECT id, name, email, family_id, role, points, avatar, created_at FROM users WHERE id = $1', [id]);
 }
 async function getUserByEmail(email) { return queryOne('SELECT * FROM users WHERE lower(email) = lower($1)', [email]); }
-async function getUserById(id) { return queryOne('SELECT id, name, email, phone, whatsapp, country, city, family_id, role, avatar, points, level, total_charged, support_spent, stars, moderator_tier, can_open_diwaniya, last_seen, currency, public_id, created_at FROM users WHERE id = $1', [id]); }
+async function getUserById(id) { return queryOne('SELECT id, name, email, phone, whatsapp, country, city, family_id, role, avatar, points, level, total_charged, support_spent, stars, moderator_tier, can_open_diwaniya, last_seen, currency, public_id, coins, wallet, created_at FROM users WHERE id = $1', [id]); }
 async function getFamilyMembers(familyId) { return query("SELECT u.id, u.name, u.email, u.phone, u.whatsapp, u.role, u.avatar, u.points, u.public_id, u.last_seen, u.can_open_diwaniya, f.verif_tier as family_verif FROM users u LEFT JOIN families f ON u.family_id = f.id WHERE u.family_id = $1 ORDER BY u.role DESC, u.points DESC", [familyId]); }
 async function updateProfile(userId, data) {
   const { name, country, city, phone, whatsapp, avatar, currency } = data;
