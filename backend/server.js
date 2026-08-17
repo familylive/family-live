@@ -238,6 +238,15 @@ app.post('/api/codes/generate-premium', authMiddleware, adminMiddleware, async (
   res.json({ code, message: 'تم إنشاء رمز مميز: ' + code });
 });
 
+// Generate special short codes (أرقام/رموز مفردة ثنائية ثلاثية رباعية — admin only)
+app.post('/api/codes/generate-special', authMiddleware, adminMiddleware, async (req, res) => {
+  const { length, charset, count, price } = req.body;
+  const codes = await db.generateSpecialCodes(length, charset, count, price);
+  const typeName = { 1: 'مفردة', 2: 'ثنائية', 3: 'ثلاثية', 4: 'رباعية' }[parseInt(length)] || '';
+  const suffix = codes.length === 1 ? 'رمز' : (codes.length === 2 ? 'رمزين' : (codes.length <= 10 ? 'رموز' : 'رمزاً'));
+  res.json({ codes, message: '✅ تم توليد ' + codes.length + ' ' + suffix + (typeName ? ' (' + typeName + ')' : '') });
+});
+
 // Get user's purchased codes
 app.get('/api/codes/my', authMiddleware, async (req, res) => {
   const codes = await db.getUserCodes(req.user.id);

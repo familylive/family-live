@@ -202,6 +202,38 @@ async function generatePremiumCode() {
   }
   return 'NONE';
 }
+
+// توليد أرقام/رموز مميزة قصيرة: مفردة (1) ثنائية (2) ثلاثية (3) رباعية (4) — حرف مكرر
+// charset: 'digits' | 'letters' | 'both'
+async function generateSpecialCodes(length, charset, count, price) {
+  const len = Math.min(4, Math.max(1, parseInt(length) || 1));
+  const n = Math.min(100, Math.max(1, parseInt(count) || 1));
+  const priceV = Math.max(0, parseInt(price) || 0);
+  let chars;
+  if (charset === 'digits') chars = '0123456789';
+  else if (charset === 'letters') chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  else chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  const type = 'vip' + len;
+  const takenRows = await query('SELECT code FROM subscription_codes');
+  const taken = new Set(takenRows.map(r => r.code));
+  const arr = Array.from(chars);
+  // خلط عشوائي للترتيب
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  const out = [];
+  for (const ch of arr) {
+    if (out.length >= n) break;
+    const code = ch.repeat(len);
+    if (!taken.has(code)) {
+      await run('INSERT INTO subscription_codes (code, type, price) VALUES ($1,$2,$3)', [code, type, priceV]);
+      taken.add(code);
+      out.push({ code, type, price: priceV });
+    }
+  }
+  return out;
+}
 async function getAvailablePremiumCodes() { return query("SELECT * FROM subscription_codes WHERE type = 'premium' AND (used = 0 OR used IS NULL) AND purchased_by IS NULL"); }
 async function purchaseCode(userId, code) {
   const c = await queryOne("SELECT * FROM subscription_codes WHERE code = $1 AND type = 'premium' AND (used = 0 OR used IS NULL) AND purchased_by IS NULL", [code]);
@@ -511,7 +543,7 @@ async function releaseAuctionCode(auctionId) {
   return getAuctionById(auctionId);
 }
 async function isAuctionParticipant(auctionId, userId) { return queryOne('SELECT * FROM auction_participants WHERE auction_id = $1 AND user_id = $2', [auctionId, userId]); }
-async function getAvailableAuctionCodes() { return query("SELECT * FROM subscription_codes WHERE type = 'premium' AND (used = 0 OR used IS NULL) AND code IS NOT NULL AND code != '' AND code != '{}' ORDER BY code ASC"); }
+async function getAvailableAuctionCodes() { return query("SELECT * FROM subscription_codes WHERE type IN ('premium','vip1','vip2','vip3','vip4') AND (used = 0 OR used IS NULL) AND code IS NOT NULL AND code != '' AND code != '{}' ORDER BY LENGTH(code) ASC, code ASC"); }
 
 // =============== ADMIN: FAMILIES & USERS ===============
 async function getAllFamilies() { return query('SELECT f.*, (SELECT COUNT(*) FROM users WHERE family_id = f.id) as members_count, u.name as founder_name, u.last_seen as founder_last_seen FROM families f LEFT JOIN users u ON f.founder_id = u.id ORDER BY f.created_at DESC'); }
@@ -1279,7 +1311,7 @@ module.exports = {
   getDb, initDb, queryAll, queryOne, run, execQuery, runRaw, getDbRaw,
   createUser, getUserByEmail, getUserById, getFamilyMembers, updateProfile, updateLastSeen, updatePassword, userHasFamily,
   createFamily, getFamily, validateSubscriptionCode, updateFamilyFounder, leaveFamily,
-  generateSubscriptionCodes, generatePremiumCode, getAvailablePremiumCodes, purchaseCode, getUserCodes, getFirstAvailablePremiumCode, updatePrice,
+  generateSubscriptionCodes, generatePremiumCode, generateSpecialCodes, getAvailablePremiumCodes, purchaseCode, getUserCodes, getFirstAvailablePremiumCode, updatePrice,
   createInvitation, createInvitationByPhone, getInvitationsByFamily, getInvitationByToken, acceptInvitation,
   openDiwaniya, closeDiwaniya, getActiveDiwaniya, getDiwaniyaSessionById, verifyDiwaniyaCode, getDiwaniyaHistory, addDiwaniyaMessage, getDiwaniyaMessages,
   createChallenge, respondToChallenge, completeChallenge, getFamilyChallenges, getPendingChallenges, getFamilyLeaderboard,

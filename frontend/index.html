@@ -820,6 +820,41 @@
           <div class="empty-state"><div class="empty-text">جاري التحميل...</div></div>
         </div>
       </div>
+
+      <!-- Admin: توليد أرقام ورموز مميزة (مفردة/ثنائية/ثلاثية/رباعية) -->
+      <div class="card" id="special-codes-section" style="border:1.5px solid rgba(232,184,48,.35);display:none">
+        <div class="card-title">🔢 توليد أرقام ورموز مميزة <span style="font-size:11px;color:var(--text-muted)">(مفردة · ثنائية · ثلاثية · رباعية)</span></div>
+        <p style="font-size:12px;color:var(--text-secondary);margin-bottom:10px">رموز قصيرة مكررة الحرف (مثال: 7 · 77 · 777 · 7777) — تظهر في المزادات ويمكن تعديل أسعارها.</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div class="form-group">
+            <label>النوع</label>
+            <select class="form-input" id="spec-len">
+              <option value="1">🔢 مفردة (1 حرف)</option>
+              <option value="2">🔢 ثنائية (2 أحرف)</option>
+              <option value="3">🔢 ثلاثية (3 أحرف)</option>
+              <option value="4">🔢 رباعية (4 أحرف)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>الأحرف</label>
+            <select class="form-input" id="spec-charset">
+              <option value="digits">🔢 أرقام فقط (0-9)</option>
+              <option value="letters">🔤 حروف فقط (A-Z)</option>
+              <option value="both">🔤🔢 أرقام وحروف</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>العدد</label>
+            <input class="form-input" id="spec-count" type="number" value="10" min="1" max="36">
+          </div>
+          <div class="form-group">
+            <label>السعر لكل رمز (ريال)</label>
+            <input class="form-input" id="spec-price" type="number" value="200" min="0">
+          </div>
+        </div>
+        <button class="btn btn-accent btn-full" onclick="generateSpecialCodesNow()">⚡ توليد الرموز</button>
+        <div id="spec-result" style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px"></div>
+      </div>
     </div>
 
     <!-- Profile Page -->
@@ -2225,6 +2260,8 @@ async function loadCodesPage() {
   if (genBtn) genBtn.style.display = isAdmin ? 'block' : 'none';
   const adminCard = document.getElementById('admin-codes-section');
   if (adminCard) adminCard.style.display = isAdmin ? 'block' : 'none';
+  const specCard = document.getElementById('special-codes-section');
+  if (specCard) specCard.style.display = isAdmin ? 'block' : 'none';
   try {
     const [avail, my, allCodes] = await Promise.all([
       api('GET', '/api/codes/available'),
@@ -2266,9 +2303,11 @@ async function loadCodesPage() {
       adminDiv.innerHTML = '<table class="admin-codes-table"><thead><tr><th>الرمز</th><th>النوع</th><th>الحالة</th><th>السعر (ريال)</th><th>تعديل</th></tr></thead><tbody>' +
         allCodes.codes.map(c => {
           const status = c.purchased_by ? 'مباع' : (c.used ? 'مستخدم' : 'متاح');
+          const typeMap = { premium: '💎 مميز', vip1: '🔢 مفردة', vip2: '🔢 ثنائية', vip3: '🔢 ثلاثية', vip4: '🔢 رباعية' };
+          const typeLabel = typeMap[c.type] || (c.type === 'free' ? '🎁 مجاني' : c.type);
           return '<tr>' +
             '<td class="code-cell">' + c.code + '</td>' +
-            '<td>' + (c.type === 'premium' ? '💎 مميز' : '🎁 مجاني') + '</td>' +
+            '<td>' + typeLabel + '</td>' +
             '<td>' + status + '</td>' +
             '<td><input type="number" class="price-input" id="price-' + c.code + '" value="' + (c.price || 0) + '" min="0"></td>' +
             '<td><button class="btn btn-sm" onclick="updateCodePrice(\'' + c.code + '\')">💾 حفظ</button></td>' +
@@ -2452,6 +2491,25 @@ async function generateNewPremiumCode() {
   } catch(e) {
     showToast(e.message || 'فشل التوليد', 'error');
   }
+}
+
+// توليد أرقام/رموز مميزة قصيرة (مفردة/ثنائية/ثلاثية/رباعية)
+async function generateSpecialCodesNow() {
+  const length = parseInt(document.getElementById('spec-len').value) || 1;
+  const charset = document.getElementById('spec-charset').value;
+  const count = parseInt(document.getElementById('spec-count').value) || 10;
+  const price = parseInt(document.getElementById('spec-price').value) || 0;
+  try {
+    const r = await api('POST', '/api/codes/generate-special', { length, charset, count, price });
+    const box = document.getElementById('spec-result');
+    const typeLabel = { 1: 'مفردة', 2: 'ثنائية', 3: 'ثلاثية', 4: 'رباعية' }[length];
+    box.innerHTML = (r.codes || []).map(c =>
+      '<span style="background:var(--bg-hover);border:1px solid rgba(232,184,48,.4);border-radius:8px;padding:4px 10px;font-size:13px;font-weight:700;direction:ltr">' + c.code +
+      ' <span style="font-size:10px;color:var(--gold);font-weight:400">' + c.price + ' ر.س</span></span>'
+    ).join('') || '<span class="empty-text">كل الرموز من هذا النوع موجودة مسبقاً — جرب نوع أو أحرف أخرى</span>';
+    showToast(r.message + (typeLabel ? ' — ' + typeLabel : ''), 'success');
+    loadCodesPage(); // تحديث جدول كل الرموز + قوائم المزادات
+  } catch(e) { showToast(e.message || 'فشل التوليد', 'error'); }
 }
 
 async function purchaseCode(code, price) {
@@ -4655,8 +4713,9 @@ async function loadAvailableCodesDropdowns() {
     const { codes } = await api('GET', '/api/admin/auctions/available-codes');
     if (!state.sarRate) { try { const { rate } = await api('GET', '/api/pricing'); state.sarRate = rate || 50; } catch(e) {} }
     const rate = state.sarRate || 50;
+    const typeMap = { premium: '💎', vip1: '🔢', vip2: '🔢', vip3: '🔢', vip4: '🔢' };
     const opts = '<option value="">اختر رمزاً...</option>' + codes.map(c =>
-      '<option value="' + c.code + '" data-price="' + (c.price || 0) + '">' + c.code + ' — 🪙 ' + ((c.price || 0) * rate) + ' <img src="/assets/coin.png" class="coin-ico" alt=""> (' + (c.price || 0) + ' ريال)</option>'
+      '<option value="' + c.code + '" data-price="' + (c.price || 0) + '">' + (typeMap[c.type] || '') + ' ' + c.code + ' — 🪙 ' + ((c.price || 0) * rate) + ' <img src="/assets/coin.png" class="coin-ico" alt=""> (' + (c.price || 0) + ' ريال)</option>'
     ).join('');
     const sel1 = document.getElementById('auction-code-2');
     const sel2 = document.getElementById('auction-code');
