@@ -16,7 +16,13 @@ async function api(method, path, body = null) {
     const res = await fetch(`${API_BASE}${path}`, opts);
     clearTimeout(timeoutId);
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'خطأ في الاتصال');
+    if (!res.ok) {
+      // رصيد غير كافٍ → تنبيه شحن الرصيد (مرة واحدة)
+      if (data.error && /رصيدك لا يكفي|رصيد الكوينزات لا يكفي|رصيدك انتهى/.test(data.error)) {
+        offerRecharge(data.error);
+      }
+      throw new Error(data.error || 'خطأ في الاتصال');
+    }
     return data;
   } catch (err) {
     clearTimeout(timeoutId);
@@ -27,6 +33,37 @@ async function api(method, path, body = null) {
 }
 
 // ==================== INIT ====================
+// تنبيه انتهاء الرصيد: يظهر مرة واحدة ويدعو لصفحة الشحن
+let _rechargePromptLock = false;
+function offerRecharge(detail) {
+  if (_rechargePromptLock) return;
+  _rechargePromptLock = true;
+  const ov = document.createElement('div');
+  ov.className = 'modal-overlay';
+  ov.style.display = 'flex';
+  ov.onclick = (e) => { if (e.target === ov) { ov.remove(); _rechargePromptLock = false; } };
+  ov.innerHTML =
+    '<div class="modal-box" style="max-width:320px;text-align:center;border:1.5px solid rgba(255,80,80,.5)">' +
+      '<div style="font-size:44px;margin-bottom:6px">⚠️</div>' +
+      '<h3 style="color:var(--danger);margin-bottom:8px">رصيدك انتهى!</h3>' +
+      '<p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">' + (detail || 'لا تملك كونزات كافية لهذه العملية') + '</p>' +
+      '<p style="font-size:12px;color:var(--text-muted);margin-bottom:16px">اشحن كونزات بالريال (STC Pay / تحويل بنكي)</p>' +
+      '<div style="display:flex;gap:8px">' +
+        '<button class="btn btn-accent" style="flex:1" onclick="goToRecharge(this)">💳 شحن الرصيد</button>' +
+        '<button class="btn btn-secondary" style="flex:1" onclick="this.closest(\'.modal-overlay\').remove();_rechargePromptLock=false">إلغاء</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(ov);
+}
+// زر الشحن: يغلق النافذة وينتقل لصفحة المحفظة (الشحن)
+function goToRecharge(btn) {
+  const ov = btn.closest('.modal-overlay');
+  if (ov) ov.remove();
+  _rechargePromptLock = false;
+  if (typeof navigateTo === 'function') navigateTo('wallet');
+  showToast('💳 اختر الباقة أو حدد المبلغ لشحن الكونزات', 'success');
+}
+
 // Tab-conflict guard: if another tab changes the session, reload (prevent token fighting)
 window.addEventListener('storage', (e) => {
   if (e.key === 'token') {
