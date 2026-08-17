@@ -1808,6 +1808,58 @@ function updateCallPresence() {
       (isHost && !p.self ? 'onclick="memberCircleAction(\'' + p.id + '\',\'' + p.name.replace(/'/g, '') + '\')"' : '') +
       ' title="' + p.name + '">' + av + muteBadge + '<span class="ca-name">' + p.name + '</span></div></div>';
   }).join('') + (rest > 0 ? '<div class="call-more" title="' + rest + ' آخرون">+' + rest + '</div>' : '');
+  updateTikTokViewers();
+}
+
+// قائمة المشاهدين على يمين البث (نمط تيك توك)
+function updateTikTokViewers() {
+  const box = document.getElementById('tt-viewers');
+  if (!box) return;
+  if (!inLiveCall) { box.style.display = 'none'; return; }
+  box.style.display = 'flex';
+  const names = state.callMembers || {};
+  const entries = Object.entries(names);
+  const me = { id: state.user?.id, name: 'أنت', avatar: state.user?.avatar };
+  const mems = (state.members || []);
+  const others = entries.map(([id, name]) => {
+    const m = mems.find(mm => mm.id === id);
+    return { id, name, avatar: m?.avatar || peerAvatars[id] || '👤' };
+  });
+  const list = [me].concat(others);
+  const visible = list.slice(0, 5);
+  const rest = list.length - 5;
+  const ava = (a) => (a || '').startsWith('data:') || (a || '').startsWith('http') || (a || '').startsWith('/')
+    ? '<img src="' + a + '">' : ((a && a.length <= 4) ? a : '👤');
+  box.innerHTML = visible.map(p =>
+    '<div class="tt-viewer-chip" title="' + p.name + '">' + ava(p.avatar) + '</div>'
+  ).join('') + (rest > 0 ? '<div class="tt-viewers-more" title="+' + rest + '">+' + rest + '</div>' : '');
+}
+
+// قائمة المشاهدين الكاملة (نقرة على الأفاتارات)
+function openTikTokViewersList() {
+  const names = state.callMembers || {};
+  const entries = Object.entries(names);
+  const list = [{ id: state.user?.id, name: 'أنت (أنت)' }].concat(entries.map(([id, n]) => ({ id, name: n })));
+  const isHost = state.isFounder || state.user?.role === 'admin';
+  const html = list.map(p => {
+    const act = (isHost && p.id !== state.user?.id)
+      ? '<button class="btn btn-sm btn-danger" style="padding:2px 10px" onclick="memberCircleAction(\'' + p.id + '\',\'' + String(p.name).replace(/'/g, '') + '\')">🚫</button>'
+      : '';
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.08)">' +
+      '<span style="font-weight:700">' + p.name + '</span>' + act + '</div>';
+  }).join('');
+  showModal('👥 المشاهدون (' + list.length + ')', html);
+}
+function showModal(title, body) {
+  const ov = document.createElement('div');
+  ov.className = 'modal-overlay';
+  ov.style.display = 'flex';
+  ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
+  ov.innerHTML = '<div class="modal-box" style="max-width:320px">' +
+    '<h3 style="color:var(--gold);margin-bottom:8px">' + title + '</h3>' +
+    '<div style="max-height:50vh;overflow-y:auto">' + body + '</div>' +
+    '<button class="btn btn-secondary btn-full" style="margin-top:10px" onclick="this.closest(\'.modal-overlay\').remove()">إغلاق</button></div>';
+  document.body.appendChild(ov);
 }
 // المضيف: الضغط على دائرة عضو = طرد / تقييد
 function memberCircleAction(id, name) {
@@ -1857,6 +1909,10 @@ function toggleMic() {
     tileState.classList.toggle('muted-state', micMuted);
   }
   showToast(micMuted ? '🔇 كتمت المايك - ما يسمعونك' : '🎤 فتحت المايك', micMuted ? 'error' : 'success');
+  const barMicIco = document.getElementById('tt-bar-mic-ico');
+  if (barMicIco) barMicIco.textContent = micMuted ? '🔇' : '🎤';
+  const barMicLbl = document.getElementById('tt-bar-mic-label');
+  if (barMicLbl) barMicLbl.textContent = micMuted ? 'مكتوم' : 'صوت';
   updateCallPresence();
 }
 
@@ -1909,6 +1965,10 @@ function toggleCamera() {
     if (!micMuted) tileState.classList.remove('muted-state');
   }
   showToast(camOff ? '🚫 أغلقت الكاميرا - يسمعونك فقط' : '🎥 فتحت الكاميرا', camOff ? 'error' : 'success');
+  const barCamIco = document.getElementById('tt-bar-cam-ico');
+  if (barCamIco) barCamIco.textContent = camOff ? '🚫' : '📷';
+  const barCamLbl = document.getElementById('tt-bar-cam-label');
+  if (barCamLbl) barCamLbl.textContent = camOff ? 'مغلقة' : 'كاميرا';
 }
 
 let diwaniyaCodeVerified = false;
@@ -2141,6 +2201,10 @@ async function joinLiveAudio() {
     refreshCamOffOverlay();
     const camBtn2 = document.getElementById('cam-toggle-btn');
     if (camBtn2) camBtn2.classList.toggle('off', camOff);
+    const barCamIco2 = document.getElementById('tt-bar-cam-ico');
+    if (barCamIco2) barCamIco2.textContent = camOff ? '🚫' : '📷';
+    const barMicIco2 = document.getElementById('tt-bar-mic-ico');
+    if (barMicIco2) barMicIco2.textContent = micMuted ? '🔇' : '🎤';
     const exitBtn = document.getElementById('call-exit-btn');
     if (exitBtn) exitBtn.style.display = 'flex';
     // Apply my saved effect
@@ -2444,6 +2508,8 @@ async function startBattle() {
     const result = await api('POST', '/api/battles/start', { opponentId, sessionId: state.activeSession.id, durationMinutes: duration });
     showToast(result.message, 'success');
     document.getElementById('battle-modal').style.display = 'none';
+    // أظهر شريط PK فوراً (بانتظار قبول الخصم)
+    if (result.battle) renderBattle(result.battle);
   } catch(e) { showToast(e.message, 'error'); }
 }
 
@@ -2463,15 +2529,27 @@ function renderBattle(b) {
   currentBattle = b;
   const bar = document.getElementById('battle-bar');
   const startBox = document.getElementById('battle-start-box');
+  const pkBar = document.getElementById('pk-bar');
+  const grid = document.getElementById('video-grid');
   if (!bar || !b || (b.status !== 'active' && b.status !== 'pending' && b.status !== 'victory')) {
     if (bar) bar.style.display = 'none';
     if (startBox) startBox.style.display = 'block';
     const supRow = document.getElementById('battle-support-row');
     if (supRow) supRow.style.display = 'none';
+    if (pkBar) pkBar.style.display = 'none';
+    if (grid) grid.classList.remove('pk-split');
+    if (grid) grid.querySelectorAll('.video-tile').forEach(t => t.classList.remove('pk-a', 'pk-b', 'pk-side-active'));
+    const pkBtn = document.getElementById('tt-bar-pk');
+    if (pkBtn) pkBtn.style.display = 'none';
     return;
   }
   if (startBox) startBox.style.display = 'none';
   bar.style.display = 'block';
+  // أسماء اللاعبين: من بيانات المعركة أو من قائمة الأعضاء
+  const memA = (state.members || []).find(m => m.id === b.player_a_id);
+  const memB = (state.members || []).find(m => m.id === b.player_b_id);
+  if (!b.player_a_name) b.player_a_name = memA?.name || state.callMembers?.[b.player_a_id] || 'لاعب أ';
+  if (!b.player_b_name) b.player_b_name = memB?.name || state.callMembers?.[b.player_b_id] || 'لاعب ب';
   // Show the fixed support row when a battle is active
   const supRow = document.getElementById('battle-support-row');
   if (supRow) supRow.style.display = (b.status === 'active' || b.status === 'victory') ? 'flex' : 'none';
@@ -2487,6 +2565,12 @@ function renderBattle(b) {
     const isPlayer = b.player_a_id === state.user?.id || b.player_b_id === state.user?.id;
     sself.style.display = isPlayer ? 'inline-block' : 'none';
   }
+  // TikTok PK bar + split screen
+  renderPkBar(b);
+  applyPkLayout(b);
+  // PK challenge icon in bottom bar (host only)
+  const pkBtn = document.getElementById('tt-bar-pk');
+  if (pkBtn) pkBtn.style.display = (state.isFounder || state.user?.role === 'admin') ? 'flex' : 'none';
   // Victory round label
   const timerEl2 = document.getElementById('battle-timer');
   if (b.status === 'victory' && timerEl2 && !b._victoryStarted) {
@@ -2510,14 +2594,127 @@ function renderBattle(b) {
     const left = Math.max(0, dur - elapsed);
     const m = Math.floor(left / 60), s = left % 60;
     document.getElementById('battle-timer').textContent = '⏱️ ' + m + ':' + String(s).padStart(2, '0');
+    const pkTimer = document.getElementById('pk-timer');
+    if (pkTimer) pkTimer.textContent = m + ':' + String(s).padStart(2, '0');
     if (battleTimer) clearInterval(battleTimer);
     battleTimer = setInterval(() => {
       const e = Math.floor((Date.now() - new Date(b.start_time).getTime()) / 1000);
       const l = Math.max(0, dur - e);
-      document.getElementById('battle-timer').textContent = '⏱️ ' + Math.floor(l / 60) + ':' + String(l % 60).padStart(2, '0');
+      const ms = Math.floor(l / 60) + ':' + String(l % 60).padStart(2, '0');
+      document.getElementById('battle-timer').textContent = '⏱️ ' + ms;
+      const pkTimer2 = document.getElementById('pk-timer');
+      if (pkTimer2) pkTimer2.textContent = ms;
       if (l <= 0) { clearInterval(battleTimer); endBattleNow(); }
     }, 1000);
   }
+}
+
+// شريط PK العلوي (نمط تيك توك): طرفان + شريط نقاط + مؤقت
+function renderPkBar(b) {
+  const pkBar = document.getElementById('pk-bar');
+  if (!pkBar) return;
+  const aName = b.player_a_name || 'لاعب أ';
+  const bName = b.player_b_name || 'لاعب ب';
+  document.getElementById('pk-name-a').textContent = aName;
+  document.getElementById('pk-name-b').textContent = bName;
+  document.getElementById('pk-points-a').textContent = b.coins_a || 0;
+  document.getElementById('pk-points-b').textContent = b.coins_b || 0;
+  // الأفاتارات (من قائمة الأعضاء إن وجدت)
+  const memsA = (state.members || []).find(m => m.id === b.player_a_id);
+  const memsB = (state.members || []).find(m => m.id === b.player_b_id);
+  const avA0 = b.player_a_avatar || memsA?.avatar || peerAvatars[b.player_a_id] || '👤';
+  const avB0 = b.player_b_avatar || memsB?.avatar || peerAvatars[b.player_b_id] || '👤';
+  const avA = String(avA0).startsWith('data:') || String(avA0).startsWith('http') || String(avA0).startsWith('/')
+    ? '<img src="' + avA0 + '">' : avA0;
+  const avB = String(avB0).startsWith('data:') || String(avB0).startsWith('http') || String(avB0).startsWith('/')
+    ? '<img src="' + avB0 + '">' : avB0;
+  document.getElementById('pk-avatar-a').innerHTML = avA;
+  document.getElementById('pk-avatar-b').innerHTML = avB;
+  // شريط التقدم: من المنتصف نحو الطرف الفائز
+  const total = (b.coins_a || 0) + (b.coins_b || 0);
+  const ratio = total ? (b.coins_a || 0) / total : 0.5;
+  const fillA = document.getElementById('pk-fill-a');
+  const fillB = document.getElementById('pk-fill-b');
+  if (fillA) fillA.style.width = (ratio * 100) + '%';
+  if (fillB) fillB.style.width = ((1 - ratio) * 100) + '%';
+  pkBar.classList.remove('pk-victory-a', 'pk-victory-b');
+  // التاج على الفائز
+  const nameA = document.getElementById('pk-name-a'), nameB = document.getElementById('pk-name-b');
+  if (nameA && nameA.querySelector('.pk-crown')) nameA.querySelector('.pk-crown').remove();
+  if (nameB && nameB.querySelector('.pk-crown')) nameB.querySelector('.pk-crown').remove();
+  if (b.status === 'victory') {
+    const winnerSide = (b.coins_a || 0) >= (b.coins_b || 0) ? 'a' : 'b';
+    pkBar.classList.add(winnerSide === 'a' ? 'pk-victory-a' : 'pk-victory-b');
+    const target = winnerSide === 'a' ? nameA : nameB;
+    if (target) target.insertAdjacentHTML('afterbegin', '<span class="pk-crown">👑</span> ');
+  }
+  pkBar.style.display = 'flex';
+  // أزرار اختيار الجانب أسفل كل نصف شاشة
+  const aBtn = document.getElementById('pk-pick-a'), bBtn = document.getElementById('pk-pick-b');
+  if (aBtn) aBtn.classList.toggle('on', pkSide === 'a');
+  if (bBtn) bBtn.classList.toggle('on', pkSide === 'b');
+}
+
+// تقسيم الشاشة: طرفا PK جنب بعض 50/50
+function applyPkLayout(b) {
+  const grid = document.getElementById('video-grid');
+  if (!grid) return;
+  grid.classList.add('pk-split');
+  const meId = state.user?.id;
+  let localSide = null, remoteId = null;
+  if (b.player_a_id === meId) { localSide = 'a'; remoteId = b.player_b_id; }
+  else if (b.player_b_id === meId) { localSide = 'b'; remoteId = b.player_a_id; }
+  const localTile = document.getElementById('my-video-tile');
+  if (localTile) {
+    localTile.classList.remove('pk-a', 'pk-b');
+    if (localSide) localTile.classList.add(localSide === 'a' ? 'pk-a' : 'pk-b');
+  }
+  const remoteTile = document.getElementById('video-' + remoteId);
+  if (remoteTile) {
+    remoteTile.classList.remove('pk-a', 'pk-b');
+    remoteTile.classList.add(localSide === 'a' ? 'pk-b' : 'pk-a');
+  }
+}
+
+// اختيار جانبي في PK (بالنقر على نصف الشاشة)
+let pkSide = null;
+function selectPkSide(side) {
+  if (!currentBattle || currentBattle.status !== 'active') return showToast('لا يوجد تحدي PK نشط', 'error');
+  pkSide = (pkSide === side) ? null : side;
+  const grid = document.getElementById('video-grid');
+  if (grid) grid.querySelectorAll('.video-tile').forEach(t => t.classList.remove('pk-side-active'));
+  if (pkSide) {
+    const tiles = grid ? grid.querySelectorAll('.video-tile') : [];
+    const meId = state.user?.id;
+    let sel = null;
+    if (currentBattle.player_a_id === meId && pkSide === 'a') sel = document.getElementById('my-video-tile');
+    else if (currentBattle.player_b_id === meId && pkSide === 'b') sel = document.getElementById('my-video-tile');
+    else sel = document.getElementById('video-' + (pkSide === 'a' ? currentBattle.player_a_id : currentBattle.player_b_id));
+    if (sel) sel.classList.add('pk-side-active');
+    const sideName = pkSide === 'a' ? currentBattle.player_a_name : currentBattle.player_b_name;
+    showToast(pkSide ? '🎯 تدعم ' + sideName + ' — اضغط ❤️ للدعم' : 'تم إلغاء اختيار الجانب', 'success');
+  }
+  renderPkBar(currentBattle);
+}
+
+// دعم PK بالقلب (مجاني +1 مع حد)
+let pkTapLock = 0;
+async function battleTap() {
+  if (!currentBattle || currentBattle.status !== 'active') return;
+  if (!pkSide) return showToast('اختر جانباً أولاً: انقر على نصف الشاشة الذي تريد دعمه', 'error');
+  const now = Date.now();
+  if (now - pkTapLock < 350) return;
+  pkTapLock = now;
+  try {
+    const r = await api('POST', '/api/battles/tap', { battleId: currentBattle.id, side: pkSide });
+    if (r && r.battle) renderBattle(r.battle);
+  } catch(e) { /* throttle */ }
+}
+
+// تركيز مربع التعليق من الشريط السفلي
+function focusTikTokChat() {
+  const input = document.getElementById('tiktok-chat-input');
+  if (input) { input.focus(); try { input.scrollIntoView({ block: 'center' }); } catch(e) {} }
 }
 
 async function supportBattle(side) {
@@ -2962,11 +3159,17 @@ function updateViewerCount() {
 
 let ttLikes = 0;
 function sendTtHeart() {
+  // في وضع PK: القلب = دعم الجانب المختار (+1 مجاني)
+  if (currentBattle && currentBattle.status === 'active') {
+    battleTap();
+  }
   ttLikes++;
   const cnt = document.getElementById('tt-like-count');
   if (cnt) cnt.textContent = ttLikes;
   const cntTop = document.getElementById('tt-top-count-num');
   if (cntTop) cntTop.textContent = ttLikes;
+  const cntBar = document.getElementById('tt-bar-like-count');
+  if (cntBar) cntBar.textContent = ttLikes;
   const layer = document.getElementById('tt-hearts-layer');
   if (!layer) return;
   const heart = document.createElement('div');
@@ -3084,12 +3287,20 @@ function toggleTikTokMode() {
   showToast(on ? '🎬 وضع تيك توك - أنت كبير والدردشة تحت' : '🖼 وضع الشبكة - بجوار بعض', 'success');
 }
 
-// Tap on any video tile to zoom
+// Tap on any video tile to zoom / PK side select
 function bindVideoTileZoom() {
   document.getElementById('video-grid')?.addEventListener('click', (e) => {
     // Ignore clicks on chat/buttons - only the video area opens fullscreen
-    if (e.target.closest('.tiktok-chat') || e.target.closest('.tt-heart-btn') || e.target.closest('button,input,select,textarea')) return;
-    if (e.target.closest('.video-tile')) toggleCallFullscreen();
+    if (e.target.closest('.tiktok-chat') || e.target.closest('.tt-heart-btn') || e.target.closest('button,input,select,textarea') || e.target.closest('.tt-bottom-bar') || e.target.closest('.pk-bar')) return;
+    const tile = e.target.closest('.video-tile');
+    if (!tile) return;
+    // في PK: النقر على نصف شاشة طرف = اختياره للدعم
+    if (currentBattle && (currentBattle.status === 'active' || currentBattle.status === 'victory') && (tile.classList.contains('pk-a') || tile.classList.contains('pk-b'))) {
+      const side = tile.classList.contains('pk-a') ? 'a' : 'b';
+      selectPkSide(side);
+      return;
+    }
+    toggleCallFullscreen();
   }, true);
 }
 if (document.readyState !== 'loading') bindVideoTileZoom();
@@ -3576,6 +3787,11 @@ function updateAudioCallUI(inCall) {
     if (camBtn3) camBtn3.style.display = (isVideoMode2 && isHost2) ? 'flex' : 'none';
     const flipBtn3 = document.getElementById('flip-cam-btn');
     if (flipBtn3) flipBtn3.style.display = (isVideoMode2 && isHost2) ? 'flex' : 'none';
+    // الأيقونات السفلية (نمط تيك توك): الكاميرا للمضيف فقط
+    const barCam = document.getElementById('tt-bar-cam');
+    if (barCam) barCam.style.display = (isVideoMode2 && isHost2) ? 'flex' : 'none';
+    const barMic = document.getElementById('tt-bar-mic');
+    if (barMic) barMic.style.display = 'flex';
     // البث شاشة منفصلة تغطي كل الشاشة (بدون مغادرة الصفحة)
     document.body.classList.add('bcast-open');
     moveControlsIntoGrid();

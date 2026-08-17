@@ -3311,6 +3311,219 @@ body {
 }
 .tt-like-count { color: #fff; font-size: 12px; font-weight: 800; text-shadow: 0 1px 3px rgba(0,0,0,.6); }
 
+/* ===== TikTok LIVE Full Interface (PK + viewers + bottom bar) ===== */
+/* شريط PK العلوي */
+.pk-bar {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 55;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0,0,0,.55);
+  border: 1px solid rgba(255,255,255,.25);
+  border-radius: 22px;
+  padding: 6px 12px;
+  backdrop-filter: blur(4px);
+  max-width: 92%;
+  width: fit-content;
+}
+.pk-side { display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 62px; }
+.pk-avatar {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  border: 2px solid #e8b830;
+  overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,.12);
+  font-size: 16px;
+}
+.pk-side.pk-b .pk-avatar { border-color: #5aa7ff; }
+.pk-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.pk-player-name { color: #fff; font-size: 10px; font-weight: 800; max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pk-points { color: #ffd75e; font-size: 11px; font-weight: 900; }
+.pk-side.pk-b .pk-points { color: #8ecfff; }
+.pk-middle { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.pk-track {
+  display: flex; align-items: center; gap: 4px;
+  width: 180px;
+  height: 18px;
+  background: rgba(0,0,0,.45);
+  border-radius: 10px;
+  padding: 2px;
+}
+.pk-fill { height: 14px; border-radius: 8px; transition: width .45s cubic-bezier(.4,0,.2,1); }
+.pk-fill-a { background: linear-gradient(90deg, #e8b830, #ffd75e); border-radius: 8px 0 0 8px; }
+.pk-fill-b { background: linear-gradient(90deg, #8ecfff, #5aa7ff); border-radius: 0 8px 8px 0; }
+.pk-vs {
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ff2d55, #ff5e3a);
+  color: #fff;
+  font-size: 9px; font-weight: 900;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 0 10px rgba(255,45,85,.6);
+  flex-shrink: 0;
+}
+.pk-timer { color: #fff; font-size: 11px; font-weight: 900; text-shadow: 0 1px 3px rgba(0,0,0,.7); }
+.pk-bar.pk-victory-a { border-color: #ffd75e; box-shadow: 0 0 24px rgba(232,184,48,.7); }
+.pk-bar.pk-victory-b { border-color: #8ecfff; box-shadow: 0 0 24px rgba(90,167,255,.7); }
+.pk-crown { font-size: 15px; animation: ttPulse 1s ease-in-out infinite; }
+
+/* تقسيم الشاشة PK: طرفين جنب بعض 50/50 */
+.video-grid.tiktok-mode.pk-split .video-tile.local {
+  width: 50%; height: 100%;
+  right: auto; left: 0;
+  border-radius: 0;
+}
+.video-grid.tiktok-mode.pk-split .video-tile.pk-a {
+  position: absolute;
+  top: 0; left: 0;
+  width: 50%; height: 100%;
+  border-radius: 0;
+  border: none;
+  z-index: 20;
+}
+.video-grid.tiktok-mode.pk-split .video-tile.pk-b {
+  position: absolute;
+  top: 0; right: 0;
+  width: 50%; height: 100%;
+  border-radius: 0;
+  border: none;
+  z-index: 20;
+}
+.video-grid.tiktok-mode.pk-split .video-tile.pk-a video,
+.video-grid.tiktok-mode.pk-split .video-tile.pk-b video {
+  width: 100%; height: 100%; object-fit: cover;
+}
+.video-grid.tiktok-mode.pk-split .video-tile:not(.local):not(.pk-a):not(.pk-b) {
+  right: 10px; bottom: 10px; width: 96px; height: 128px; z-index: 30;
+}
+.video-grid.tiktok-mode.pk-split .video-tile:not(.local):not(.pk-a):not(.pk-b):nth-of-type(3) { bottom: 150px; }
+.video-grid.tiktok-mode.pk-split .video-tile:not(.local):not(.pk-a):not(.pk-b):nth-of-type(4) { bottom: 290px; }
+/* خط الفصل بين طرفي PK */
+.video-grid.tiktok-mode.pk-split::after {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0; left: 50%;
+  width: 3px;
+  background: linear-gradient(to bottom, rgba(255,255,255,.9), rgba(255,255,255,.2));
+  z-index: 22;
+  pointer-events: none;
+}
+/* شريط اسم الفريق على كل شاشة PK */
+.video-grid.tiktok-mode.pk-split .video-tile.pk-a .video-name,
+.video-grid.tiktok-mode.pk-split .video-tile.pk-b .video-name {
+  font-size: 12px;
+  padding: 3px 12px;
+  border-radius: 12px;
+  background: rgba(0,0,0,.5);
+  font-weight: 900;
+}
+
+/* قائمة المشاهدين (يمين البث) */
+.tt-viewers {
+  position: absolute;
+  bottom: 220px;
+  right: 10px;
+  z-index: 58;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+}
+.tt-viewer-chip {
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,.7);
+  overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,.5);
+  font-size: 14px;
+  box-shadow: 0 2px 6px rgba(0,0,0,.4);
+}
+.tt-viewer-chip img { width: 100%; height: 100%; object-fit: cover; }
+.tt-viewers-more {
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  background: rgba(0,0,0,.55);
+  color: #fff;
+  font-size: 11px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+  border: 2px solid rgba(255,255,255,.5);
+}
+
+/* الشريط السفلي للأيقونات */
+.tt-bottom-bar {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 62;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(0,0,0,.5);
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: 26px;
+  padding: 5px 8px;
+  backdrop-filter: blur(5px);
+  max-width: 96%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tt-bottom-bar::-webkit-scrollbar { display: none; }
+.tt-bar-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 0;
+  background: none;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  min-width: 52px;
+  padding: 3px 6px;
+  border-radius: 14px;
+  transition: background .2s;
+}
+.tt-bar-btn:hover { background: rgba(255,255,255,.12); }
+.tt-bar-ico { font-size: 20px; line-height: 1; }
+.tt-bar-label { font-size: 9px; font-weight: 700; opacity: .85; }
+.tt-bar-btn.pk-side-active { background: rgba(255,45,85,.35); border: 1px solid rgba(255,255,255,.35); }
+
+/* لوحة الهدايا: شريحة سفلية + شرائح المستلمين */
+.gift-bar-balance {
+  color: var(--gold);
+  font-size: 12px;
+  font-weight: 800;
+  display: flex; align-items: center; gap: 4px;
+}
+.gift-recipient-chips {
+  display: flex; gap: 6px;
+  padding: 8px 10px 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.gift-recipient-chips::-webkit-scrollbar { display: none; }
+.gift-recipient-chip {
+  flex-shrink: 0;
+  display: flex; align-items: center; gap: 4px;
+  background: rgba(255,255,255,.1);
+  border: 1.5px solid rgba(255,255,255,.25);
+  color: #fff;
+  font-size: 11px; font-weight: 700;
+  border-radius: 18px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: all .15s;
+}
+.gift-recipient-chip.selected { background: var(--gold); border-color: var(--gold); color: #111; }
+.gift-recipient-chip .chip-av { width: 18px; height: 18px; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.3); font-size: 11px; }
+.gift-recipient-chip .chip-av img { width: 100%; height: 100%; object-fit: cover; }
+.gift-recipient-chip.pk-chip-a.selected { background: #e8b830; border-color: #ffd75e; color: #111; }
+.gift-recipient-chip.pk-chip-b.selected { background: #5aa7ff; border-color: #8ecfff; color: #111; }
+
 /* صور الأفاتارات: حجمها مضبوط داخل دائرتها (كانت تظهر بحجمها الطبيعي!) */
 .welcome-avatar img,
 .menu-avatar img,

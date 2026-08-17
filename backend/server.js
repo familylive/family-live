@@ -2486,6 +2486,26 @@ app.post('/api/battles/reject', authMiddleware, asyncHandler(async (req, res) =>
 }));
 
 // Support a player with coins
+// TikTok PK tap: free +1 point to a side (likes), throttled per user
+const pkTapCounters = {}; // userId -> { lastReset, count }
+app.post('/api/battles/tap', authMiddleware, asyncHandler(async (req, res) => {
+  const { battleId, side } = req.body;
+  if (!battleId || !['a', 'b'].includes(side)) return res.status(400).json({ error: 'بيانات غير صحيحة' });
+  // Throttle: 8 taps / second per user
+  const now = Date.now();
+  const c = pkTapCounters[req.user.id] || { lastReset: now, count: 0 };
+  if (now - c.lastReset > 1000) { c.lastReset = now; c.count = 0; }
+  if (c.count >= 8) return res.status(429).json({ error: 'تمهل قليلاً ⏳' });
+  c.count++; pkTapCounters[req.user.id] = c;
+  const battle = await db.getBattleById(battleId);
+  if (!battle || battle.status !== 'active') return res.status(400).json({ error: 'التحدي غير نشط' });
+  const updated = await db.supportBattle(battleId, side, 1);
+  if (battle.session_id) io.to(`session_${battle.session_id}`).emit('battle_update', updated);
+  if (battle.family_a_id) io.to(`family_${battle.family_a_id}`).emit('battle_update', updated);
+  if (battle.family_b_id) io.to(`family_${battle.family_b_id}`).emit('battle_update', updated);
+  res.json({ ok: true, battle: updated });
+}));
+
 app.post('/api/battles/support', authMiddleware, asyncHandler(async (req, res) => {
   const { battleId, side, coins } = req.body;
   const amount = parseInt(coins);

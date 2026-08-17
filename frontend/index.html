@@ -641,6 +641,56 @@
             </div>
             <!-- TikTok live overlay elements -->
             <div class="tt-live-badge">🔴 مباشر</div>
+            <!-- TikTok PK bar (top center, hidden unless battle) -->
+            <div class="pk-bar" id="pk-bar" style="display:none">
+              <div class="pk-side pk-a" id="pk-side-a">
+                <div class="pk-avatar" id="pk-avatar-a">👤</div>
+                <div class="pk-player-name" id="pk-name-a">أ</div>
+                <div class="pk-points" id="pk-points-a">0</div>
+              </div>
+              <div class="pk-middle">
+                <div class="pk-track">
+                  <div class="pk-fill pk-fill-a" id="pk-fill-a"></div>
+                  <div class="pk-vs">VS</div>
+                  <div class="pk-fill pk-fill-b" id="pk-fill-b"></div>
+                </div>
+                <div class="pk-timer" id="pk-timer">⏱️ 3:00</div>
+              </div>
+              <div class="pk-side pk-b" id="pk-side-b">
+                <div class="pk-avatar" id="pk-avatar-b">👤</div>
+                <div class="pk-player-name" id="pk-name-b">ب</div>
+                <div class="pk-points" id="pk-points-b">0</div>
+              </div>
+            </div>
+            <!-- TikTok viewers stack (right edge) -->
+            <div class="tt-viewers" id="tt-viewers" style="display:none" onclick="openTikTokViewersList()"></div>
+            <!-- TikTok bottom icons bar -->
+            <div class="tt-bottom-bar" id="tt-bottom-bar">
+              <button class="tt-bar-btn tt-bar-gift" id="tt-bar-gift" onclick="openGiftBox()" title="الهدايا">
+                <span class="tt-bar-ico">🎁</span><span class="tt-bar-label" id="tt-bar-gift-label">هدية</span>
+              </button>
+              <button class="tt-bar-btn" id="tt-bar-heart" onclick="sendTtHeart()" title="إعجاب">
+                <span class="tt-bar-ico">❤️</span><span class="tt-bar-label" id="tt-bar-like-count">0</span>
+              </button>
+              <button class="tt-bar-btn" id="tt-bar-comment" onclick="focusTikTokChat()" title="تعليق">
+                <span class="tt-bar-ico">💬</span><span class="tt-bar-label">تعليق</span>
+              </button>
+              <button class="tt-bar-btn" id="tt-bar-pk" onclick="openBattleModal()" title="تحدي PK" style="display:none">
+                <span class="tt-bar-ico">⚔️</span><span class="tt-bar-label">PK</span>
+              </button>
+              <button class="tt-bar-btn" id="tt-bar-effects" onclick="openEffectsModal()" title="المؤثرات">
+                <span class="tt-bar-ico">✨</span><span class="tt-bar-label">تأثير</span>
+              </button>
+              <button class="tt-bar-btn" id="tt-bar-mic" onclick="toggleMic()" title="المايك">
+                <span class="tt-bar-ico" id="tt-bar-mic-ico">🎤</span><span class="tt-bar-label" id="tt-bar-mic-label">صوت</span>
+              </button>
+              <button class="tt-bar-btn" id="tt-bar-cam" onclick="toggleCamera()" title="الكاميرا" style="display:none">
+                <span class="tt-bar-ico" id="tt-bar-cam-ico">📷</span><span class="tt-bar-label" id="tt-bar-cam-label">كاميرا</span>
+              </button>
+              <button class="tt-bar-btn" id="tt-bar-more" onclick="toggleCallExtras()" title="المزيد">
+                <span class="tt-bar-ico">⚙️</span><span class="tt-bar-label">مزيد</span>
+              </button>
+            </div>
             <div class="tt-host-info">
               <div class="tt-host-avatar" id="tt-host-avatar">👤</div>
               <div>
@@ -1928,9 +1978,11 @@
       <div class="gift-tiktok-bar" onclick="event.stopPropagation()">
         <div class="gift-bar-header">
           <span style="color:var(--gold);font-weight:900">🎁 الهدايا</span>
-          <select class="form-input gift-bar-recipient" id="gift-recipient"><option value="">المرسل إليه...</option></select>
+          <div class="gift-bar-balance" id="gift-bar-balance"></div>
           <button class="gift-bar-close" onclick="document.getElementById('gift-box-modal').style.display='none'">✕</button>
         </div>
+        <select class="form-input gift-bar-recipient" id="gift-recipient" style="display:none"><option value="">المرسل إليه...</option></select>
+        <div class="gift-recipient-chips" id="gift-recipient-chips"></div>
         <div id="gift-items-list" class="gift-items-horizontal"></div>
         <div id="gift-send-area" class="gift-bar-send" style="display:none">
           <span id="gift-selected-label" class="gift-bar-label">لا شيء محدد</span>
@@ -3770,27 +3822,62 @@ async function openGiftBox() {
     const { gifts } = await api('GET', '/api/gifts/items');
     giftItems = gifts || [];
   } catch(e) { giftItems = []; }
-  // Load recipients (participants on camera)
+  // الرصيد الحالي
+  const bal = document.getElementById('gift-bar-balance');
+  if (bal) bal.innerHTML = '<img src="/assets/coin.png" class="coin-ico" alt="كونزه"> ' + (state.user?.coins || 0);
+  // المستلمون: في PK → الفريقان؛ خارج PK → المشاركون (الافتراضي: صاحب البث)
   const sel = document.getElementById('gift-recipient');
   sel.innerHTML = '<option value="">اختر العضو...</option>';
-  Object.keys(peerConnections).forEach(pid => {
-    const name = state.callMembers?.[pid] || 'عضو';
-    sel.innerHTML += '<option value="' + pid + '">' + name + '</option>';
-  });
+  const chips = document.getElementById('gift-recipient-chips');
+  const inPk = currentBattle && (currentBattle.status === 'active' || currentBattle.status === 'victory');
+  const ava = (a) => (a || '').startsWith('data:') || (a || '').startsWith('http') || (a || '').startsWith('/')
+    ? '<img src="' + a + '">' : ((a && a.length <= 4) ? a : '👤');
+  if (inPk) {
+    const mA = (state.members || []).find(m => m.id === currentBattle.player_a_id);
+    const mB = (state.members || []).find(m => m.id === currentBattle.player_b_id);
+    const avA = mA?.avatar || peerAvatars[currentBattle.player_a_id] || '👤';
+    const avB = mB?.avatar || peerAvatars[currentBattle.player_b_id] || '👤';
+    chips.innerHTML =
+      '<div class="gift-recipient-chip pk-chip-a" data-pk="a" onclick="selectGiftRecipientChip(this,\'pk:a\')"><span class="chip-av">' + ava(avA) + '</span>⭐ ' + (currentBattle.player_a_name || 'أ') + '</div>' +
+      '<div class="gift-recipient-chip pk-chip-b" data-pk="b" onclick="selectGiftRecipientChip(this,\'pk:b\')"><span class="chip-av">' + ava(avB) + '</span>⭐ ' + (currentBattle.player_b_name || 'ب') + '</div>';
+  } else {
+    const mems = (state.members || []);
+    const participants = Object.keys(peerConnections);
+    const chipsHtml = ['self'].concat(participants).map(pid => {
+      const isSelf = pid === 'self';
+      const id = isSelf ? state.user.id : pid;
+      const name = isSelf ? 'أنت (دعم ذاتي)' : (state.callMembers?.[pid] || 'عضو');
+      const m = mems.find(mm => mm.id === id);
+      const av = m?.avatar || (isSelf ? state.user.avatar : peerAvatars[pid]) || '👤';
+      return '<div class="gift-recipient-chip" data-id="' + id + '" onclick="selectGiftRecipientChip(this,\'' + id + '\')"><span class="chip-av">' + ava(av) + '</span>' + name + '</div>';
+    }).join('');
+    chips.innerHTML = chipsHtml;
+    // إضافة الخيارات للـ select القديم (توافق مع sendGiftItem)
+    chips.querySelectorAll('.gift-recipient-chip').forEach(ch => {
+      sel.innerHTML += '<option value="' + ch.dataset.id + '">' + ch.textContent.trim() + '</option>';
+    });
+  }
   // Load gift items grid
   const grid = document.getElementById('gift-items-list');
   let selectedGiftId = null;
-  window._selectGift = (id) => {
+  window._giftTapCount = {};
+  window._selectGift = (id, el) => {
+    // نقرة أولى: تحديد — نقرة ثانية: إرسال فوري (نمط تيك توك)
+    if (selectedGiftId === id) {
+      sendSelectedGift();
+      selectedGiftId = null;
+      return;
+    }
     selectedGiftId = id;
     const g = giftItems.find(x => x.id === id);
-    document.querySelectorAll('.gift-item').forEach(el => el.classList.remove('selected'));
+    document.querySelectorAll('.gift-item').forEach(el2 => el2.classList.remove('selected'));
     const clicked = document.getElementById('gift-item-' + id);
     if (clicked) clicked.classList.add('selected');
     const area = document.getElementById('gift-send-area');
     const label = document.getElementById('gift-selected-label');
     if (area && g) {
       area.style.display = 'block';
-      if (label) label.textContent = 'الهدية: ' + (g.gift_image ? '' : g.emoji + ' ') + g.name + ' · <img src="/assets/coin.png" class="coin-ico" alt="🪙"> ' + g.coins;
+      if (label) label.innerHTML = 'الهدية: ' + (g.gift_image ? '' : g.emoji + ' ') + g.name + ' · <img src="/assets/coin.png" class="coin-ico" alt="🪙"> ' + g.coins + ' <span style="opacity:.7">(اضغط مرة أخرى للإرسال)</span>';
     }
   };
   window._sendSelectedGift = () => {
@@ -3802,7 +3889,7 @@ async function openGiftBox() {
       const media = g.gift_image
         ? '<img src="' + g.gift_image + '" style="width:56px;height:56px;object-fit:contain;margin:0 auto">'
         : '<div style="font-size:34px">' + g.emoji + '</div>';
-      return '<div class="gift-item" id="gift-item-' + g.id + '" onclick="window._selectGift(\'' + g.id + '\')">' +
+      return '<div class="gift-item" id="gift-item-' + g.id + '" onclick="window._selectGift(\'' + g.id + '\',this)">' +
         media +
         '<div style="font-size:11px;font-weight:700">' + g.name + '</div>' +
         '<div style="font-size:11px;color:var(--gold)"><img src="/assets/coin.png" class="coin-ico" alt="كونزه"> ' + g.coins + '</div>' +
@@ -3815,11 +3902,58 @@ async function openGiftBox() {
   document.getElementById('gift-box-modal').style.display = 'flex';
 }
 
+// اختيار مستلم من الشرائح
+function selectGiftRecipientChip(el, val) {
+  const chips = document.getElementById('gift-recipient-chips');
+  chips.querySelectorAll('.gift-recipient-chip').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  const sel = document.getElementById('gift-recipient');
+  // تحديث الـ select المستخدم في الإرسال
+  const pkMatch = val.match(/^pk:(a|b)$/);
+  if (pkMatch) {
+    if (!currentBattle) return;
+    const id = pkMatch[1] === 'a' ? currentBattle.player_a_id : currentBattle.player_b_id;
+    if (sel) { sel.innerHTML = '<option value="' + id + '">' + (pkMatch[1] === 'a' ? currentBattle.player_a_name : currentBattle.player_b_name) + '</option>'; }
+    // اختيار الجانب في PK
+    pkSide = pkMatch[1];
+    const grid = document.getElementById('video-grid');
+    if (grid) grid.querySelectorAll('.video-tile').forEach(t => t.classList.remove('pk-side-active'));
+    const tiles = grid ? grid.querySelectorAll('.video-tile') : [];
+    const meId = state.user?.id;
+    let sideTile = null;
+    if (currentBattle.player_a_id === meId && pkSide === 'a') sideTile = document.getElementById('my-video-tile');
+    else if (currentBattle.player_b_id === meId && pkSide === 'b') sideTile = document.getElementById('my-video-tile');
+    else sideTile = document.getElementById('video-' + id);
+    if (sideTile) sideTile.classList.add('pk-side-active');
+  } else {
+    const id = el.dataset.id;
+    if (sel) { sel.innerHTML = '<option value="' + id + '">' + el.textContent.trim() + '</option>'; }
+  }
+}
+
 function sendSelectedGift() { window._sendSelectedGift && window._sendSelectedGift(); }
 
 async function sendGiftItem(giftId) {
-  const toId = document.getElementById('gift-recipient').value;
-  if (!toId) return showToast('⚠️ اختر العضو المرسل إليه من القائمة أولاً', 'error');
+  const g = giftItems.find(x => x.id === giftId);
+  const sel = document.getElementById('gift-recipient');
+  const toId = sel ? sel.value : '';
+  if (!toId) return showToast('⚠️ اختر العضو المرسل إليه من الشرائح أولاً', 'error');
+  // في وضع PK: الهدية = دعم مباشر للفريق المختار
+  if (currentBattle && (currentBattle.status === 'active' || currentBattle.status === 'victory')) {
+    if (toId !== currentBattle.player_a_id && toId !== currentBattle.player_b_id) {
+      return showToast('⚠️ اختر أحد فريقَي التحدي من الشرائح', 'error');
+    }
+    const side = toId === currentBattle.player_a_id ? 'a' : 'b';
+    if (!g) return showToast('الهدية غير موجودة', 'error');
+    try {
+      const r = await api('POST', '/api/battles/support', { battleId: currentBattle.id, side, coins: g.coins });
+      showToast(r.message || '🎁 دعمت الفريق!', 'success');
+      refreshWalletHeader();
+      document.getElementById('gift-box-modal').style.display = 'none';
+      showGiftOnCamera({ giftName: g.name, giftEmoji: g.emoji, giftCoins: g.coins, giftImage: g.gift_image || null, fromName: state.user?.name, toName: side === 'a' ? currentBattle.player_a_name : currentBattle.player_b_name, familyName: '', toId: toId, fromId: state.user?.id });
+      return;
+    } catch(e) { return showToast(e.message || 'فشل الإرسال', 'error'); }
+  }
   // Ensure we have an active session (never silent-fail)
   if (!state.activeSession?.id) {
     try {
