@@ -203,17 +203,17 @@ async function generatePremiumCode() {
   return 'NONE';
 }
 
-// توليد أرقام/رموز مميزة قصيرة: مفردة (1) ثنائية (2) ثلاثية (3) رباعية (4) خماسية (5) سداسية (6) سباعية (7) — حرف مكرر
+// توليد أرقام/رموز مميزة قصيرة: مفردة (1) ... سباعية (7) وثمانية (8=نفس نوع premium القديم — بدون تعارض)
 // charset: 'digits' | 'letters' | 'both'
 async function generateSpecialCodes(length, charset, count, price) {
-  const len = Math.min(7, Math.max(1, parseInt(length) || 1));
+  const len = Math.min(8, Math.max(1, parseInt(length) || 1));
   const n = Math.min(100, Math.max(1, parseInt(count) || 1));
   const priceV = Math.max(0, parseInt(price) || 0);
   let chars;
   if (charset === 'digits') chars = '0123456789';
   else if (charset === 'letters') chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
   else chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  const type = 'vip' + len;
+  const type = len === 8 ? 'premium' : 'vip' + len;
   const takenRows = await query('SELECT code FROM subscription_codes');
   const taken = new Set(takenRows.map(r => r.code));
   const arr = Array.from(chars);

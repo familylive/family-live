@@ -242,7 +242,7 @@ app.post('/api/codes/generate-premium', authMiddleware, adminMiddleware, async (
 app.post('/api/codes/generate-special', authMiddleware, adminMiddleware, async (req, res) => {
   const { length, charset, count, price } = req.body;
   const codes = await db.generateSpecialCodes(length, charset, count, price);
-  const typeName = { 1: 'مفردة', 2: 'ثنائية', 3: 'ثلاثية', 4: 'رباعية', 5: 'خماسية', 6: 'سداسية', 7: 'سباعية' }[parseInt(length)] || '';
+  const typeName = { 1: 'مفردة', 2: 'ثنائية', 3: 'ثلاثية', 4: 'رباعية', 5: 'خماسية', 6: 'سداسية', 7: 'سباعية', 8: 'ثمانية' }[parseInt(length)] || '';
   const suffix = codes.length === 1 ? 'رمز' : (codes.length === 2 ? 'رمزين' : (codes.length <= 10 ? 'رموز' : 'رمزاً'));
   res.json({ codes, message: '✅ تم توليد ' + codes.length + ' ' + suffix + (typeName ? ' (' + typeName + ')' : '') });
 });

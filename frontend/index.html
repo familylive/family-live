@@ -824,7 +824,7 @@
       <!-- Admin: توليد أرقام ورموز مميزة (مفردة/ثنائية/ثلاثية/رباعية) -->
       <div class="card" id="special-codes-section" style="border:1.5px solid rgba(232,184,48,.35);display:none">
         <div class="card-title">🔢 توليد أرقام ورموز مميزة <span style="font-size:11px;color:var(--text-muted)">(مفردة · ثنائية · ثلاثية · رباعية)</span></div>
-        <p style="font-size:12px;color:var(--text-secondary);margin-bottom:10px">رموز قصيرة مكررة الحرف (مثال: 7 · 77 · 777 · 7777) — تظهر في المزادات ويمكن تعديل أسعارها.</p>
+        <p style="font-size:12px;color:var(--text-secondary);margin-bottom:10px">رموز مكررة الحرف (مثال: 7 · 77 · 777 · 7777 · 77777777) — تظهر في المزادات ويمكن تعديل أسعارها. الثمانية هي نفس الرموز المميزة 💎.</p>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
           <div class="form-group">
             <label>النوع</label>
@@ -836,6 +836,7 @@
               <option value="5">🔢 خماسية (5 أحرف)</option>
               <option value="6">🔢 سداسية (6 أحرف)</option>
               <option value="7">🔢 سباعية (7 أحرف)</option>
+              <option value="8">💎 ثمانية (8 أحرف — مميزة)</option>
             </select>
           </div>
           <div class="form-group">
@@ -2505,7 +2506,7 @@ async function generateSpecialCodesNow() {
   try {
     const r = await api('POST', '/api/codes/generate-special', { length, charset, count, price });
     const box = document.getElementById('spec-result');
-    const typeLabel = { 1: 'مفردة', 2: 'ثنائية', 3: 'ثلاثية', 4: 'رباعية', 5: 'خماسية', 6: 'سداسية', 7: 'سباعية' }[length];
+    const typeLabel = { 1: 'مفردة', 2: 'ثنائية', 3: 'ثلاثية', 4: 'رباعية', 5: 'خماسية', 6: 'سداسية', 7: 'سباعية', 8: 'ثمانية' }[length];
     box.innerHTML = (r.codes || []).map(c =>
       '<span style="background:var(--bg-hover);border:1px solid rgba(232,184,48,.4);border-radius:8px;padding:4px 10px;font-size:13px;font-weight:700;direction:ltr">' + c.code +
       ' <span style="font-size:10px;color:var(--gold);font-weight:400">' + c.price + ' ر.س</span></span>'
