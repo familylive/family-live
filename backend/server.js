@@ -2351,6 +2351,43 @@ app.post('/api/battles/join-invite-response', authMiddleware, asyncHandler(async
 }));
 
 // Invite another family's founder to JOIN the broadcast (chat first, battle after)
+// البوت: إهداء دوري بكل أنواع الهدايا (للمضيف) — يظهر أنيميشن الهدية للجميع
+let botGiftTimer = null;
+let botGiftCycle = [];
+async function botStartGifting(sessionId) {
+  try {
+    if (!globalThis.BOT_USER) return;
+    if (botGiftTimer) { clearInterval(botGiftTimer); botGiftTimer = null; }
+    const giftRows = await db.execQuery("SELECT * FROM gift_items WHERE status = 'active' ORDER BY coins");
+    botGiftCycle = giftRows || [];
+    if (!botGiftCycle.length) return;
+    let i = 0;
+    const tick = async () => {
+      try {
+        const sess = await db.getDiwaniyaSessionById(sessionId);
+        if (!sess || sess.status !== 'open') { if (botGiftTimer) { clearInterval(botGiftTimer); botGiftTimer = null; } return; }
+        const g = botGiftCycle[i % botGiftCycle.length]; i++;
+        const bot = globalThis.BOT_USER;
+        // إعادة تعبئة رصيد البوت عند الحاجة (بوت تجريبي)
+        const botW = await db.getWallet(bot.id);
+        if (botW.coins < g.coins + 5000) await db.addCoins(bot.id, 50000).catch(() => {});
+        const res = await db.sendGift(bot.id, sess.opened_by, g.coins, 'هدية من البوت: ' + g.emoji + ' ' + g.name);
+        if (res.error) return;
+        const host = await db.getUserById(sess.opened_by);
+        io.to(`session_${sessionId}`).emit('gift_on_camera', {
+          giftName: g.name, giftEmoji: g.emoji, giftCoins: g.coins, giftImage: g.gift_image || null,
+          fromName: bot.name, toName: host?.name || 'المضيف',
+          familyName: globalThis.BOT_FAMILY?.name || 'عائلة الاختبار',
+          toId: sess.opened_by, fromId: bot.id
+        });
+        console.log(`🤖 بوت أهدى ${g.emoji} ${g.name} (${g.coins}) إلى ${host?.name || sess.opened_by}`);
+      } catch(e) {}
+    };
+    tick();
+    botGiftTimer = setInterval(tick, 7000);
+  } catch(e) {}
+}
+
 app.post('/api/battles/join-invite', authMiddleware, asyncHandler(async (req, res) => {
   const { toUserId, sessionId } = req.body;
   if (!toUserId || !sessionId) return res.status(400).json({ error: 'بيانات ناقصة' });
@@ -2364,6 +2401,8 @@ app.post('/api/battles/join-invite', authMiddleware, asyncHandler(async (req, re
       const botEntry = { socketId: 'bot-socket-' + Date.now(), userId: globalThis.BOT_USER.id, userName: globalThis.BOT_USER.name, avatar: '🤖', isObserver: true, wantsVideo: false };
       audioRooms[sessionId].push(botEntry);
       io.to(`session_${sessionId}`).emit('user_joined_call', { userId: globalThis.BOT_USER.id, userName: globalThis.BOT_USER.name, avatar: '🤖', effect: null, isObserver: true });
+      // البوت يبدأ الإهداء فوراً
+      botStartGifting(sessionId);
     } catch(e) {}
     io.to(`user_${req.user.id}`).emit('join_invite_accepted', { founderName: globalThis.BOT_USER.name, familyName: globalThis.BOT_FAMILY?.name || 'عائلة الاختبار' });
     return res.json({ message: '🤖 بوت التحدي انضم للبث - تحدَّه الآن!' });
@@ -2450,6 +2489,7 @@ app.post('/api/battles/start', authMiddleware, asyncHandler(async (req, res) => 
       const botEntry = { socketId: 'bot-socket', userId: globalThis.BOT_USER.id, userName: globalThis.BOT_USER.name, avatar: '🤖', isObserver: true, wantsVideo: false };
       audioRooms[sessionId].push(botEntry);
       io.to(`session_${sessionId}`).emit('user_joined_call', { userId: globalThis.BOT_USER.id, userName: globalThis.BOT_USER.name, avatar: '🤖', effect: null, isObserver: true });
+      botStartGifting(sessionId);
     } catch(e) {}
     const started = await db.acceptBattle(battle.id, new Date().toISOString());
     if (battle.session_id) io.to(`session_${battle.session_id}`).emit('battle_started', started);
@@ -3089,6 +3129,11 @@ async function bootstrap() {
     globalThis.BOT_USER = botUser;
     globalThis.BOT_FAMILY = botFam;
     onlineUsers.add(botUser.id); // bot is always "online"
+    // كونزات البوت: رصيد كبير للإهداء التجريبي
+    try {
+      const bw = await db.getWallet(botUser.id);
+      if (bw.coins < 50000) await db.addCoins(botUser.id, 100000);
+    } catch(e) {}
     console.log('🤖 Test bot ready:', botUser.name, '|', botUser.id.slice(0,8));
   } catch(e) { console.log('Bot seed error:', e.message); }
   

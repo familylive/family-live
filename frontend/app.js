@@ -232,6 +232,8 @@ async function loadApp(user, family) {
       state.pendingChallenges = challData.pending || [];
       state.leaderboard = lbData.leaderboard || [];
       applyDiwaniyaSession(diwData.session);
+      // استرجاع التحدي النشط فور فتح الصفحة (يبقى شريط PK ظاهراً بعد التحديث)
+      try { await loadBattleStatus(); } catch(e) {}
     } else {
       // Admin or new user: load minimal data
       state.members = [];
@@ -602,6 +604,8 @@ function connectSocket() {
   });
   socket.on('gift_on_camera', (d) => {
     if (d && d.toId) { sessionGiftCoins[d.toId] = (sessionGiftCoins[d.toId] || 0) + (d.giftCoins || 0); updateCallPresence(); }
+    // أنيميشن الهدية على الشاشة (نمط تيك توك) لكل من في البث
+    if (d && d.giftName) showGiftOnCamera(d);
   });
   socket.on('diwaniya_message', (msg) => {
     addChatMessage(msg.user_name, msg.message, msg.user_id === state.user?.id, msg.avatar, msg.user_level, msg.user_role === 'founder' ? (msg.family_verif || 'none') : 'none', msg.user_id);
@@ -1102,6 +1106,8 @@ async function refreshDiwaniyaNow() {
     const { session } = await api('GET', '/api/diwaniya/active');
     applyDiwaniyaSession(session);
   } catch(e) {}
+  // استرجاع التحدي النشط (بعد تحديث الصفحة مثلاً) ليبقى شريط PK ظاهراً
+  try { await loadBattleStatus(); } catch(e) {}
 }
 
 // Apply a fetched session to the UI (shared by poll + page open)
@@ -1167,6 +1173,8 @@ function startDiwaniyaStatusPoll() {
       applyDiwaniyaSession(session);
       if (wasOpen && session?.status !== 'open') showToast('🔒 أغلقت الديوانية', 'error');
     } catch(e) {}
+    // مزامنة التحدي النشط (شريط PK) كل دورة
+    try { await loadBattleStatus(); } catch(e) {}
   }, 15000);
 }
 
@@ -2539,6 +2547,12 @@ function renderBattle(b) {
     if (pkBar) pkBar.style.display = 'none';
     if (grid) grid.classList.remove('pk-split');
     if (grid) grid.querySelectorAll('.video-tile').forEach(t => t.classList.remove('pk-a', 'pk-b', 'pk-side-active'));
+    // إعادة بلاطات الأعضاء لعمودها الأيمن بعد انتهاء التحدي
+    if (grid) grid.querySelectorAll('.video-tile:not(.local)').forEach((t, i) => {
+      t.style.bottom = (10 + (i % 6) * 150) + 'px';
+      t.style.right = '10px';
+      t.style.zIndex = 30;
+    });
     const pkBtn = document.getElementById('tt-bar-pk');
     if (pkBtn) pkBtn.style.display = 'none';
     return;
@@ -2664,6 +2678,7 @@ function applyPkLayout(b) {
   let localSide = null, remoteId = null;
   if (b.player_a_id === meId) { localSide = 'a'; remoteId = b.player_b_id; }
   else if (b.player_b_id === meId) { localSide = 'b'; remoteId = b.player_a_id; }
+  const clearInline = (t) => { if (!t) return; t.style.bottom = ''; t.style.right = ''; t.style.zIndex = ''; t.style.width = ''; t.style.height = ''; };
   const localTile = document.getElementById('my-video-tile');
   if (localTile) {
     localTile.classList.remove('pk-a', 'pk-b');
@@ -2674,6 +2689,9 @@ function applyPkLayout(b) {
     remoteTile.classList.remove('pk-a', 'pk-b');
     remoteTile.classList.add(localSide === 'a' ? 'pk-b' : 'pk-a');
   }
+  // إزالة الأنماط المضمنة حتى تسري أنماط التقسيم
+  clearInline(localTile);
+  clearInline(remoteTile);
 }
 
 // اختيار جانبي في PK (بالنقر على نصف الشاشة)
@@ -3483,6 +3501,12 @@ function addRemoteAudio(peerId, peerName, stream) {
       '</div>' +
       '<div class="video-name">' + peerName + '</div>';
     videoGrid.appendChild(tile);
+    // ترتيب بلاطات الأعضاء: عمود على اليمين (بدل nth-of-type الذي ينكسر بالعناصر الجديدة)
+    const peerTiles = [...videoGrid.querySelectorAll('.video-tile:not(.local)')];
+    const idx = peerTiles.indexOf(tile);
+    tile.style.bottom = (10 + (idx % 6) * 150) + 'px';
+    tile.style.right = '10px';
+    tile.style.zIndex = 30;
     const video = tile.querySelector('video');
     const videoTracks = stream.getVideoTracks();
     // If participant has NO video track at all (audio-only listener) -> show overlay
