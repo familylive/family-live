@@ -3665,14 +3665,24 @@ function verifBadge(tier, size) {
   const sy = (12 + 10.65 * Math.sin(-Math.PI / 2)).toFixed(2);
   return '<span class="fv-badge fv-' + tier + '" style="width:' + s + 'px;height:' + s + 'px" title="توثيق ' + c.label + '">' +
     '<svg viewBox="0 0 24 24" width="' + s + '" height="' + s + '">' +
-      '<defs><linearGradient id="fv-g' + n + '" x1="0" y1="0" x2="1" y2="1">' +
-        '<stop offset="0" stop-color="' + c.g1 + '"/><stop offset="1" stop-color="' + c.g2 + '"/></linearGradient></defs>' +
+      '<defs>' +
+        '<linearGradient id="fv-g' + n + '" x1="0" y1="0" x2="1" y2="1">' +
+          '<stop offset="0" stop-color="' + c.g1 + '"/><stop offset="1" stop-color="' + c.g2 + '"/></linearGradient>' +
+        '<linearGradient id="fv-sh' + n + '" x1="0" y1="0" x2="0" y2="1">' +
+          '<stop offset="0" stop-color="#ffffff" stop-opacity="0.8"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/></linearGradient>' +
+        '<clipPath id="fv-cl' + n + '"><path d="' + disc + '"/></clipPath>' +
+      '</defs>' +
       '<path d="' + disc + '" fill="url(#fv-g' + n + ')"/>' +
+      '<g clip-path="url(#fv-cl' + n + ')">' +
+        '<ellipse cx="12" cy="8.4" rx="10.8" ry="5.2" fill="url(#fv-sh' + n + ')"/>' +
+        '<ellipse cx="9.0" cy="5.9" rx="3.8" ry="2.1" fill="#ffffff" opacity="0.7"/>' +
+        '<path d="M5.6 6.8 Q12 3.4 18.4 6.8" fill="none" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round" opacity="1"/>' +
+      '</g>' +
       '<g class="fv-rotate">' +
         '<path d="' + ring + '" fill="none" stroke="' + c.ring + '" stroke-width="1.6"/>' +
-        '<circle cx="' + sx + '" cy="' + sy + '" r="0.85" fill="#ffffff" class="fv-spark"/>' +
+        '<circle cx="' + sx + '" cy="' + sy + '" r="1.0" fill="#ffffff" class="fv-spark"/>' +
       '</g>' +
-      '<path d="M6.9 12.9l3.8 3.8 6.5-10.1" fill="none" stroke="' + c.check + '" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>' +
+      '<path d="M6.8 12.9 C7.6 14.8, 9.4 16.9, 10.7 16.7 C13.9 16.9, 16.2 12.0, 16.9 6.9" fill="none" stroke="' + c.check + '" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>' +
     '</svg></span>';
 }
 function fvTierLabel(tier) { return (FV_TIERS[tier] && FV_TIERS[tier].label) || tier || ''; }
