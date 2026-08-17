@@ -3632,25 +3632,47 @@ function coinVal(coins) {
 // ==================== FAMILY VERIFICATION BADGE (توثيق العائلات) ====================
 let fvGradCounter = 0;
 const FV_TIERS = {
-  black:    { g1: '#3d3d47', g2: '#060608', ring: '#aab0b8', check: '#ffffff', label: 'أسود' },
-  blue:     { g1: '#3db6ff', g2: '#0d6fb8', ring: '#a8dfff', check: '#ffffff', label: 'أزرق' },
-  silver:   { g1: '#f5f6f8', g2: '#a6adb6', ring: '#ffffff', check: '#3f4a55', label: 'فضي' },
-  gold:     { g1: '#ffe08a', g2: '#cf9b1f', ring: '#fff3c4', check: '#ffffff', label: 'ذهبي' },
-  platinum: { g1: '#e9f2ff', g2: '#8fb0d6', ring: '#f2f8ff', check: '#1d4ed8', label: 'بلاتيني' },
+  black:    { g1: '#4a4a55', g2: '#0a0a0d', ring: '#cfd3d9', check: '#ffffff', label: 'أسود' },
+  blue:     { g1: '#4db8ff', g2: '#0e6fb8', ring: '#bfe6ff', check: '#ffffff', label: 'أزرق' },
+  silver:   { g1: '#f7f8fa', g2: '#a9b0b9', ring: '#ffffff', check: '#3f4a55', label: 'فضي' },
+  gold:     { g1: '#ffe08a', g2: '#cf9b1f', ring: '#fff6d8', check: '#ffffff', label: 'ذهبي' },
+  platinum: { g1: '#eef4ff', g2: '#93b2d8', ring: '#ffffff', check: '#1d4ed8', label: 'بلاتيني' },
 };
-// شارة تويتر: دائرة متقطعة تدور + علامة صح ثابتة تخترق حافة الدائرة
+// مسار دائرة "مكرمشة" — بتلات دائرية حول المحيط (نفس شكل الصورة المرفقة)
+function scallopPath(cx, cy, R, r, n) {
+  let d = '';
+  for (let i = 0; i < n; i++) {
+    const a0 = (i * 2 * Math.PI) / n - Math.PI / 2;
+    const a1 = a0 + Math.PI / n;
+    const a2 = a0 + (2 * Math.PI) / n;
+    const p0 = [cx + r * Math.cos(a0), cy + r * Math.sin(a0)];
+    const p1 = [cx + R * Math.cos(a1), cy + R * Math.sin(a1)];
+    const p2 = [cx + r * Math.cos(a2), cy + r * Math.sin(a2)];
+    if (i === 0) d += 'M' + p0[0].toFixed(2) + ' ' + p0[1].toFixed(2);
+    d += 'Q' + p1[0].toFixed(2) + ' ' + p1[1].toFixed(2) + ' ' + p2[0].toFixed(2) + ' ' + p2[1].toFixed(2);
+  }
+  return d + 'Z';
+}
+// شارة تويتر مكرمشة: الديسك المكرمش ثابت + حلقة مكرمشة تدور حوله بشرارة + صح أبيض ثابت يخترق الحافة
 function verifBadge(tier, size) {
   if (!tier || tier === 'none' || !FV_TIERS[tier]) return '';
   const c = FV_TIERS[tier];
   const n = ++fvGradCounter;
   const s = size || 18;
+  const disc = scallopPath(12, 12, 9.5, 8.1, 12);       // الديسك المكرمش (ثابت)
+  const ring = scallopPath(12, 12, 11.3, 10.0, 12);     // الحلقة المكرمشة (تدور)
+  const sx = (12 + 10.65 * Math.cos(-Math.PI / 2)).toFixed(2); // موضع الشرارة أعلى الحلقة
+  const sy = (12 + 10.65 * Math.sin(-Math.PI / 2)).toFixed(2);
   return '<span class="fv-badge fv-' + tier + '" style="width:' + s + 'px;height:' + s + 'px" title="توثيق ' + c.label + '">' +
     '<svg viewBox="0 0 24 24" width="' + s + '" height="' + s + '">' +
       '<defs><linearGradient id="fv-g' + n + '" x1="0" y1="0" x2="1" y2="1">' +
         '<stop offset="0" stop-color="' + c.g1 + '"/><stop offset="1" stop-color="' + c.g2 + '"/></linearGradient></defs>' +
-      '<g class="fv-rotate"><circle class="fv-ring" cx="12" cy="12" r="10.2" fill="none" stroke="' + c.ring + '" stroke-width="1.9" stroke-dasharray="10 4.8 7 4.8"/></g>' +
-      '<circle cx="12" cy="12" r="8.9" fill="url(#fv-g' + n + ')"/>' +
-      '<path d="M6.5 13.1l4.1 4.1 7.6-12.2" fill="none" stroke="' + c.check + '" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>' +
+      '<path d="' + disc + '" fill="url(#fv-g' + n + ')"/>' +
+      '<g class="fv-rotate">' +
+        '<path d="' + ring + '" fill="none" stroke="' + c.ring + '" stroke-width="1.6"/>' +
+        '<circle cx="' + sx + '" cy="' + sy + '" r="0.85" fill="#ffffff" class="fv-spark"/>' +
+      '</g>' +
+      '<path d="M6.6 13.2l4.2 4.2 7.4-12.6" fill="none" stroke="' + c.check + '" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>' +
     '</svg></span>';
 }
 function fvTierLabel(tier) { return (FV_TIERS[tier] && FV_TIERS[tier].label) || tier || ''; }
