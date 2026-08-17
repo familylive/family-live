@@ -350,6 +350,19 @@
       <div class="page-title">الرئيسية</div>
       <div class="page-subtitle">نشاط عائلتك اليوم</div>
 
+      <!-- Pinned Auction (top - under header) -->
+      <div class="card" id="dash-pinned-card" style="display:none;border:1.5px solid rgba(232,184,48,.55);background:linear-gradient(135deg,rgba(232,184,48,.08),rgba(232,184,48,.02))">
+        <div class="card-title">📌 مزاد مثبت <span style="font-size:11px;color:var(--text-muted)">(من إدارة التطبيق)</span></div>
+        <div id="dash-pinned-auction" style="text-align:center;padding:6px 0">
+          <div style="font-size:26px;font-weight:900;letter-spacing:3px;color:var(--gold)" id="dash-pinned-code">------</div>
+          <div style="display:flex;justify-content:center;gap:18px;margin-top:8px;font-size:13px">
+            <span>السعر الحالي: <b style="color:var(--gold)" id="dash-pinned-price">0</b></span>
+            <span>⏳ ينتهي: <b id="dash-pinned-end">--:--:--</b></span>
+          </div>
+          <button class="btn btn-accent btn-full" style="margin-top:12px" onclick="navigateTo('auctions')">⚡ شارك في المزاد</button>
+        </div>
+      </div>
+
       <!-- Active Auctions (top - under header) -->
       <div class="card">
         <div class="card-title">🏷️ مزادات الرموز <button class="btn btn-sm" style="float:left" onclick="navigateTo('auctions')">الكل ←</button></div>
@@ -2673,6 +2686,34 @@ function adminCoinPreview(inputId, spanId) {
 }
 
 async function loadDashboardAuctions() {
+  // المزاد المثبت (يظهر أعلى الرئيسية)
+  try {
+    const { auction } = await api('GET', '/api/auctions/pinned');
+    const card = document.getElementById('dash-pinned-card');
+    if (card) {
+      if (auction) {
+        card.style.display = 'block';
+        document.getElementById('dash-pinned-code').textContent = auction.code;
+        document.getElementById('dash-pinned-price').innerHTML = (auction.current_coins || (auction.current_price || auction.starting_price) * (auction.rate || 50)).toLocaleString('en') + ' <img src="/assets/coin.png" class="coin-ico" alt="كونزه">';
+        const endEl = document.getElementById('dash-pinned-end');
+        const end = new Date(auction.end_time).getTime();
+        if (endEl) {
+          endEl.dataset.end = end;
+          const tick = () => {
+            const diff = Math.max(0, end - Date.now());
+            const h = Math.floor(diff / 3600000), m = Math.floor(diff % 3600000 / 60000), s = Math.floor(diff % 60000 / 1000);
+            endEl.textContent = (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+            if (diff <= 0) clearInterval(endEl._t);
+          };
+          clearInterval(endEl._t);
+          tick();
+          endEl._t = setInterval(tick, 1000);
+        }
+      } else {
+        card.style.display = 'none';
+      }
+    }
+  } catch(e) {}
   try {
     const { auctions } = await api('GET', '/api/auctions/active');
     const list = document.getElementById('dash-auctions-list');
@@ -2682,7 +2723,7 @@ async function loadDashboardAuctions() {
     }
     list.innerHTML = auctions.slice(0, 4).map(a =>
       '<div class="dash-auction-item">' +
-        '<span class="dash-auction-code">🏷️ <span class="rainbow-text">' + a.code + '</span></span>' +
+        '<span class="dash-auction-code">' + (a.pinned ? '📌 ' : '🏷️ ') + '<span class="rainbow-text">' + a.code + '</span></span>' +
         '<span class="dash-auction-price"><img src="/assets/coin.png" class="coin-ico" alt="كونزه"> ' + (a.current_coins || (a.current_price || a.starting_price) * (a.rate || 50)) + '</span>' +
         '<button class="btn btn-sm btn-accent" onclick="navigateTo(\'auctions\')">شارك</button>' +
       '</div>'
@@ -4858,6 +4899,16 @@ function startAdminCountdowns() {
   }, 1000);
 }
 
+// تثبيت مزاد بالرئيسية (أدمن)
+async function pinAuctionAdmin(auctionId, pinned) {
+  try {
+    const r = await api('POST', '/api/admin/auctions/pin', { auctionId, pinned });
+    showToast(r.message, 'success');
+    loadAdminAuctions();
+    if (typeof loadDashboardAuctions === 'function') loadDashboardAuctions();
+  } catch(e) { showToast(e.message || 'فشل التثبيت', 'error'); }
+}
+
 async function loadAdminAuctions() {
   try {
     const { auctions } = await api('GET', '/api/admin/auctions');
@@ -4896,6 +4947,8 @@ async function loadAdminAuctions() {
         '</div>' +
         partsHtml +
         '<div class="admin-family-actions">' +
+          (a.pinned ? '<span class="empty-text" style="font-size:11px;font-weight:700;color:var(--gold)">📌 مثبت</span>' : '') +
+          (a.status === 'active' ? '<button class="btn btn-sm btn-accent" onclick="pinAuctionAdmin(\'' + a.id + '\',' + (a.pinned ? 0 : 1) + ')">' + (a.pinned ? '📌 إلغاء التثبيت' : '📌 تثبيت بالرئيسية') + '</button>' : '') +
           (a.status === 'active' ? '<button class="btn btn-sm btn-danger" onclick="endAuctionAdmin(\'' + a.id + '\')">🏁 إنهاء</button>' : '') +
           (a.status === 'ended' && a.winner_id && !a.paid ? '<button class="btn btn-sm btn-success" onclick="confirmPaymentAdmin(\'' + a.id + '\')">💰 تأكيد السداد</button>' : '') +
           (a.status === 'ended' && a.winner_id && !a.paid ? '<button class="btn btn-sm btn-danger" onclick="releaseCodeAdmin(\'' + a.id + '\')">↩️ إرجاع الرمز</button>' : '') +

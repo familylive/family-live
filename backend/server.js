@@ -1302,6 +1302,12 @@ app.get('/api/auctions/active', async (req, res) => {
   res.json({ auctions });
 });
 
+// Public: pinned auction (للرئيسية ولوحات الأعضاء)
+app.get('/api/auctions/pinned', asyncHandler(async (req, res) => {
+  const auction = await db.getPinnedAuction();
+  res.json({ auction: auction ? await auctionInCoins(auction) : null });
+}));
+
 // Get auction details with bids
 app.get('/api/auctions/:id', authMiddleware, async (req, res) => {
   const auction = await db.getAuctionById(req.params.id);
@@ -1473,6 +1479,15 @@ app.get('/api/admin/reports', authMiddleware, adminMiddleware, asyncHandler(asyn
 // Admin: auction reports (sales/returns/bids)
 app.get('/api/admin/auction-logs', authMiddleware, adminMiddleware, asyncHandler(async (req, res) => {
   res.json({ logs: await db.getAuctionLogs() });
+}));
+
+// Admin: pin/unpin an auction (المزاد المثبت يظهر بالرئيسية)
+app.post('/api/admin/auctions/pin', authMiddleware, adminMiddleware, asyncHandler(async (req, res) => {
+  const { auctionId, pinned } = req.body;
+  if (!auctionId) return res.status(400).json({ error: 'معرف المزاد مطلوب' });
+  const auction = await db.setAuctionPinned(auctionId, pinned ? 1 : 0);
+  if (!auction) return res.status(404).json({ error: 'المزاد غير موجود' });
+  res.json({ message: pinned ? '📌 تم تثبيت المزاد على الرئيسية — يظهر لجميع الأعضاء' : '📌 تم إلغاء تثبيت المزاد', auction });
 }));
 
 // Admin: all auctions

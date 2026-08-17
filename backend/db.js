@@ -63,6 +63,7 @@ async function initDb() {
   await run(`CREATE TABLE IF NOT EXISTS ads (id TEXT PRIMARY KEY, title TEXT NOT NULL, image_url TEXT, link_url TEXT, status TEXT DEFAULT 'active', position TEXT DEFAULT 'banner', start_time TEXT, end_time TEXT, views INTEGER DEFAULT 0, clicks INTEGER DEFAULT 0, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS auction_logs (id TEXT PRIMARY KEY, auction_id TEXT, code TEXT, event TEXT, user_id TEXT, user_name TEXT, amount INTEGER DEFAULT 0, detail TEXT, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS auctions (id TEXT PRIMARY KEY, code TEXT NOT NULL, starting_price INTEGER DEFAULT 100, entry_fee INTEGER DEFAULT 50, current_price INTEGER DEFAULT 100, min_increment INTEGER DEFAULT 10, start_time TEXT DEFAULT now(), end_time TEXT NOT NULL, status TEXT DEFAULT 'active', winner_id TEXT, paid INTEGER DEFAULT 0, created_by TEXT, created_at TEXT DEFAULT now())`);
+  try { await run(`ALTER TABLE auctions ADD COLUMN IF NOT EXISTS pinned INTEGER DEFAULT 0`); } catch(e) {}
   await run(`CREATE TABLE IF NOT EXISTS auction_bids (id TEXT PRIMARY KEY, auction_id TEXT NOT NULL, user_id TEXT NOT NULL, amount INTEGER NOT NULL, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS auction_participants (id TEXT PRIMARY KEY, auction_id TEXT NOT NULL, user_id TEXT NOT NULL, paid_entry INTEGER DEFAULT 1, joined_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS announcements (id TEXT PRIMARY KEY, family_id TEXT NOT NULL, created_by TEXT NOT NULL, title TEXT NOT NULL, content TEXT, announce_type TEXT DEFAULT 'text', target_user_id TEXT, event_time TEXT, status TEXT DEFAULT 'active', created_at TEXT DEFAULT now())`);
@@ -398,7 +399,18 @@ async function createAuction(code, startingPrice, entryFee, durationMinutes, min
 }
 async function getActiveAuctions() {
   await run("UPDATE auctions SET status = 'ended' WHERE status = 'active' AND end_time::timestamptz < now()", []);
-  return query('SELECT a.*, u.name as winner_name FROM auctions a LEFT JOIN users u ON a.winner_id = u.id WHERE a.status = \'active\' ORDER BY a.created_at DESC');
+  return query('SELECT a.*, u.name as winner_name FROM auctions a LEFT JOIN users u ON a.winner_id = u.id WHERE a.status = \'active\' ORDER BY a.pinned DESC, a.created_at DESC');
+}
+// المزاد المثبت (واحد فقط) — يظهر بالرئيسية
+async function getPinnedAuction() {
+  await run("UPDATE auctions SET status = 'ended' WHERE status = 'active' AND end_time::timestamptz < now()", []);
+  return queryOne('SELECT a.*, u.name as winner_name FROM auctions a LEFT JOIN users u ON a.winner_id = u.id WHERE a.pinned = 1 AND a.status = \'active\' ORDER BY a.created_at DESC LIMIT 1');
+}
+// تثبيت مزاد (يلغي تثبيت غيره)
+async function setAuctionPinned(auctionId, pinned) {
+  if (pinned) await run('UPDATE auctions SET pinned = 0 WHERE pinned = 1');
+  await run('UPDATE auctions SET pinned = $1 WHERE id = $2', [pinned ? 1 : 0, auctionId]);
+  return queryOne('SELECT * FROM auctions WHERE id = $1', [auctionId]);
 }
 async function getAllAuctions() { return query('SELECT a.*, u.name as winner_name FROM auctions a LEFT JOIN users u ON a.winner_id = u.id ORDER BY a.created_at DESC LIMIT 30'); }
 async function getAuctionById(id) { return queryOne('SELECT a.*, u.name as winner_name FROM auctions a LEFT JOIN users u ON a.winner_id = u.id WHERE a.id = $1', [id]); }
@@ -1364,7 +1376,7 @@ module.exports = {
   createInvitation, createInvitationByPhone, getInvitationsByFamily, getInvitationByToken, acceptInvitation,
   openDiwaniya, closeDiwaniya, getActiveDiwaniya, getDiwaniyaSessionById, verifyDiwaniyaCode, getDiwaniyaHistory, addDiwaniyaMessage, getDiwaniyaMessages,
   createChallenge, respondToChallenge, completeChallenge, getFamilyChallenges, getPendingChallenges, getFamilyLeaderboard,
-  createAuction, getActiveAuctions, getAllAuctions, getAuctionById, joinAuction, placeBid, endAuction, confirmAuctionPayment, cancelAuction, getAuctionBids, isAuctionParticipant, getAvailableAuctionCodes, getAuctionParticipants, getLastBidder, releaseAuctionCode,
+  createAuction, getActiveAuctions, getPinnedAuction, setAuctionPinned, getAllAuctions, getAuctionById, joinAuction, placeBid, endAuction, confirmAuctionPayment, cancelAuction, getAuctionBids, isAuctionParticipant, getAvailableAuctionCodes, getAuctionParticipants, getLastBidder, releaseAuctionCode,
   getAllFamilies, updateFamilyData, setFamilyStatus, deleteFamily, getAllUsersDetailed, updateUserByAdmin, deleteUserByAdmin, createAdminUser, createUserByRole, getAdminStats,
   getActiveAds, getAllAds, addAd, updateAd, deleteAd, trackAdView, trackAdClick, getAdsStats, getFeaturedFamilies,
   getUserFamilies, getUserFamilyCount, addUserToFamily, setCurrentFamily, getSetting, setSetting,
