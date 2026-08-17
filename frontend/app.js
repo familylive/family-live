@@ -3672,7 +3672,7 @@ function verifBadge(tier, size) {
         '<path d="' + ring + '" fill="none" stroke="' + c.ring + '" stroke-width="1.6"/>' +
         '<circle cx="' + sx + '" cy="' + sy + '" r="0.85" fill="#ffffff" class="fv-spark"/>' +
       '</g>' +
-      '<path d="M6.6 13.2l4.2 4.2 7.4-12.6" fill="none" stroke="' + c.check + '" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>' +
+      '<path d="M6.9 12.9l3.8 3.8 6.5-10.1" fill="none" stroke="' + c.check + '" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>' +
     '</svg></span>';
 }
 function fvTierLabel(tier) { return (FV_TIERS[tier] && FV_TIERS[tier].label) || tier || ''; }
