@@ -604,8 +604,8 @@ function connectSocket() {
   });
   socket.on('gift_on_camera', (d) => {
     if (d && d.toId) { sessionGiftCoins[d.toId] = (sessionGiftCoins[d.toId] || 0) + (d.giftCoins || 0); updateCallPresence(); }
-    // أنيميشن الهدية على الشاشة (نمط تيك توك) لكل من في البث
-    if (d && d.giftName) showGiftOnCamera(d);
+    // أنيميشن الهدية على الشاشة (نمط تيك توك) لكل من في البث — فقط أثناء البث
+    if (d && d.giftName && inLiveCall) showGiftOnCamera(d);
   });
   socket.on('diwaniya_message', (msg) => {
     addChatMessage(msg.user_name, msg.message, msg.user_id === state.user?.id, msg.avatar, msg.user_level, msg.user_role === 'founder' ? (msg.family_verif || 'none') : 'none', msg.user_id);

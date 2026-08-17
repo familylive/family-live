@@ -2484,6 +2484,14 @@ body {
   border-radius: 14px;
   overflow: hidden;
 }
+/* في وضع تيك توك: عناصر التحكم القديمة المكررة مخفية — الشريط السفلي الجديد هو الواجهة */
+.video-grid.tiktok-mode .call-buttons { display: none !important; }
+.video-grid.tiktok-mode #call-controls .tt-top-count,
+.video-grid.tiktok-mode #call-controls .call-participants,
+.video-grid.tiktok-mode #call-controls .call-timer,
+.video-grid.tiktok-mode #call-controls .call-limit { display: none !important; }
+.video-grid.tiktok-mode #battle-bar { display: none !important; }
+.video-grid.tiktok-mode #battle-start-box { display: none !important; }
 .video-grid.tiktok-mode .video-tile {
   aspect-ratio: auto;
 }
@@ -3253,12 +3261,13 @@ body {
 /* البث يملاً الشاشة داخل القسم */
 .video-grid.tiktok-mode.audio-mode { height: 68vh; }
 
-/* تعليقات تيك توك: يمين الشاشة صاعدة */
+/* تعليقات تيك توك: يمين الشاشة صاعدة (فوق شريط الأيقونات السفلي) */
 .tiktok-chat {
   left: auto;
   right: 0;
   width: 72%;
-  height: 55%;
+  height: 46%;
+  bottom: 58px;
   justify-content: flex-end;
   background: none;
   padding: 8px;

@@ -2141,6 +2141,8 @@ app.post('/api/diwaniya/open', authMiddleware, async (req, res) => {
 app.post('/api/diwaniya/close/:sessionId', authMiddleware, async (req, res) => {
   // Reset mic/camera room state for this session
   if (audioRooms[req.params.sessionId]) delete audioRooms[req.params.sessionId];
+  // Stop the bot gifting loop immediately when the broadcast closes
+  if (botGiftTimer) { clearInterval(botGiftTimer); botGiftTimer = null; }
   const userFull = await db.getUserById(req.user.id);
   const isFounder = req.user.role === 'founder';
   const isManager = userFull && userFull.can_open_diwaniya == 1;
