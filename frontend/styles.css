@@ -3566,3 +3566,7 @@ body.bcast-open .modal-overlay { z-index: 2500 !important; }
 
 /* صف بطاقة التوثيق في لوحة التحكم */
 #admin-fv-card .form-group label { font-size: 12px; }
+
+/* زر الصيانة البرتقالي */
+.btn-warning { background: #ff9800; color: #fff; }
+.btn-warning:hover { background: #e68900; }

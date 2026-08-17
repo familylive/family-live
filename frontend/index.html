@@ -538,6 +538,11 @@
     <div id="page-diwaniya" class="page-content">
       <div class="page-title">الديوانية</div>
       <div class="page-subtitle">مجلس العائلة الافتراضي</div>
+      <div id="maintenance-banner" style="display:none;margin-bottom:12px;padding:14px;border-radius:12px;background:rgba(255,152,0,.12);border:1.5px solid rgba(255,152,0,.55)">
+        <div style="font-size:15px;font-weight:800;color:#ff9800">🟠 الديوانية تحت الصيانة</div>
+        <div style="font-size:13px;color:var(--text-secondary);margin-top:4px"><span id="maintenance-banner-reason">جاري تحديث وصيانة الديوانيات</span><span id="maintenance-banner-until"></span></div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:4px">يمكنك المحاولة لاحقاً، أو التواصل مع الإدارة.</div>
+      </div>
       <div class="card" id="diwaniya-controls-card">
         <div class="card-title">🎛️ التحكم</div>
         <div class="diwaniya-controls">
@@ -1195,6 +1200,42 @@
           <button class="btn btn-success" onclick="chargeSite()">💳 شحن</button>
         </div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:6px">يضيف كونزات إلى رصيد الموقع الكلي (يظهر في التقارير)</div>
+      </div>
+      <div class="card" id="admin-diwaniya-card" style="border:1.5px solid rgba(255,152,0,.45)">
+        <div class="card-title">🕌 إدارة الديوانية <span style="font-size:11px;color:var(--text-muted)">(تحكم بكل الديوانيات)</span></div>
+        <div style="font-size:12px;color:var(--text-secondary);margin-bottom:10px">أوقف خاصية الفيديو أو الصوت أو كلاهما، أو أغلق كل الديوانيات للصيانة بوقت محدد — وتظهر برتقالي 🟠 للمستخدمين.</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+          <label class="toggle-row" style="display:flex;align-items:center;gap:8px;flex:1;min-width:150px;background:var(--bg-hover);border-radius:10px;padding:10px 12px">
+            <span style="font-size:13px;font-weight:700">🎥 الفيديو</span>
+            <select class="form-input" id="dw-video-toggle" style="flex:1">
+              <option value="1">مفعل ✅</option><option value="0">معطل ⛔</option>
+            </select>
+          </label>
+          <label class="toggle-row" style="display:flex;align-items:center;gap:8px;flex:1;min-width:150px;background:var(--bg-hover);border-radius:10px;padding:10px 12px">
+            <span style="font-size:13px;font-weight:700">🎤 الصوت</span>
+            <select class="form-input" id="dw-audio-toggle" style="flex:1">
+              <option value="1">مفعل ✅</option><option value="0">معطل ⛔</option>
+            </select>
+          </label>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-sm" style="flex:1" onclick="saveDiwaniyaToggles()">💾 حفظ الإعدادات</button>
+          <button class="btn btn-sm btn-danger" style="flex:1" onclick="disableAllDiwaniyaModes()">⛔ إيقاف الكل</button>
+        </div>
+        <div style="border-top:1px dashed var(--border);margin-top:12px;padding-top:12px">
+          <div class="card-title" style="font-size:14px">🟠 وضع الصيانة</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:6px">
+            <input class="form-input" id="dw-maint-minutes" type="number" value="30" min="1" placeholder="المدة (دقائق)" style="width:110px">
+            <input class="form-input" id="dw-maint-reason" type="text" placeholder="سبب الصيانة (اختياري)" style="flex:1;min-width:150px">
+            <button class="btn btn-warning" onclick="startDiwaniyaMaintenance()">🟠 بدء الصيانة</button>
+            <button class="btn btn-success" onclick="endDiwaniyaMaintenance()">✅ إيقاف الصيانة</button>
+          </div>
+          <div id="dw-maint-status" style="font-size:12px;color:var(--text-muted);margin-top:8px"></div>
+        </div>
+        <div style="border-top:1px dashed var(--border);margin-top:12px;padding-top:12px">
+          <div class="card-title" style="font-size:14px">📋 كل الديوانيات <span id="dw-sessions-count" class="badge"></span></div>
+          <div id="dw-sessions-list" style="max-height:260px;overflow-y:auto;margin-top:6px"><div class="empty-text">جاري التحميل...</div></div>
+        </div>
       </div>
       <div class="page-subtitle">إدارة جميع العوائل</div>
       
@@ -1895,7 +1936,7 @@ function navigateTo(pageName) {
   if (pageName === 'reports' && state.user?.role === 'admin') loadReportsPage();
   if (pageName === 'admin' && state.user?.role === 'admin') loadAdminSupport();
   if (pageName === 'family' && state.isLoggedIn) { loadAnnouncements(); populateAnnTarget(); populateManagerSelect(); loadFamilyPageData(); }
-  if (pageName === 'admin' && state.user?.role === 'admin') { loadBannedWords(); loadAdminBans(); loadAIUsers(); loadViolations(); loadAdminAgreements(); loadAdminUsers(); loadModeratorVisitsAdmin(); loadFamilyVerificationSettings(); }
+  if (pageName === 'admin' && state.user?.role === 'admin') { loadBannedWords(); loadAdminBans(); loadAIUsers(); loadViolations(); loadAdminAgreements(); loadAdminUsers(); loadModeratorVisitsAdmin(); loadFamilyVerificationSettings(); loadDiwaniyaAdminSettings(); }
   if (pageName === 'moderator' && (state.user?.role === 'moderator' || state.user?.role === 'admin')) { loadModeratorFamilies(); loadModeratorVisitsHistory(); loadModeratorProfile(); }
   if (pageName === 'admin' && state.user?.role === 'admin') loadTierSettings();
   if (pageName === 'codes' && state.isLoggedIn) loadCodesPage();

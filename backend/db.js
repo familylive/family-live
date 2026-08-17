@@ -977,6 +977,51 @@ async function isDiwaniyaRestricted(sessionId, userId) {
   const r = await queryOne('SELECT * FROM diwaniya_restrictions WHERE session_id = $1 AND user_id = $2', [sessionId, userId]);
   return r || null;
 }
+
+// =============== DIWANIYA GLOBAL CONTROLS (إدارة الديوانية) ===============
+async function getDiwaniyaGlobalSettings() {
+  const now = Date.now();
+  const untilRaw = await getSetting('dw_maintenance_until', '');
+  const until = untilRaw ? new Date(untilRaw).getTime() : 0;
+  return {
+    video_enabled: (await getSetting('dw_video_enabled', '1')) !== '0',
+    audio_enabled: (await getSetting('dw_audio_enabled', '1')) !== '0',
+    maintenance: {
+      active: !!(untilRaw && until > now),
+      until: untilRaw || null,
+      reason: (await getSetting('dw_maintenance_reason', '')) || ''
+    }
+  };
+}
+async function setDiwaniyaGlobalSettings(videoEnabled, audioEnabled) {
+  await setSetting('dw_video_enabled', videoEnabled ? '1' : '0');
+  await setSetting('dw_audio_enabled', audioEnabled ? '1' : '0');
+  return getDiwaniyaGlobalSettings();
+}
+async function setDiwaniyaMaintenance(minutes, reason) {
+  const until = new Date(Date.now() + (parseInt(minutes) || 30) * 60000).toISOString();
+  await setSetting('dw_maintenance_until', until);
+  await setSetting('dw_maintenance_reason', reason || '');
+  return getDiwaniyaGlobalSettings();
+}
+async function clearDiwaniyaMaintenance() {
+  await setSetting('dw_maintenance_until', '');
+  await setSetting('dw_maintenance_reason', '');
+  return getDiwaniyaGlobalSettings();
+}
+async function getAllDiwaniyaSessions() {
+  return query(`SELECT s.*, f.name as family_name,
+    (SELECT COUNT(*) FROM diwaniya_messages m WHERE m.session_id = s.id) as msg_count
+    FROM diwaniya_sessions s LEFT JOIN families f ON s.family_id = f.id
+    ORDER BY s.opened_at DESC`);
+}
+async function closeAllDiwaniyas() {
+  return query("UPDATE diwaniya_sessions SET status = 'closed', closed_at = now() WHERE status = 'open'");
+}
+async function closeDiwaniyaByAdmin(sessionId) {
+  const r = await queryOne("UPDATE diwaniya_sessions SET status = 'closed', closed_at = now() WHERE id = $1 AND status = 'open' RETURNING *", [sessionId]);
+  return r || null;
+}
 async function restrictFromDiwaniya(sessionId, userId, type = 'restrict') {
   const ex = await isDiwaniyaRestricted(sessionId, userId);
   if (ex) {
@@ -1259,6 +1304,7 @@ module.exports = {
   addLevelPoints, getUserLevel, getLevelConfig, getLevelByNum, setLevelConfig, deleteLevelConfig, seedLevels, computeUserLevel, addUserCharged, addUserSupport,
   getWithdrawFee, setWithdrawFee,
   isDiwaniyaRestricted, restrictFromDiwaniya, unrestrictFromDiwaniya, getDiwaniyaRestrictions,
+  getDiwaniyaGlobalSettings, setDiwaniyaGlobalSettings, setDiwaniyaMaintenance, clearDiwaniyaMaintenance, getAllDiwaniyaSessions, closeAllDiwaniyas, closeDiwaniyaByAdmin,
   seedViolationTemplates, getViolationTemplates, getAllViolationTemplates, addViolationTemplate, deleteViolationTemplate, addFounderViolation,
   getGiftItems, getAllGiftItems, addGiftItem, updateGiftItem, deleteGiftItem,
   getWallet, addCoins, deductCoins, addToHold, releaseHold, sendGift, convertCoinsToWallet, getUserByPublicId, transferCoins, getCoinPackages, getAllCoinPackages, addCoinPackage, updateCoinPackage, updateCoinPackageFull, deleteCoinPackage,

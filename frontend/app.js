@@ -272,6 +272,7 @@ async function refreshData() {
 function updateAllUI() {
   if (typeof updateLevelUI === 'function') updateLevelUI();
   if (typeof updateChatGiftBtn === 'function') updateChatGiftBtn();
+  refreshDiwaniyaGlobalStatus();
   try {
   document.getElementById('menu-user-name').textContent = state.user?.name || '';
   document.getElementById('menu-user-role').textContent = state.isFounder ? 'المؤسس 👑' : 'عضو';
@@ -550,7 +551,7 @@ function connectSocket() {
   });
   socket.on('diwaniya_opened', (s) => {
     state.diwaniyaOpen = true; state.activeSession = s;
-    document.getElementById('stat-diwaniya').textContent = '🟢 مفتوحة';
+    updateDiwaniyaStat();
     document.getElementById('timer-display').className = 'timer-display active';
     document.getElementById('timer-num').textContent = String(s.duration_minutes).padStart(2,'0') + ':00';
     document.querySelector('#timer-display .timer-label').textContent = 'الديوانية مفتوحة';
@@ -561,14 +562,14 @@ function connectSocket() {
     state.diwaniyaOpen = false; state.activeSession = null;
     stopDiwaniyaTimer(); enableChat(false);
     document.getElementById('diwaniya-toggle-btn').textContent = '🔓 فتح الديوانية';
-    document.getElementById('stat-diwaniya').textContent = '🔴 متوقفة';
+    updateDiwaniyaStat();
   });
   socket.on('diwaniya_closed_violation', (data) => {
     // Close diwaniya UI
     state.diwaniyaOpen = false; state.activeSession = null;
     stopDiwaniyaTimer(); enableChat(false);
     document.getElementById('diwaniya-toggle-btn').textContent = '🔓 فتح الديوانية';
-    document.getElementById('stat-diwaniya').textContent = '🔴 متوقفة';
+    updateDiwaniyaStat();
     // Show persistent violation banner with countdown
     showViolationBanner(data.violatorName, data.reason, data.lockedUntil || null);
   });
@@ -643,7 +644,7 @@ function connectSocket() {
     state.activeSession = null;
     stopDiwaniyaTimer();
     document.getElementById('diwaniya-toggle-btn').textContent = '🔓 فتح الديوانية';
-    document.getElementById('stat-diwaniya').textContent = '🔴 متوقفة';
+    updateDiwaniyaStat();
   });
   socket.on('audio_kick', (data) => {
     if (data.userId === state.user?.id) {
@@ -918,8 +919,95 @@ function connectSocket() {
 }
 
 // ==================== DIWANIYA ====================
+// الحالة العالمية للديوانية (فيديو/صوت/صيانة) — تتحكم من لوحة الإدارة
+let dwGlobal = { video_enabled: true, audio_enabled: true, maintenance: { active: false, until: null, reason: '' } };
+
+async function refreshDiwaniyaGlobalStatus() {
+  try {
+    const s = await api('GET', '/api/diwaniya/global-status');
+    dwGlobal = Object.assign(dwGlobal, s);
+    applyDiwaniyaGlobalStatusUI();
+  } catch(e) {}
+}
+
+function dwMaintenanceActive() {
+  return !!(dwGlobal.maintenance && dwGlobal.maintenance.active);
+}
+
+function updateDiwaniyaStat() {
+  const stat = document.getElementById('stat-diwaniya');
+  if (!stat) return;
+  if (dwMaintenanceActive() && state.user?.role !== 'admin') {
+    stat.innerHTML = '<span style="color:#ff9800;font-weight:700">🟠 تحت الصيانة</span>';
+  } else {
+    stat.textContent = state.diwaniyaOpen ? '🟢 مفتوحة' : '🔴 متوقفة';
+  }
+}
+
+function applyDiwaniyaGlobalStatusUI() {
+  // مؤشر الرئيسية
+  updateDiwaniyaStat();
+  const isAdmin = state.user?.role === 'admin';
+  const maint = dwMaintenanceActive();
+
+  // بانر الصيانة في صفحة الديوانية
+  const banner = document.getElementById('maintenance-banner');
+  if (banner) {
+    const show = maint && !isAdmin;
+    banner.style.display = show ? 'block' : 'none';
+    if (show) {
+      const reasonEl = document.getElementById('maintenance-banner-reason');
+      if (reasonEl) reasonEl.textContent = dwGlobal.maintenance.reason || 'جاري تحديث وصيانة الديوانيات';
+      const untilEl = document.getElementById('maintenance-banner-until');
+      if (untilEl) {
+        try {
+          const d = new Date(dwGlobal.maintenance.until);
+          if (!isNaN(d)) untilEl.textContent = ' حتى ' + d.toLocaleString('ar-SA', { hour: '2-digit', minute: '2-digit' });
+        } catch(e) {}
+      }
+    }
+  }
+
+  // إخفاء أزرار التحكم للمستخدم العادي أثناء الصيانة
+  const controls = document.getElementById('diwaniya-controls-card');
+  if (controls) controls.style.display = (maint && !isAdmin) ? 'none' : 'block';
+
+  // تعطيل أوضاع الفيديو/الصوت من القائمة
+  const modeSel = document.getElementById('diwaniya-mode');
+  if (modeSel) {
+    const opt = v => modeSel.querySelector('option[value="' + v + '"]');
+    const setOpt = (v, enabled) => {
+      const o = opt(v);
+      if (o) {
+        o.disabled = !enabled;
+        o.textContent = (enabled ? '' : '⛔ ') + o.textContent.replace(/^⛔ /, '');
+      }
+    };
+    setOpt('video', dwGlobal.video_enabled);
+    setOpt('audio', dwGlobal.audio_enabled);
+    setOpt('both', dwGlobal.video_enabled && dwGlobal.audio_enabled);
+    setOpt('all', dwGlobal.video_enabled && dwGlobal.audio_enabled);
+    // لو الوضع المحدد صار معطلاً → نرجع للكتابي
+    const curOpt = modeSel.querySelector('option[value="' + modeSel.value + '"]');
+    if (curOpt && curOpt.disabled) modeSel.value = 'text';
+  }
+
+  // إخفاء قسم المكالمة إذا كان الصوت أو الفيديو معطل
+  const liveSection = document.getElementById('live-audio-section');
+  if (liveSection && liveSection.style.display !== 'none' && state.diwaniyaOpen) {
+    const mode = state.diwaniyaMode || 'text';
+    const needsAudio = ['audio', 'video', 'both', 'all'].includes(mode);
+    const needsVideo = ['video', 'all'].includes(mode);
+    if (needsAudio && !dwGlobal.audio_enabled) liveSection.style.display = 'none';
+    if (needsVideo && !dwGlobal.video_enabled) liveSection.style.display = 'none';
+  }
+}
+
 async function toggleDiwaniya() {
   if (state.diwaniyaOpen) return closeDiwaniya();
+  if (dwMaintenanceActive() && state.user?.role !== 'admin') {
+    return showToast('🟠 الديوانية تحت الصيانة حالياً — جاري التحديث، حاول لاحقاً', 'error');
+  }
   const duration = parseInt(document.getElementById('diwaniya-duration').value);
   const topic = document.getElementById('diwaniya-topic').value.trim();
   const mode = document.getElementById('diwaniya-mode')?.value || 'text';
@@ -938,7 +1026,7 @@ async function toggleDiwaniya() {
     state.diwaniyaOpen = true; state.activeSession = session;
     state.diwaniyaMode = mode;
     document.getElementById('diwaniya-toggle-btn').textContent = '🔒 إغلاق الديوانية';
-    document.getElementById('stat-diwaniya').textContent = '🟢 مفتوحة';
+    updateDiwaniyaStat();
     const modeLabel = { text: '✍️ كتابي', audio: '🎤 صوتي', video: '🎥 فيديو', both: '📝🎤 كتابي+صوتي', all: '📝🎥🎤 كل شي' };
     document.querySelector('#timer-display .timer-label').textContent = 'الديوانية مفتوحة - ' + (modeLabel[mode] || mode);
     startDiwaniyaTimer(duration);
@@ -968,7 +1056,7 @@ async function closeDiwaniya() {
     state.diwaniyaOpen = false; state.activeSession = null;
     stopDiwaniyaTimer(); enableChat(false);
     document.getElementById('diwaniya-toggle-btn').textContent = '🔓 فتح الديوانية';
-    document.getElementById('stat-diwaniya').textContent = '🔴 متوقفة';
+    updateDiwaniyaStat();
     const audioSection = document.getElementById('live-audio-section');
     if (audioSection) audioSection.style.display = 'none';
     if (inLiveCall) leaveLiveAudio();
@@ -1554,6 +1642,9 @@ function stopRecording() {
 }
 
 function sendAudioMessage(blob) {
+  if (!dwGlobal.audio_enabled && state.user?.role !== 'admin') {
+    return showToast('🎤 خاصية الصوت معطلة حالياً من إدارة التطبيق', 'error');
+  }
   const reader = new FileReader();
   reader.onload = function() {
     const base64Audio = reader.result.split(',')[1];
@@ -3847,5 +3938,86 @@ async function saveFamilyVerification() {
     });
     showToast(r.message, 'success');
   } catch(e) { showToast(e.message || 'فشل حفظ إعدادات التوثيق', 'error'); }
+}
+
+// ==================== ADMIN: إدارة الديوانية ====================
+async function loadDiwaniyaAdminSettings() {
+  try {
+    const { settings, sessions } = await api('GET', '/api/admin/diwaniya-settings');
+    document.getElementById('dw-video-toggle').value = settings.video_enabled ? '1' : '0';
+    document.getElementById('dw-audio-toggle').value = settings.audio_enabled ? '1' : '0';
+    const st = document.getElementById('dw-maint-status');
+    if (st) {
+      if (settings.maintenance.active) {
+        st.innerHTML = '<span style="color:#ff9800;font-weight:700">🟠 الصيانة مفعلة حتى ' + new Date(settings.maintenance.until).toLocaleString('ar-SA', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'numeric' }) + '</span>' + (settings.maintenance.reason ? ' — ' + settings.maintenance.reason : '');
+      } else {
+        st.textContent = 'لا توجد صيانة مفعلة حالياً';
+      }
+    }
+    const cnt = document.getElementById('dw-sessions-count');
+    if (cnt) cnt.textContent = sessions.length;
+    const list = document.getElementById('dw-sessions-list');
+    if (list) {
+      list.innerHTML = sessions.length ? sessions.map(s => {
+        const open = s.status === 'open';
+        const modeLabel = { text: '✍️', audio: '🎤', video: '🎥', both: '📝🎤', all: '📝🎥🎤' }[s.mode] || s.mode;
+        return '<div class="admin-family-item">' +
+          '<div class="admin-family-name">' + escapeHtml(s.family_name || 'بدون عائلة') + ' · ' + modeLabel + ' · ' + (s.topic || '') + '</div>' +
+          '<div class="admin-family-actions">' +
+            '<span style="font-size:11px;color:var(--text-muted)">' + (s.msg_count || 0) + ' رسالة · ' + fmtDateTime(s.opened_at) + '</span>' +
+            (open ? '<button class="btn btn-sm btn-danger" onclick="closeDiwaniyaAdmin(\'' + s.id + '\')">🔒 إغلاق</button>' : '<span class="empty-text" style="font-size:11px">مغلقة</span>') +
+          '</div></div>';
+      }).join('') : '<div class="empty-text">لا توجد جلسات بعد</div>';
+    }
+  } catch(e) { console.error('Diwaniya admin:', e); }
+}
+async function saveDiwaniyaToggles() {
+  try {
+    const r = await api('POST', '/api/admin/diwaniya-settings', {
+      video_enabled: document.getElementById('dw-video-toggle').value === '1',
+      audio_enabled: document.getElementById('dw-audio-toggle').value === '1'
+    });
+    showToast(r.message, 'success');
+    dwGlobal = Object.assign(dwGlobal, r.settings);
+    applyDiwaniyaGlobalStatusUI();
+  } catch(e) { showToast(e.message || 'فشل الحفظ', 'error'); }
+}
+async function disableAllDiwaniyaModes() {
+  if (!confirm('⛔ إيقاف الفيديو والصوت معاً؟ (الديوانية كتابية فقط)')) return;
+  try {
+    const r = await api('POST', '/api/admin/diwaniya-settings', { video_enabled: false, audio_enabled: false });
+    document.getElementById('dw-video-toggle').value = '0';
+    document.getElementById('dw-audio-toggle').value = '0';
+    showToast('⛔ تم إيقاف الفيديو والصوت — الديوانية كتابية فقط', 'success');
+    dwGlobal = Object.assign(dwGlobal, r.settings);
+    applyDiwaniyaGlobalStatusUI();
+  } catch(e) { showToast(e.message || 'فشل', 'error'); }
+}
+async function startDiwaniyaMaintenance() {
+  const minutes = parseInt(document.getElementById('dw-maint-minutes').value) || 30;
+  const reason = document.getElementById('dw-maint-reason').value.trim();
+  if (!confirm('🟠 إغلاق كل الديوانيات وبدء الصيانة لمدة ' + minutes + ' دقيقة؟\n' + (reason ? '(' + reason + ')' : ''))) return;
+  try {
+    const r = await api('POST', '/api/admin/diwaniya-maintenance', { action: 'start', minutes, reason });
+    showToast(r.message, 'success');
+    loadDiwaniyaAdminSettings();
+    refreshDiwaniyaGlobalStatus();
+  } catch(e) { showToast(e.message || 'فشل بدء الصيانة', 'error'); }
+}
+async function endDiwaniyaMaintenance() {
+  try {
+    const r = await api('POST', '/api/admin/diwaniya-maintenance', { action: 'end' });
+    showToast(r.message, 'success');
+    loadDiwaniyaAdminSettings();
+    refreshDiwaniyaGlobalStatus();
+  } catch(e) { showToast(e.message || 'فشل إيقاف الصيانة', 'error'); }
+}
+async function closeDiwaniyaAdmin(sessionId) {
+  if (!confirm('🔒 إغلاق هذه الديوانية؟')) return;
+  try {
+    const r = await api('POST', '/api/admin/diwaniyas/close', { sessionId });
+    showToast(r.message, 'success');
+    loadDiwaniyaAdminSettings();
+  } catch(e) { showToast(e.message || 'فشل الإغلاق', 'error'); }
 }
 

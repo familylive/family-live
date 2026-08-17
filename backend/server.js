@@ -315,6 +315,49 @@ app.get('/api/admin/site-logs', authMiddleware, adminMiddleware, asyncHandler(as
   res.json({ logs: await db.getSiteLogs(100) });
 }));
 
+// =============== ADMIN: DIWANIYA MANAGEMENT (إدارة الديوانية) ===============
+
+// Admin: global diwaniya settings + all sessions
+app.get('/api/admin/diwaniya-settings', authMiddleware, adminMiddleware, asyncHandler(async (req, res) => {
+  const settings = await db.getDiwaniyaGlobalSettings();
+  const sessions = await db.getAllDiwaniyaSessions();
+  res.json({ settings, sessions });
+}));
+
+// Admin: toggle video/audio globally
+app.post('/api/admin/diwaniya-settings', authMiddleware, adminMiddleware, asyncHandler(async (req, res) => {
+  const { video_enabled, audio_enabled } = req.body;
+  const settings = await db.setDiwaniyaGlobalSettings(video_enabled !== false, audio_enabled !== false);
+  res.json({ message: '⚙️ تم تحديث إعدادات الديوانية', settings });
+}));
+
+// Admin: maintenance mode (start with minutes + reason / end)
+app.post('/api/admin/diwaniya-maintenance', authMiddleware, adminMiddleware, asyncHandler(async (req, res) => {
+  const { action, minutes, reason } = req.body;
+  if (action === 'start') {
+    await db.closeAllDiwaniyas(); // أغلق كل الديوانيات المفتوحة
+    const settings = await db.setDiwaniyaMaintenance(minutes, reason);
+    res.json({ message: '🟠 تم إغلاق كل الديوانيات وبدء الصيانة حتى ' + new Date(settings.maintenance.until).toLocaleString('ar-SA'), settings });
+  } else if (action === 'end') {
+    const settings = await db.clearDiwaniyaMaintenance();
+    res.json({ message: '✅ تم إيقاف الصيانة — الديوانيات عادت للعمل', settings });
+  } else {
+    res.status(400).json({ error: 'إجراء غير صالح' });
+  }
+}));
+
+// Admin: close any specific diwaniya
+app.post('/api/admin/diwaniyas/close', authMiddleware, adminMiddleware, asyncHandler(async (req, res) => {
+  const { sessionId } = req.body;
+  if (!sessionId) return res.status(400).json({ error: 'معرف الجلسة مطلوب' });
+  const session = await db.closeDiwaniyaByAdmin(sessionId);
+  if (!session) return res.status(404).json({ error: 'الديوانية غير موجودة أو مغلقة' });
+  if (audioRooms[sessionId]) delete audioRooms[sessionId];
+  io.to(`session_${sessionId}`).emit('diwaniya_closed', session);
+  io.to(`family_${session.family_id}`).emit('diwaniya_closed', session);
+  res.json({ message: '🔒 تم إغلاق الديوانية من الإدارة', session });
+}));
+
 // =============== ADMIN: FAMILY MANAGEMENT ===============
 
 // List all families (admin)
@@ -1935,6 +1978,28 @@ app.get('/api/family/invitations', authMiddleware, async (req, res) => {
 // =============== DIWANIYA ROUTES ===============
 
 // Open diwaniya
+// =============== DIWANIYA GLOBAL GUARD (إدارة الديوانية) ===============
+// Returns an error response object if the action is blocked globally, else null.
+async function diwaniyaGlobalGuard(req, mode) {
+  if (req.user.role === 'admin') return null; // الأدمن يتجاوز كل القيود (للتحديث والصيانة)
+  const g = await db.getDiwaniyaGlobalSettings();
+  if (g.maintenance.active) {
+    return { status: 503, error: '🟠 الديوانية تحت الصيانة حالياً — جاري التحديث، حاول لاحقاً' + (g.maintenance.reason ? ' (' + g.maintenance.reason + ')' : ''), maintenance: true, until: g.maintenance.until, reason: g.maintenance.reason };
+  }
+  if (mode && (mode === 'video' || mode === 'both' || mode === 'all') && !g.video_enabled) {
+    return { status: 403, error: '🎥 خاصية الفيديو معطلة حالياً من إدارة التطبيق' };
+  }
+  if (mode && (mode === 'audio' || mode === 'both' || mode === 'all') && !g.audio_enabled) {
+    return { status: 403, error: '🎤 خاصية الصوت معطلة حالياً من إدارة التطبيق' };
+  }
+  return null;
+}
+
+// Public global diwaniya status (for orange maintenance indicator)
+app.get('/api/diwaniya/global-status', async (req, res) => {
+  res.json(await db.getDiwaniyaGlobalSettings());
+});
+
 app.post('/api/diwaniya/open', authMiddleware, async (req, res) => {
   // Guard: stale sessions (family deleted/reset) must not create ghost diwaniyas
   const famExists = req.user.familyId ? await db.getFamily(req.user.familyId) : null;
@@ -1974,7 +2039,11 @@ app.post('/api/diwaniya/open', authMiddleware, async (req, res) => {
   const { durationMinutes, topic, mode, secretCode } = req.body;
   const duration = durationMinutes || 30;
   const diwaniyaMode = mode || 'text';
-  
+
+  // Global controls: maintenance + video/audio toggles
+  const gGuard = await diwaniyaGlobalGuard(req, diwaniyaMode);
+  if (gGuard) return res.status(gGuard.status).json(gGuard);
+
   if (duration < 15 || duration > 60) {
     return res.status(400).json({ error: 'المدة يجب أن تكون بين 15 و 60 دقيقة' });
   }
@@ -2503,6 +2572,7 @@ io.on('connection', (socket) => {
       const user = await db.getUserById(userId);
       if (!user) { socket.disconnect(true); return; }
       socket.userId = userId;
+      socket.userRole = user.role;
       socket.join(`user_${userId}`);
       onlineUsers.add(userId);
       console.log(`🟢 ${userId} online`);
@@ -2548,6 +2618,9 @@ io.on('connection', (socket) => {
 
   socket.on('diwaniya_audio', async (data) => {
     const { sessionId, userId, message, audio, audioType } = data;
+    if (userId !== socket.userId) return;
+    const gGuard = await diwaniyaGlobalGuard({ user: { role: socket.userRole } }, 'audio');
+    if (gGuard) { socket.emit('message_blocked', { message: gGuard.error }); return; }
     const result = await db.addDiwaniyaMessage(sessionId, userId, message);
     if (result) {
       // Broadcast audio to all in session
@@ -2823,6 +2896,9 @@ const LIVEKIT_URL = process.env.LIVEKIT_URL || 'wss://familylive-vitm3l6f.liveki
 app.post('/api/livekit/token', authMiddleware, asyncHandler(async (req, res) => {
   const { room, role } = req.body; // role: 'host' | 'viewer'
   if (!room) return res.status(400).json({ error: 'اسم الغرفة مطلوب' });
+  // Global guard: video disabled / maintenance blocks non-admins
+  const gGuard = await diwaniyaGlobalGuard(req, 'video');
+  if (gGuard) return res.status(gGuard.status).json(gGuard);
   const identity = req.user.id.slice(0, 8) + '_' + (role === 'host' ? 'host' : 'viewer');
   const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
     identity,
