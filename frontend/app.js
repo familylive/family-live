@@ -2028,8 +2028,9 @@ async function joinLiveAudio() {
   const isModeratorVisit = (state.user?.role === 'moderator') || (state.user?.role === 'admin' && document.getElementById('moderator-send-box')?.style.display === 'block');
   
   try {
-    // Normal users: request camera (server limits to 6). Moderator: audio only.
-    const wantVideo = !isModeratorVisit;
+    // الكاميرا فقط في أوضاع الفيديو (video/all) — المكالمة الصوتية بدون كاميرا
+    const isVideoMode = ['video', 'all'].includes(state.diwaniyaMode);
+    const wantVideo = !isModeratorVisit && isVideoMode;
     localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: wantVideo ? { facingMode: state.cameraFacing || 'user' } : false });
     
     if (isModeratorVisit) {
@@ -2037,6 +2038,8 @@ async function joinLiveAudio() {
       localStream.getAudioTracks().forEach(t => t.enabled = false);
       micMuted = true;
       camOff = true;
+    } else {
+      camOff = !wantVideo;
     }
     
     inLiveCall = true;
@@ -2047,7 +2050,7 @@ async function joinLiveAudio() {
       userId: state.user.id, 
       userName: state.user.name,
       isObserver: isModeratorVisit,
-      wantsVideo: !isModeratorVisit
+      wantsVideo: wantVideo
     });
     
     state.callMembers = {};
@@ -2069,12 +2072,13 @@ async function joinLiveAudio() {
     setTikTokMode(true); // TikTok layout by default with chat below
     updateTikTokLiveInfo();
     updateViewerCount();
-    // Camera starts ON by default
-    camOff = false;
+    // الكاميرا تفتح تلقائياً فقط في أوضاع الفيديو — الصوتية تبدأ بالكاميرا مغلقة
     const myVideo2 = document.getElementById('my-video');
-    if (myVideo2) { myVideo2.srcObject = localStream; myVideo2.style.display = 'block'; }
+    if (myVideo2) { myVideo2.srcObject = localStream; myVideo2.style.display = camOff ? 'none' : 'block'; }
     const myTile2 = document.getElementById('my-video-tile');
-    if (myTile2) myTile2.classList.add('has-video');
+    if (myTile2) myTile2.classList.toggle('has-video', !camOff);
+    const camBtn2 = document.getElementById('cam-toggle-btn');
+    if (camBtn2) camBtn2.classList.toggle('off', camOff);
     const exitBtn = document.getElementById('call-exit-btn');
     if (exitBtn) exitBtn.style.display = 'flex';
     // Apply my saved effect
@@ -2094,7 +2098,11 @@ async function joinLiveAudio() {
       const stateEl = document.getElementById('my-tile-state');
       if (stateEl) stateEl.textContent = '🕵️ مراقب - يسمع فقط';
     } else {
-      showToast('🎤 أنت في المكالمة الصوتية الآن', 'success');
+      if (!isVideoMode) {
+        const stateEl = document.getElementById('my-tile-state');
+        if (stateEl) stateEl.textContent = '🎤 صوت فقط';
+      }
+      showToast(isVideoMode ? '🎥 أنت في مكالمة الفيديو الآن' : '🎤 أنت في المكالمة الصوتية الآن', 'success');
     }
   } catch(e) {
     showToast('الرجاء السماح بالميكروفون', 'error');
@@ -3448,6 +3456,10 @@ function updateAudioCallUI(inCall) {
     btn.className = 'btn btn-danger btn-full';
     document.getElementById('call-controls').style.display = 'block';
     document.getElementById('video-grid').style.display = 'grid';
+    // زر الكاميرا يظهر فقط في أوضاع الفيديو — الصوتية بدون كاميرا
+    const isVideoMode2 = ['video', 'all'].includes(state.diwaniyaMode);
+    const camBtn3 = document.getElementById('cam-toggle-btn');
+    if (camBtn3) camBtn3.style.display = isVideoMode2 ? 'flex' : 'none';
     // البث شاشة منفصلة تغطي كل الشاشة (بدون مغادرة الصفحة)
     document.body.classList.add('bcast-open');
     moveControlsIntoGrid();
@@ -3455,11 +3467,11 @@ function updateAudioCallUI(inCall) {
     const host = state.isFounder || state.user?.role === 'admin' || (state.activeSession && state.activeSession.opened_by === state.user?.id);
     const sBtn = document.getElementById('call-settings-btn');
     if (sBtn) sBtn.style.display = host ? 'flex' : 'none';
-    // Show my local video
+    // Show my local video (audio-only: stays hidden since camOff)
     const myVideo = document.getElementById('my-video');
     if (myVideo && localStream) {
       myVideo.srcObject = localStream;
-      myVideo.style.display = 'block';
+      myVideo.style.display = camOff ? 'none' : 'block';
     }
   } else {
     btn.textContent = dwJoinBtnText(state.diwaniyaMode || 'text');
