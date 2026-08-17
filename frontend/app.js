@@ -347,7 +347,7 @@ function updateAllUI() {
 
   const founder = state.members?.find(m => m.role === 'founder');
   if (founder) {
-    document.getElementById('founder-name').textContent = founder.name;
+    document.getElementById('founder-name').innerHTML = escapeHtml(founder.name) + verifBadge(founder.family_verif || 'none', 18);
     setAvatarEl(document.getElementById('founder-avatar'), founder.avatar, founder.name?.charAt(0) || '👤');
   }
   updateMembersList();
@@ -591,11 +591,11 @@ function connectSocket() {
     if (d && d.toId) { sessionGiftCoins[d.toId] = (sessionGiftCoins[d.toId] || 0) + (d.giftCoins || 0); updateCallPresence(); }
   });
   socket.on('diwaniya_message', (msg) => {
-    addChatMessage(msg.user_name, msg.message, msg.user_id === state.user?.id, msg.avatar, msg.user_level);
+    addChatMessage(msg.user_name, msg.message, msg.user_id === state.user?.id, msg.avatar, msg.user_level, msg.user_role === 'founder' ? (msg.family_verif || 'none') : 'none');
     const tk = document.getElementById('tiktok-chat');
-    if (tk && tk.style.display !== 'none') addTikTokChatMessage(msg.user_name, msg.message, msg.user_id === state.user?.id, msg.user_level);
+    if (tk && tk.style.display !== 'none') addTikTokChatMessage(msg.user_name, msg.message, msg.user_id === state.user?.id, msg.user_level, msg.user_role === 'founder' ? (msg.family_verif || 'none') : 'none');
   });
-  socket.on('diwaniya_audio', (msg) => addAudioMessage(msg.user_name, msg.audio, msg.audioType, msg.user_id === state.user?.id));
+  socket.on('diwaniya_audio', (msg) => addAudioMessage(msg.user_name, msg.audio, msg.audioType, msg.user_id === state.user?.id, msg.user_role === 'founder' ? (msg.family_verif || 'none') : 'none'));
   socket.on('new_challenge', () => { showToast('⚔️ تحدٍ جديد!', 'success'); refreshData(); });
   socket.on('challenge_completed', () => { showToast('🏆 تم التحدي!', 'success'); refreshData(); });
   socket.on('leaderboard_update', () => refreshData());
@@ -1087,7 +1087,7 @@ async function loadDiwaniyaMessages(sessionId, isPoll = false) {
     if (isPoll && ids === lastMsgIds && room.children.length > 0) return;
     if (ids !== lastMsgIds) {
       room.innerHTML = '';
-      messages.forEach(msg => addChatMessage(msg.user_name, msg.message, msg.user_id === state.user?.id, msg.avatar, msg.user_level));
+      messages.forEach(msg => addChatMessage(msg.user_name, msg.message, msg.user_id === state.user?.id, msg.avatar, msg.user_level, msg.user_role === 'founder' ? (msg.family_verif || 'none') : 'none'));
       lastMsgIds = ids;
     }
     // Sync TikTok overlay chat if visible
@@ -1248,10 +1248,12 @@ function updateMembersList() {
   }
   document.getElementById('members-count').textContent = state.members.length;
   const onlineIds = state.onlineMembers || [];
+  const famVerif = state.family?.verif_tier || 'none';
   list.innerHTML = state.members.map(m => {
     const isOnline = onlineIds.includes(m.id);
+    const vfHtml = (m.role === 'founder' && famVerif !== 'none') ? verifBadge(famVerif, 16) : '';
     return '<div class="member-item"><div class="member-avatar">' + (m.avatar || m.name?.charAt(0) || '👤') +
-    '</div><div class="member-info"><div class="member-name">' + (m.name || '') + ' ' +
+    '</div><div class="member-info"><div class="member-name">' + (m.name || '') + ' ' + vfHtml +
     '<span class="online-status ' + (isOnline ? 'online' : 'offline') + '">' + (isOnline ? '● متصل الآن' : '○ غير متصل') + '</span></div>' +
     (m.role === 'founder' ? '<span class="member-role-tag">المؤسس</span>' : '') + '</div></div>';
   }).join('');
@@ -1403,7 +1405,7 @@ function enableChat(enabled) {
   if (btn) btn.disabled = !enabled;
 }
 
-function addChatMessage(name, text, isSent, avatar) {
+function addChatMessage(name, text, isSent, avatar, level, verif) {
   const room = document.getElementById('chat-room');
   if (!room) return;
   const empty = room.querySelector('.empty-state');
@@ -1413,8 +1415,9 @@ function addChatMessage(name, text, isSent, avatar) {
   msg.avatar = avatar;
   const initial = name?.charAt(0) || '👤';
   const time = new Date().toLocaleTimeString('ar-SA', { hour:'2-digit', minute:'2-digit' });
+  const badges = levelImgHtml(level) + verifBadge(verif, 17);
   msg.innerHTML = '<div class="chat-avatar">' + initial + '</div><div>' +
-    '<div class="chat-sender">' + (name || '') + '</div>' +
+    '<div class="chat-sender">' + (name || '') + ' ' + badges + '</div>' +
     '<div class="chat-bubble">' + text +
     '</div><div class="chat-time">' + time + '</div></div>';
   room.appendChild(msg);
@@ -1567,12 +1570,12 @@ function sendAudioMessage(blob) {
     }
     
     // Show in local chat
-    addAudioMessage(state.user?.name || 'أنت', base64Audio, blob.type, true);
+    addAudioMessage(state.user?.name || 'أنت', base64Audio, blob.type, true, state.user?.role === 'founder' ? (state.family?.verif_tier || 'none') : 'none');
   };
   reader.readAsDataURL(blob);
 }
 
-function addAudioMessage(name, audioBase64, audioType, isSent) {
+function addAudioMessage(name, audioBase64, audioType, isSent, verif) {
   const room = document.getElementById('chat-room');
   if (!room) return;
   const empty = room.querySelector('.empty-state');
@@ -1583,7 +1586,7 @@ function addAudioMessage(name, audioBase64, audioType, isSent) {
   const dataSrc = 'data:' + audioType + ';base64,' + audioBase64;
   
   msg.innerHTML = '<div class="chat-avatar">' + initial + '</div><div>' +
-    '<div class="chat-sender">' + (name || '') + '</div>' +
+    '<div class="chat-sender">' + (name || '') + ' ' + verifBadge(verif, 17) + '</div>' +
     '<div class="audio-bubble"><audio controls src="' + dataSrc + '" style="height:40px;max-width:220px"></audio></div>' +
     '<div class="chat-time">' + new Date().toLocaleTimeString('ar-SA', { hour:'2-digit', minute:'2-digit' }) + '</div></div>';
   room.appendChild(msg);
@@ -2814,14 +2817,13 @@ function sendTikTokChat() {
   }
 }
 
-function addTikTokChatMessage(name, text, isSent, level) {
+function addTikTokChatMessage(name, text, isSent, level, verif) {
   const list = document.getElementById('tiktok-chat-list');
   if (!list) return;
   const msg = document.createElement('div');
   msg.className = 'tiktok-chat-msg' + (isSent ? ' mine' : '');
-  const lvBadge = (parseInt(level) >= 0 && parseInt(level) <= 100 && level !== undefined && level !== null)
-    ? '<img src="/assets/levels/level_' + level + '.' + (level >= 1 && level <= 10 ? 'gif' : 'png') + '?v=3" style="width:34px;height:13px;vertical-align:middle;margin-right:3px">' : '';
-  msg.innerHTML = '<span class="tiktok-chat-name">' + (name || '') + '</span> ' + lvBadge + escapeHtml(text);
+  const lvBadge = levelImgHtml(level);
+  msg.innerHTML = '<span class="tiktok-chat-name">' + (name || '') + '</span> ' + lvBadge + verifBadge(verif, 16) + escapeHtml(text);
   list.appendChild(msg);
   // Keep max 30 messages
   while (list.children.length > 30) list.removeChild(list.firstChild);
@@ -2833,7 +2835,7 @@ function escapeHtml(s) {
 }
 
 function syncTikTokChat() {
-  // Re-render from the main chat room messages if available (keeps level badges)
+  // Re-render from the main chat room messages if available (keeps level + verification badges)
   const list = document.getElementById('tiktok-chat-list');
   const room = document.getElementById('chat-room');
   if (!list || !room) return;
@@ -2846,9 +2848,11 @@ function syncTikTokChat() {
     const isSent = m.classList.contains('sent');
     const lvImg = senderEl?.querySelector('img');
     const lvHtml = lvImg ? lvImg.outerHTML : '';
+    const fvBadge = senderEl?.querySelector('.fv-badge');
+    const fvHtml = fvBadge ? fvBadge.outerHTML : '';
     const msg = document.createElement('div');
     msg.className = 'tiktok-chat-msg' + (isSent ? ' mine' : '');
-    msg.innerHTML = '<span class="tiktok-chat-name">' + escapeHtml(name) + '</span> ' + lvHtml + escapeHtml(text);
+    msg.innerHTML = '<span class="tiktok-chat-name">' + escapeHtml(name) + '</span> ' + lvHtml + fvHtml + escapeHtml(text);
     list.appendChild(msg);
   });
   while (list.children.length > 30) list.removeChild(list.firstChild);
@@ -3625,6 +3629,38 @@ function coinVal(coins) {
     '<span class="coin-sar">= ' + sar + ' ريال</span></span>';
 }
 
+// ==================== FAMILY VERIFICATION BADGE (توثيق العائلات) ====================
+let fvGradCounter = 0;
+const FV_TIERS = {
+  black:    { g1: '#3d3d47', g2: '#060608', ring: '#aab0b8', check: '#ffffff', label: 'أسود' },
+  blue:     { g1: '#3db6ff', g2: '#0d6fb8', ring: '#a8dfff', check: '#ffffff', label: 'أزرق' },
+  silver:   { g1: '#f5f6f8', g2: '#a6adb6', ring: '#ffffff', check: '#3f4a55', label: 'فضي' },
+  gold:     { g1: '#ffe08a', g2: '#cf9b1f', ring: '#fff3c4', check: '#ffffff', label: 'ذهبي' },
+  platinum: { g1: '#e9f2ff', g2: '#8fb0d6', ring: '#f2f8ff', check: '#1d4ed8', label: 'بلاتيني' },
+};
+// شارة تويتر: دائرة متقطعة تدور + علامة صح ثابتة تخترق حافة الدائرة
+function verifBadge(tier, size) {
+  if (!tier || tier === 'none' || !FV_TIERS[tier]) return '';
+  const c = FV_TIERS[tier];
+  const n = ++fvGradCounter;
+  const s = size || 18;
+  return '<span class="fv-badge fv-' + tier + '" style="width:' + s + 'px;height:' + s + 'px" title="توثيق ' + c.label + '">' +
+    '<svg viewBox="0 0 24 24" width="' + s + '" height="' + s + '">' +
+      '<defs><linearGradient id="fv-g' + n + '" x1="0" y1="0" x2="1" y2="1">' +
+        '<stop offset="0" stop-color="' + c.g1 + '"/><stop offset="1" stop-color="' + c.g2 + '"/></linearGradient></defs>' +
+      '<g class="fv-rotate"><circle class="fv-ring" cx="12" cy="12" r="10.2" fill="none" stroke="' + c.ring + '" stroke-width="1.9" stroke-dasharray="10 4.8 7 4.8"/></g>' +
+      '<circle cx="12" cy="12" r="8.9" fill="url(#fv-g' + n + ')"/>' +
+      '<path d="M6.5 13.1l4.1 4.1 7.6-12.2" fill="none" stroke="' + c.check + '" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>' +
+    '</svg></span>';
+}
+function fvTierLabel(tier) { return (FV_TIERS[tier] && FV_TIERS[tier].label) || tier || ''; }
+// شارة مستوى بجانب الاسم في الشات
+function levelImgHtml(lv) {
+  const level = parseInt(lv);
+  if (isNaN(level) || level < 0 || level > 100) return '';
+  return '<img src="/assets/levels/level_' + level + '.' + (level <= 10 ? 'gif' : 'png') + '?v=3" style="width:34px;height:13px;vertical-align:middle;margin:0 3px">';
+}
+
 // ==================== ADMIN: شحن الموقع + النسخ الاحتياطي ====================
 async function chargeSite() {
   const input = document.getElementById('site-charge-input');
@@ -3748,5 +3784,36 @@ async function loadReportsPage() {
         '</div>').join('') : '<div class="empty-text">لا توجد تقارير</div>';
     }
   } catch(e) { showToast(e.message || 'فشل تحميل التقارير', 'error'); }
+}
+
+// ==================== ADMIN: نظام توثيق العائلات ====================
+async function loadFamilyVerificationSettings() {
+  try {
+    const { settings } = await api('GET', '/api/admin/family-verification');
+    const map = { 'fv-black':'black', 'fv-blue':'blue', 'fv-silver':'silver', 'fv-gold':'gold', 'fv-platinum':'platinum' };
+    Object.keys(map).forEach(id => {
+      const el = document.getElementById(id);
+      if (el && settings[map[id]] !== undefined) el.value = settings[map[id]];
+    });
+    previewFvBadges();
+  } catch(e) { console.error('Family verification settings:', e); }
+}
+function previewFvBadges() {
+  const wrap = document.getElementById('fv-preview-badges');
+  if (!wrap) return;
+  wrap.innerHTML = Object.keys(FV_TIERS).map(t =>
+    '<div style="text-align:center;display:flex;flex-direction:column;align-items:center;gap:5px">' +
+      '<div style="width:46px;height:46px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.06);border-radius:12px">' + verifBadge(t, 34) + '</div>' +
+      '<div style="font-size:11px;color:var(--text-muted)">' + fvTierLabel(t) + '</div>' +
+    '</div>').join('');
+}
+async function saveFamilyVerification() {
+  const g = id => document.getElementById(id)?.value;
+  try {
+    const r = await api('POST', '/api/admin/family-verification', {
+      black: g('fv-black'), blue: g('fv-blue'), silver: g('fv-silver'), gold: g('fv-gold'), platinum: g('fv-platinum')
+    });
+    showToast(r.message, 'success');
+  } catch(e) { showToast(e.message || 'فشل حفظ إعدادات التوثيق', 'error'); }
 }
 

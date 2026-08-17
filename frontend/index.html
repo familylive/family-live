@@ -1259,6 +1259,23 @@
         </div>
       </div>
 
+      <div class="card" id="admin-fv-card" style="border:1.5px solid rgba(232,184,48,.35)">
+        <div class="card-title">🏅 نظام توثيق العائلات <span style="font-size:11px;color:var(--text-muted)">(علامة صح مثل تويتر — الدائرة تتحرك والصح ثابت)</span></div>
+        <p style="font-size:12px;color:var(--text-secondary);margin-bottom:8px">مؤسس العائلة يحصل على التوثيق <b>تلقائياً</b> عند وصوله للمستوى المحدد. الشارة تظهر بجوار اسمه في ملفه، بجوار مستواه في الشات، وبجوار اسم العائلة.</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div class="form-group"><label>⬛ أسود (المستوى)</label><input class="form-input" id="fv-black" type="number" value="3" min="0"></div>
+          <div class="form-group"><label>🟦 أزرق (المستوى)</label><input class="form-input" id="fv-blue" type="number" value="5" min="0"></div>
+          <div class="form-group"><label>⬜ فضي (المستوى)</label><input class="form-input" id="fv-silver" type="number" value="7" min="0"></div>
+          <div class="form-group"><label>🟨 ذهبي (المستوى)</label><input class="form-input" id="fv-gold" type="number" value="8" min="0"></div>
+          <div class="form-group"><label>💎 بلاتيني (المستوى)</label><input class="form-input" id="fv-platinum" type="number" value="10" min="0"></div>
+        </div>
+        <div style="margin-top:12px;background:var(--bg-hover);border-radius:10px;padding:10px">
+          <p style="font-size:12px;color:var(--text-secondary);margin-bottom:8px">✨ معاينة الشارات:</p>
+          <div id="fv-preview-badges" style="display:flex;gap:14px;flex-wrap:wrap;justify-content:center"></div>
+        </div>
+        <button class="btn btn-accent btn-full" style="margin-top:10px" onclick="saveFamilyVerification()">💾 حفظ الإعدادات</button>
+      </div>
+
       <div class="card" id="admin-support-card">
         <div class="card-title">🎧 الدعم الفني والمساعدة</div>
         <div class="card-title" style="font-size:14px;margin-top:8px">💬 رسائل المودريتر الجاهزة</div>
@@ -1878,7 +1895,7 @@ function navigateTo(pageName) {
   if (pageName === 'reports' && state.user?.role === 'admin') loadReportsPage();
   if (pageName === 'admin' && state.user?.role === 'admin') loadAdminSupport();
   if (pageName === 'family' && state.isLoggedIn) { loadAnnouncements(); populateAnnTarget(); populateManagerSelect(); loadFamilyPageData(); }
-  if (pageName === 'admin' && state.user?.role === 'admin') { loadBannedWords(); loadAdminBans(); loadAIUsers(); loadViolations(); loadAdminAgreements(); loadAdminUsers(); loadModeratorVisitsAdmin(); }
+  if (pageName === 'admin' && state.user?.role === 'admin') { loadBannedWords(); loadAdminBans(); loadAIUsers(); loadViolations(); loadAdminAgreements(); loadAdminUsers(); loadModeratorVisitsAdmin(); loadFamilyVerificationSettings(); }
   if (pageName === 'moderator' && (state.user?.role === 'moderator' || state.user?.role === 'admin')) { loadModeratorFamilies(); loadModeratorVisitsHistory(); loadModeratorProfile(); }
   if (pageName === 'admin' && state.user?.role === 'admin') loadTierSettings();
   if (pageName === 'codes' && state.isLoggedIn) loadCodesPage();
@@ -2485,7 +2502,7 @@ async function loadProfilePage() {
   document.getElementById('profile-avatar').textContent = user?.avatar || user?.name?.charAt(0) || '👤';
   const pidEl = document.getElementById('profile-id');
   if (pidEl) pidEl.textContent = user?.public_id || '-';
-  document.getElementById('profile-name').textContent = user?.name || '';
+  document.getElementById('profile-name').innerHTML = (user?.name || '') + verifBadge(user?.role === 'founder' ? (family?.verif_tier || 'none') : 'none', 22);
   document.getElementById('profile-role').textContent = user?.role === 'founder' ? 'المؤسس 👑' : (user?.role === 'admin' ? 'مدير التطبيق 🛡️' : (user?.role === 'moderator' ? 'مشرف الديوانيات 🕵️' : 'عضو'));
   document.getElementById('profile-family').textContent = family?.name || '-';
   document.getElementById('profile-code').textContent = family?.subscription_code || '-';

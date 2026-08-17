@@ -58,6 +58,7 @@ async function initDb() {
   await run(`CREATE TABLE IF NOT EXISTS user_families (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, family_id TEXT NOT NULL, is_current INTEGER DEFAULT 0, joined_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)`);
   await run(`CREATE TABLE IF NOT EXISTS site_logs (id TEXT PRIMARY KEY, action TEXT NOT NULL, coins INTEGER DEFAULT 0, detail TEXT, by_user_id TEXT, by_user_name TEXT, created_at TEXT DEFAULT now())`);
+  try { await run(`ALTER TABLE families ADD COLUMN IF NOT EXISTS verif_tier TEXT DEFAULT 'none'`); } catch(e) {}
   await run(`CREATE TABLE IF NOT EXISTS ads (id TEXT PRIMARY KEY, title TEXT NOT NULL, image_url TEXT, link_url TEXT, status TEXT DEFAULT 'active', position TEXT DEFAULT 'banner', start_time TEXT, end_time TEXT, views INTEGER DEFAULT 0, clicks INTEGER DEFAULT 0, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS auction_logs (id TEXT PRIMARY KEY, auction_id TEXT, code TEXT, event TEXT, user_id TEXT, user_name TEXT, amount INTEGER DEFAULT 0, detail TEXT, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS auctions (id TEXT PRIMARY KEY, code TEXT NOT NULL, starting_price INTEGER DEFAULT 100, entry_fee INTEGER DEFAULT 50, current_price INTEGER DEFAULT 100, min_increment INTEGER DEFAULT 10, start_time TEXT DEFAULT now(), end_time TEXT NOT NULL, status TEXT DEFAULT 'active', winner_id TEXT, paid INTEGER DEFAULT 0, created_by TEXT, created_at TEXT DEFAULT now())`);
@@ -143,7 +144,7 @@ async function createUser(name, email, password, familyId, role = 'member') {
 }
 async function getUserByEmail(email) { return queryOne('SELECT * FROM users WHERE lower(email) = lower($1)', [email]); }
 async function getUserById(id) { return queryOne('SELECT id, name, email, phone, whatsapp, country, city, family_id, role, avatar, points, level, total_charged, support_spent, stars, moderator_tier, can_open_diwaniya, last_seen, currency, public_id, created_at FROM users WHERE id = $1', [id]); }
-async function getFamilyMembers(familyId) { return query('SELECT id, name, email, phone, whatsapp, role, avatar, points, public_id, last_seen, can_open_diwaniya FROM users WHERE family_id = $1 ORDER BY role DESC, points DESC', [familyId]); }
+async function getFamilyMembers(familyId) { return query("SELECT u.id, u.name, u.email, u.phone, u.whatsapp, u.role, u.avatar, u.points, u.public_id, u.last_seen, u.can_open_diwaniya, f.verif_tier as family_verif FROM users u LEFT JOIN families f ON u.family_id = f.id WHERE u.family_id = $1 ORDER BY u.role DESC, u.points DESC", [familyId]); }
 async function updateProfile(userId, data) {
   const { name, country, city, phone, whatsapp, avatar, currency } = data;
   if (name !== undefined) await run('UPDATE users SET name = $1 WHERE id = $2', [name, userId]);
@@ -268,9 +269,9 @@ async function getDiwaniyaHistory(familyId) { return query('SELECT ds.*, u.name 
 async function addDiwaniyaMessage(sessionId, userId, message) {
   const id = uuidv4();
   await run('INSERT INTO diwaniya_messages (id, session_id, user_id, message) VALUES ($1,$2,$3,$4)', [id, sessionId, userId, message]);
-  return queryOne('SELECT dm.*, u.name as user_name, u.avatar, u.level as user_level FROM diwaniya_messages dm JOIN users u ON dm.user_id = u.id WHERE dm.id = $1', [id]);
+  return queryOne('SELECT dm.*, u.name as user_name, u.avatar, u.level as user_level, u.role as user_role, f.verif_tier as family_verif FROM diwaniya_messages dm JOIN users u ON dm.user_id = u.id LEFT JOIN families f ON u.family_id = f.id WHERE dm.id = $1', [id]);
 }
-async function getDiwaniyaMessages(sessionId) { return query('SELECT dm.*, u.name as user_name, u.avatar, u.level as user_level FROM diwaniya_messages dm JOIN users u ON dm.user_id = u.id WHERE dm.session_id = $1 ORDER BY dm.created_at ASC', [sessionId]); }
+async function getDiwaniyaMessages(sessionId) { return query('SELECT dm.*, u.name as user_name, u.avatar, u.level as user_level, u.role as user_role, f.verif_tier as family_verif FROM diwaniya_messages dm JOIN users u ON dm.user_id = u.id LEFT JOIN families f ON u.family_id = f.id WHERE dm.session_id = $1 ORDER BY dm.created_at ASC', [sessionId]); }
 
 // =============== CHALLENGES ===============
 async function createChallenge(familyId, gameType, challengerId, opponentId, points = 10) {
@@ -409,13 +410,65 @@ async function addUserSupport(userId, coins) {
   await run('UPDATE users SET support_spent = support_spent + $1 WHERE id = $2', [coins, userId]);
   const info = await computeUserLevel(userId);
   await run('UPDATE users SET level = $1 WHERE id = $2', [info.level, userId]);
+  await refreshFamilyVerifForUser(userId);
   return info;
 }
 async function addUserCharged(userId, coins) {
   await run('UPDATE users SET total_charged = total_charged + $1 WHERE id = $2', [coins, userId]);
   const info = await computeUserLevel(userId);
   await run('UPDATE users SET level = $1 WHERE id = $2', [info.level, userId]);
+  await refreshFamilyVerifForUser(userId);
   return info;
+}
+
+// =============== FAMILY VERIFICATION (توثيق العائلات) ===============
+async function getFamilyVerificationSettings() {
+  return {
+    black: parseInt(await getSetting('fv_black', '3')),
+    blue: parseInt(await getSetting('fv_blue', '5')),
+    silver: parseInt(await getSetting('fv_silver', '7')),
+    gold: parseInt(await getSetting('fv_gold', '8')),
+    platinum: parseInt(await getSetting('fv_platinum', '10')),
+  };
+}
+async function saveFamilyVerificationSettings(s) {
+  const int = v => Math.max(0, parseInt(v) || 0);
+  await setSetting('fv_black', int(s.black));
+  await setSetting('fv_blue', int(s.blue));
+  await setSetting('fv_silver', int(s.silver));
+  await setSetting('fv_gold', int(s.gold));
+  await setSetting('fv_platinum', int(s.platinum));
+  return getFamilyVerificationSettings();
+}
+async function computeVerifTierForLevel(level) {
+  const s = await getFamilyVerificationSettings();
+  const lv = parseInt(level) || 0;
+  if (lv >= s.platinum) return 'platinum';
+  if (lv >= s.gold) return 'gold';
+  if (lv >= s.silver) return 'silver';
+  if (lv >= s.blue) return 'blue';
+  if (lv >= s.black) return 'black';
+  return 'none';
+}
+async function recomputeFamilyVerification(familyId) {
+  const family = await getFamily(familyId);
+  if (!family || !family.founder_id) return null;
+  const founder = await getUserById(family.founder_id);
+  const tier = await computeVerifTierForLevel(founder?.level);
+  if (tier !== family.verif_tier) {
+    await run('UPDATE families SET verif_tier = $1 WHERE id = $2', [tier, familyId]);
+    family.verif_tier = tier;
+  }
+  return family.verif_tier;
+}
+async function recomputeAllFamilyVerifications() {
+  const families = await query('SELECT id FROM families WHERE founder_id IS NOT NULL');
+  for (const f of families) await recomputeFamilyVerification(f.id);
+  return families.length;
+}
+async function refreshFamilyVerifForUser(userId) {
+  const u = await queryOne('SELECT id, family_id, role FROM users WHERE id = $1', [userId]);
+  if (u?.role === 'founder' && u.family_id) await recomputeFamilyVerification(u.family_id);
 }
 
 async function getReportsData() {
@@ -1200,6 +1253,7 @@ module.exports = {
   createAnnouncement, getFamilyAnnouncements, getAnnouncementsForUser, deleteAnnouncement,
   createBattle, getBattleById, getActiveBattle, acceptBattle, rejectBattle, supportBattle, endBattle, finalizeBattle, addFamilySupportPoints, getOnlineFounders,
   addAuctionLog, getAuctionLogs, getReportsData, addSiteLog, getSiteLogs,
+  getFamilyVerificationSettings, saveFamilyVerificationSettings, computeVerifTierForLevel, recomputeFamilyVerification, recomputeAllFamilyVerifications, refreshFamilyVerifForUser,
   getEffects, getEffectById, addEffect, getUserEffects, buyEffect, selectEffect, addFamilyBattleWin,
   getPricing, getPricingByFeature, setPricing, deletePricing, getSarToCoinsRate, setSarToCoinsRate, payWithCoins, settleAuction, getSiteTotalCoins,
   addLevelPoints, getUserLevel, getLevelConfig, getLevelByNum, setLevelConfig, deleteLevelConfig, seedLevels, computeUserLevel, addUserCharged, addUserSupport,

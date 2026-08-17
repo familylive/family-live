@@ -900,6 +900,17 @@ app.post('/api/admin/moderator/tier', authMiddleware, adminMiddleware, async (re
   res.json({ message: '🏅 تم تحديث توثيق المشرف إلى ' + tier });
 });
 
+// Admin: family verification settings (توثيق العائلات — مستويات)
+app.get('/api/admin/family-verification', authMiddleware, adminMiddleware, asyncHandler(async (req, res) => {
+  res.json({ settings: await db.getFamilyVerificationSettings() });
+}));
+app.post('/api/admin/family-verification', authMiddleware, adminMiddleware, asyncHandler(async (req, res) => {
+  const { black, blue, silver, gold, platinum } = req.body;
+  const settings = await db.saveFamilyVerificationSettings({ black, blue, silver, gold, platinum });
+  const updated = await db.recomputeAllFamilyVerifications();
+  res.json({ message: '🏅 تم حفظ إعدادات توثيق العائلات وإعادة حساب التوثيق (' + updated + ' عائلة)', settings });
+}));
+
 // Award stars for visit completion (called in exitModeratorVisit flow)
 // =============== MODERATOR VISITS ===============
 
@@ -1862,7 +1873,7 @@ app.get('/api/family', authMiddleware, async (req, res) => {
   const members = await db.getFamilyMembers(req.user.familyId);
   const invitations = await db.getInvitationsByFamily(req.user.familyId);
   const founder = await db.getUserById(family.founder_id);
-  res.json({ family, members, invitations, founder });
+  res.json({ family, members, invitations, founder: { ...founder, family_verif: family.verif_tier || 'none' } });
 });
 
 // Send invitations
