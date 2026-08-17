@@ -331,6 +331,18 @@ function updateAllUI() {
   if (adminMenu) {
     adminMenu.style.display = state.user?.role === 'admin' ? 'flex' : 'none';
   }
+
+  // للأدمن: عنصر الرئيسية (داشبورد) يتحول إلى "لوحة التحكم" — والرئيسية الجديدة ترجع للموقع
+  const dashLabel = document.getElementById('menu-dashboard-label');
+  if (dashLabel) {
+    if (state.user?.role === 'admin') {
+      dashLabel.textContent = 'لوحة التحكم';
+      document.querySelector('#menu-dashboard-item .nav-icon').textContent = '🛠️';
+    } else {
+      dashLabel.textContent = 'الرئيسية';
+      document.querySelector('#menu-dashboard-item .nav-icon').textContent = '📊';
+    }
+  }
   
   // Adapt menu for visitors vs logged-in users
   updateMenuVisibility();

@@ -67,8 +67,11 @@
       </div>
     </div>
     <div class="menu-nav">
-      <div class="menu-nav-item" data-page="dashboard" onclick="navigateTo('dashboard');toggleMenu()">
-        <span class="nav-icon">📊</span> الرئيسية
+      <div class="menu-nav-item" data-page="landing" onclick="navigateTo('landing');toggleMenu()">
+        <span class="nav-icon">🏠</span> الرئيسية
+      </div>
+      <div class="menu-nav-item" id="menu-dashboard-item" data-page="dashboard" onclick="navigateTo('dashboard');toggleMenu()">
+        <span class="nav-icon">📊</span> <span id="menu-dashboard-label">الرئيسية</span>
       </div>
       <div class="menu-nav-item" data-page="family" onclick="navigateTo('family');toggleMenu()">
         <span class="nav-icon">👨‍👩‍👧‍👦</span> العائلة
@@ -2009,12 +2012,13 @@ function navigateTo(pageName) {
   const navItem = document.querySelector('.menu-nav-item[data-page="' + pageName + '"]');
   if (page) page.classList.add('active');
   if (navItem) navItem.classList.add('active');
-  const titles = { dashboard:'الرئيسية', family:'العائلة', diwaniya:'الديوانية', games:'الألعاب', challenges:'التحديات', leaderboard:'قادة النقاط', codes:'رموزي', profile:'ملفي الشخصي', moderator:'زيارات المودريتر', myviolations:'نظام المخالفات', wallet:'محفظتي', buy:'شراء الرصيد', reports:'التقارير', login:'تسجيل الدخول', register:'إنشاء حساب' };
+  const titles = { landing:'الرئيسية', dashboard:'لوحة التحكم', family:'العائلة', diwaniya:'الديوانية', games:'الألعاب', challenges:'التحديات', leaderboard:'قادة النقاط', codes:'رموزي', profile:'ملفي الشخصي', moderator:'زيارات المودريتر', myviolations:'نظام المخالفات', wallet:'محفظتي', buy:'شراء الرصيد', reports:'التقارير', login:'تسجيل الدخول', register:'إنشاء حساب' };
   const titleEl = document.getElementById('header-title-text');
   if (titleEl && titles[pageName]) titleEl.textContent = titles[pageName];
   toggleHeaderVisibility(pageName);
   
   // Load page-specific data
+  if (pageName === 'landing') loadLandingPage();
   if (pageName === 'diwaniya' && state.isLoggedIn) { checkDiwaniyaLock(); refreshDiwaniyaNow(); }
   if (pageName === 'dashboard' && state.isLoggedIn) { loadDashboardAuctions(); loadDashboardAds(); }
   if (pageName === 'profile' && state.isLoggedIn) { loadProfilePage(); loadMyFamilies(); }
