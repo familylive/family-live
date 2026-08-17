@@ -203,10 +203,10 @@ async function generatePremiumCode() {
   return 'NONE';
 }
 
-// توليد أرقام/رموز مميزة قصيرة: مفردة (1) ثنائية (2) ثلاثية (3) رباعية (4) — حرف مكرر
+// توليد أرقام/رموز مميزة قصيرة: مفردة (1) ثنائية (2) ثلاثية (3) رباعية (4) خماسية (5) سداسية (6) سباعية (7) — حرف مكرر
 // charset: 'digits' | 'letters' | 'both'
 async function generateSpecialCodes(length, charset, count, price) {
-  const len = Math.min(4, Math.max(1, parseInt(length) || 1));
+  const len = Math.min(7, Math.max(1, parseInt(length) || 1));
   const n = Math.min(100, Math.max(1, parseInt(count) || 1));
   const priceV = Math.max(0, parseInt(price) || 0);
   let chars;
@@ -543,7 +543,7 @@ async function releaseAuctionCode(auctionId) {
   return getAuctionById(auctionId);
 }
 async function isAuctionParticipant(auctionId, userId) { return queryOne('SELECT * FROM auction_participants WHERE auction_id = $1 AND user_id = $2', [auctionId, userId]); }
-async function getAvailableAuctionCodes() { return query("SELECT * FROM subscription_codes WHERE type IN ('premium','vip1','vip2','vip3','vip4') AND (used = 0 OR used IS NULL) AND code IS NOT NULL AND code != '' AND code != '{}' ORDER BY LENGTH(code) ASC, code ASC"); }
+async function getAvailableAuctionCodes() { return query("SELECT * FROM subscription_codes WHERE type IN ('premium','vip1','vip2','vip3','vip4','vip5','vip6','vip7') AND (used = 0 OR used IS NULL) AND code IS NOT NULL AND code != '' AND code != '{}' ORDER BY LENGTH(code) ASC, code ASC"); }
 
 // =============== ADMIN: FAMILIES & USERS ===============
 async function getAllFamilies() { return query('SELECT f.*, (SELECT COUNT(*) FROM users WHERE family_id = f.id) as members_count, u.name as founder_name, u.last_seen as founder_last_seen FROM families f LEFT JOIN users u ON f.founder_id = u.id ORDER BY f.created_at DESC'); }
