@@ -3914,14 +3914,14 @@ async function loadReportsPage() {
     if (sl) {
       const logs = siteLogs.logs || [];
       sl.innerHTML = logs.length ? logs.map(l => {
-        const sign = (l.coins > 0 ? '+' : '') + (+l.coins).toLocaleString('en');
+        const coinsHtml = (l.coins && l.coins > 0) ? '<b style="color:var(--success)">+' + (+l.coins).toLocaleString('en') + ' <img src="/assets/coin.png" class="coin-ico" alt="كونزه"></b> ' : '';
         return '<div class="admin-family-item">' +
           '<div class="admin-family-name">' + (l.by_user_name ? escapeHtml(l.by_user_name) : 'أدمن') + ' · ' + fmtDateTime(l.created_at) + '</div>' +
           '<div class="admin-family-actions">' +
-            '<b style="color:var(--success)">' + sign + ' <img src="/assets/coin.png" class="coin-ico" alt="كونزه"></b>' +
+            coinsHtml +
             '<div style="font-size:11px;color:var(--text-muted)">' + escapeHtml(l.detail || '') + '</div>' +
           '</div></div>';
-      }).join('') : '<div class="empty-text">لا توجد عمليات شحن بعد</div>';
+      }).join('') : '<div class="empty-text">لا توجد عمليات بعد</div>';
     }
 
     // أفضل 10 عائلات

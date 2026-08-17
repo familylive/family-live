@@ -288,6 +288,11 @@ app.post('/api/codes/pin', authMiddleware, asyncHandler(async (req, res) => {
   if (!code) return res.status(400).json({ error: 'الرمز مطلوب' });
   const result = await db.pinPremiumCode(req.user.id, code);
   if (result?.error) return res.status(400).json(result);
+  // أثر أمني: سجل التثبيت في سجل الموقع (من ثبّت، أي رمز، على أي عائلة، متى)
+  await db.addSiteLog('code_pin', 0,
+    '📌 تثبيت رمز ' + result.code + ' على عائلة «' + (result.family_name || '') + '»' +
+    (result.released ? ' — الرمز القديم ' + result.released + ' أُطلق ليُصرف بعد سنة' : ''),
+    req.user.id, req.user.name);
   res.json({
     message: '📌 تم تثبيت الرمز ' + result.code + ' كرمز لعائلتك' + (result.released ? ' — رمزك السابق (' + result.released + ') رجع للقاعدة ويُصرف لمستفيد آخر بعد سنة' : ''),
     ...result
