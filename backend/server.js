@@ -2415,7 +2415,8 @@ app.post('/api/battles/join-invite', authMiddleware, asyncHandler(async (req, re
       if (!audioRooms[sessionId]) audioRooms[sessionId] = [];
       const botEntry = { socketId: 'bot-socket-' + Date.now(), userId: globalThis.BOT_USER.id, userName: globalThis.BOT_USER.name, avatar: '🤖', isObserver: true, wantsVideo: false };
       audioRooms[sessionId].push(botEntry);
-      io.to(`session_${sessionId}`).emit('user_joined_call', { userId: globalThis.BOT_USER.id, userName: globalThis.BOT_USER.name, avatar: '🤖', effect: null, isObserver: true });
+      const botLevel = (await db.getUserById(globalThis.BOT_USER.id))?.level || 0;
+      io.to(`session_${sessionId}`).emit('user_joined_call', { userId: globalThis.BOT_USER.id, userName: globalThis.BOT_USER.name, avatar: '🤖', effect: null, isObserver: true, level: botLevel });
       // البوت يبدأ الإهداء فوراً
       botStartGifting(sessionId);
     } catch(e) {}
@@ -2503,7 +2504,8 @@ app.post('/api/battles/start', authMiddleware, asyncHandler(async (req, res) => 
       if (!audioRooms[sessionId]) audioRooms[sessionId] = [];
       const botEntry = { socketId: 'bot-socket', userId: globalThis.BOT_USER.id, userName: globalThis.BOT_USER.name, avatar: '🤖', isObserver: true, wantsVideo: false };
       audioRooms[sessionId].push(botEntry);
-      io.to(`session_${sessionId}`).emit('user_joined_call', { userId: globalThis.BOT_USER.id, userName: globalThis.BOT_USER.name, avatar: '🤖', effect: null, isObserver: true });
+      const botLevel = (await db.getUserById(globalThis.BOT_USER.id))?.level || 0;
+      io.to(`session_${sessionId}`).emit('user_joined_call', { userId: globalThis.BOT_USER.id, userName: globalThis.BOT_USER.name, avatar: '🤖', effect: null, isObserver: true, level: botLevel });
       botStartGifting(sessionId);
     } catch(e) {}
     const started = await db.acceptBattle(battle.id, new Date().toISOString());
