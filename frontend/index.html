@@ -837,6 +837,7 @@
               <option value="6">🔢 سداسية (6 أحرف)</option>
               <option value="7">🔢 سباعية (7 أحرف)</option>
               <option value="8">💎 ثمانية (8 أحرف — مميزة)</option>
+              <option value="9">🔢 تساعية (9 أحرف)</option>
             </select>
           </div>
           <div class="form-group">
@@ -2307,7 +2308,7 @@ async function loadCodesPage() {
       adminDiv.innerHTML = '<table class="admin-codes-table"><thead><tr><th>الرمز</th><th>النوع</th><th>الحالة</th><th>السعر (ريال)</th><th>تعديل</th></tr></thead><tbody>' +
         allCodes.codes.map(c => {
           const status = c.purchased_by ? 'مباع' : (c.used ? 'مستخدم' : 'متاح');
-          const typeMap = { premium: '💎 مميز', vip1: '🔢 مفردة', vip2: '🔢 ثنائية', vip3: '🔢 ثلاثية', vip4: '🔢 رباعية', vip5: '🔢 خماسية', vip6: '🔢 سداسية', vip7: '🔢 سباعية' };
+          const typeMap = { premium: '💎 مميز', vip1: '🔢 مفردة', vip2: '🔢 ثنائية', vip3: '🔢 ثلاثية', vip4: '🔢 رباعية', vip5: '🔢 خماسية', vip6: '🔢 سداسية', vip7: '🔢 سباعية', vip8: '🔢 ثمانية', vip9: '🔢 تساعية' };
           const typeLabel = typeMap[c.type] || (c.type === 'free' ? '🎁 مجاني' : c.type);
           return '<tr>' +
             '<td class="code-cell">' + c.code + '</td>' +
@@ -2506,7 +2507,7 @@ async function generateSpecialCodesNow() {
   try {
     const r = await api('POST', '/api/codes/generate-special', { length, charset, count, price });
     const box = document.getElementById('spec-result');
-    const typeLabel = { 1: 'مفردة', 2: 'ثنائية', 3: 'ثلاثية', 4: 'رباعية', 5: 'خماسية', 6: 'سداسية', 7: 'سباعية', 8: 'ثمانية' }[length];
+    const typeLabel = { 1: 'مفردة', 2: 'ثنائية', 3: 'ثلاثية', 4: 'رباعية', 5: 'خماسية', 6: 'سداسية', 7: 'سباعية', 8: 'ثمانية', 9: 'تساعية' }[length];
     box.innerHTML = (r.codes || []).map(c =>
       '<span style="background:var(--bg-hover);border:1px solid rgba(232,184,48,.4);border-radius:8px;padding:4px 10px;font-size:13px;font-weight:700;direction:ltr">' + c.code +
       ' <span style="font-size:10px;color:var(--gold);font-weight:400">' + c.price + ' ر.س</span></span>'
@@ -4717,7 +4718,7 @@ async function loadAvailableCodesDropdowns() {
     const { codes } = await api('GET', '/api/admin/auctions/available-codes');
     if (!state.sarRate) { try { const { rate } = await api('GET', '/api/pricing'); state.sarRate = rate || 50; } catch(e) {} }
     const rate = state.sarRate || 50;
-    const typeMap = { premium: '💎', vip1: '🔢', vip2: '🔢', vip3: '🔢', vip4: '🔢', vip5: '🔢', vip6: '🔢', vip7: '🔢' };
+    const typeMap = { premium: '💎', vip1: '🔢', vip2: '🔢', vip3: '🔢', vip4: '🔢', vip5: '🔢', vip6: '🔢', vip7: '🔢', vip8: '🔢', vip9: '🔢' };
     const opts = '<option value="">اختر رمزاً...</option>' + codes.map(c =>
       '<option value="' + c.code + '" data-price="' + (c.price || 0) + '">' + (typeMap[c.type] || '') + ' ' + c.code + ' — 🪙 ' + ((c.price || 0) * rate) + ' <img src="/assets/coin.png" class="coin-ico" alt=""> (' + (c.price || 0) + ' ريال)</option>'
     ).join('');
