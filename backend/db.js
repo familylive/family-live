@@ -57,6 +57,7 @@ async function initDb() {
   await run(`CREATE TABLE IF NOT EXISTS user_codes (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, code TEXT NOT NULL, type TEXT DEFAULT 'free', purchase_date TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS user_families (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, family_id TEXT NOT NULL, is_current INTEGER DEFAULT 0, joined_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)`);
+  await run(`CREATE TABLE IF NOT EXISTS site_logs (id TEXT PRIMARY KEY, action TEXT NOT NULL, coins INTEGER DEFAULT 0, detail TEXT, by_user_id TEXT, by_user_name TEXT, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS ads (id TEXT PRIMARY KEY, title TEXT NOT NULL, image_url TEXT, link_url TEXT, status TEXT DEFAULT 'active', position TEXT DEFAULT 'banner', start_time TEXT, end_time TEXT, views INTEGER DEFAULT 0, clicks INTEGER DEFAULT 0, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS auction_logs (id TEXT PRIMARY KEY, auction_id TEXT, code TEXT, event TEXT, user_id TEXT, user_name TEXT, amount INTEGER DEFAULT 0, detail TEXT, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS auctions (id TEXT PRIMARY KEY, code TEXT NOT NULL, starting_price INTEGER DEFAULT 100, entry_fee INTEGER DEFAULT 50, current_price INTEGER DEFAULT 100, min_increment INTEGER DEFAULT 10, start_time TEXT DEFAULT now(), end_time TEXT NOT NULL, status TEXT DEFAULT 'active', winner_id TEXT, paid INTEGER DEFAULT 0, created_by TEXT, created_at TEXT DEFAULT now())`);
@@ -370,6 +371,13 @@ async function getAuctionBids(auctionId) { return query('SELECT ab.*, u.name as 
 async function addAuctionLog(auctionId, code, event, userId, userName, amount, detail) {
   await run('INSERT INTO auction_logs (id, auction_id, code, event, user_id, user_name, amount, detail) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
     [uuidv4(), auctionId || null, code || '', event, userId || null, userName || '', amount || 0, detail || '']);
+}
+async function addSiteLog(action, coins, detail, userId, userName) {
+  await run('INSERT INTO site_logs (id, action, coins, detail, by_user_id, by_user_name) VALUES ($1,$2,$3,$4,$5,$6)',
+    [uuidv4(), action, coins || 0, detail || '', userId || null, userName || '']);
+}
+async function getSiteLogs(limit = 100) {
+  return query('SELECT * FROM site_logs ORDER BY created_at DESC LIMIT $1', [limit]);
 }
 async function getLevelConfig() { return query('SELECT * FROM level_config ORDER BY level'); }
 async function getLevelByNum(level) { return queryOne('SELECT * FROM level_config WHERE level = $1', [level]); }
@@ -1191,7 +1199,7 @@ module.exports = {
   getActivePackages, getAllPackages, addPackage, updatePackage, deletePackage, getPaymentSettings, savePaymentSettings, createPayment, getAllPayments, getMyPayments, confirmPayment, rejectPayment, getFamilyEditInfo, recordFamilyNameChange, getFamilyCapacity, purchaseCapacity, setDiwaniyaCapacity, getCapacityPackages,
   createAnnouncement, getFamilyAnnouncements, getAnnouncementsForUser, deleteAnnouncement,
   createBattle, getBattleById, getActiveBattle, acceptBattle, rejectBattle, supportBattle, endBattle, finalizeBattle, addFamilySupportPoints, getOnlineFounders,
-  addAuctionLog, getAuctionLogs, getReportsData,
+  addAuctionLog, getAuctionLogs, getReportsData, addSiteLog, getSiteLogs,
   getEffects, getEffectById, addEffect, getUserEffects, buyEffect, selectEffect, addFamilyBattleWin,
   getPricing, getPricingByFeature, setPricing, deletePricing, getSarToCoinsRate, setSarToCoinsRate, payWithCoins, settleAuction, getSiteTotalCoins,
   addLevelPoints, getUserLevel, getLevelConfig, getLevelByNum, setLevelConfig, deleteLevelConfig, seedLevels, computeUserLevel, addUserCharged, addUserSupport,

@@ -303,8 +303,16 @@ app.post('/api/admin/site-charge', authMiddleware, adminMiddleware, asyncHandler
   const coins = parseInt(req.body.coins);
   if (!coins || coins <= 0 || coins > 100000000) return res.status(400).json({ error: 'أدخل عدد كونزات صحيح (1 - 100,000,000)' });
   const cur = await db.getSiteTotalCoins().catch(() => 0);
-  await db.runRaw("INSERT INTO settings (key, value) VALUES ('site_total_coins', $1) ON CONFLICT (key) DO UPDATE SET value = $1", [String(cur + coins)]);
-  res.json({ message: '💳 شُحن رصيد الموقع: ' + coins.toLocaleString('en') + ' كونزه', siteCoins: cur + coins });
+  const newTotal = cur + coins;
+  await db.runRaw("INSERT INTO settings (key, value) VALUES ('site_total_coins', $1) ON CONFLICT (key) DO UPDATE SET value = $1", [String(newTotal)]);
+  const adminUser = await db.getUserById(req.user.id);
+  await db.addSiteLog('site_charge', coins, '💳 شحن رصيد الموقع — الرصيد الكلي أصبح ' + newTotal.toLocaleString('en') + ' كونزه', req.user.id, adminUser?.name || req.user.email || '');
+  res.json({ message: '💳 شُحن رصيد الموقع: ' + coins.toLocaleString('en') + ' كونزه', siteCoins: newTotal });
+}));
+
+// Admin: site log (عمليات الشحن وغيرها)
+app.get('/api/admin/site-logs', authMiddleware, adminMiddleware, asyncHandler(async (req, res) => {
+  res.json({ logs: await db.getSiteLogs(100) });
 }));
 
 // =============== ADMIN: FAMILY MANAGEMENT ===============

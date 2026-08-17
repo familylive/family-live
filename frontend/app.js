@@ -3636,6 +3636,8 @@ async function chargeSite() {
     const r = await api('POST', '/api/admin/site-charge', { coins });
     showToast(r.message, 'success');
     input.value = '';
+    const scd = document.getElementById('site-coins-display');
+    if (scd) scd.innerHTML = '<img src="/assets/coin.png" class="coin-ico" alt="كونزه"> ' + (r.siteCoins || 0).toLocaleString('en');
     if (typeof loadReportsPage === 'function') loadReportsPage();
   } catch(e) { showToast(e.message || 'فشل الشحن', 'error'); }
 }
@@ -3663,3 +3665,88 @@ async function restoreBackup(input) {
     setTimeout(() => location.reload(), 1200);
   } catch(e) { showToast('فشل الاستعادة: ' + (e.message || ''), 'error'); }
 }
+
+// ==================== ADMIN: التقارير + سجل شحن الموقع ====================
+function fmtDateTime(t) {
+  if (!t) return '';
+  const d = new Date(t);
+  if (isNaN(d.getTime())) return String(t).slice(0, 16);
+  const p = n => String(n).padStart(2, '0');
+  return d.toLocaleDateString('en-GB') + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+}
+
+async function loadReportsPage() {
+  try {
+    const [reports, siteLogs, auctionLogs] = await Promise.all([
+      api('GET', '/api/admin/reports'),
+      api('GET', '/api/admin/site-logs'),
+      api('GET', '/api/admin/auction-logs')
+    ]);
+
+    // رصيد الموقع الكلي
+    const sc = document.getElementById('rpt-site-coins');
+    if (sc) sc.textContent = (reports.site_balance || 0).toLocaleString('en');
+    const ss = document.getElementById('rpt-site-sar');
+    if (ss) ss.textContent = '≈ ' + (reports.site_balance_sar || 0).toLocaleString('en') + ' ريال';
+
+    // سجل شحن الموقع
+    const sl = document.getElementById('rpt-site-logs');
+    if (sl) {
+      const logs = siteLogs.logs || [];
+      sl.innerHTML = logs.length ? logs.map(l => {
+        const sign = (l.coins > 0 ? '+' : '') + (+l.coins).toLocaleString('en');
+        return '<div class="admin-family-item">' +
+          '<div class="admin-family-name">' + (l.by_user_name ? escapeHtml(l.by_user_name) : 'أدمن') + ' · ' + fmtDateTime(l.created_at) + '</div>' +
+          '<div class="admin-family-actions">' +
+            '<b style="color:var(--success)">' + sign + ' <img src="/assets/coin.png" class="coin-ico" alt="كونزه"></b>' +
+            '<div style="font-size:11px;color:var(--text-muted)">' + escapeHtml(l.detail || '') + '</div>' +
+          '</div></div>';
+      }).join('') : '<div class="empty-text">لا توجد عمليات شحن بعد</div>';
+    }
+
+    // أفضل 10 عائلات
+    const tf = document.getElementById('rpt-top-families');
+    if (tf) {
+      const fs = reports.top_families || [];
+      tf.innerHTML = fs.length ? fs.map((f, i) =>
+        '<div class="admin-family-item">' +
+          '<div class="admin-family-name">' + (i + 1) + '. ' + escapeHtml(f.name) + '</div>' +
+          '<div class="admin-family-actions"><b>' + (+f.total_coins).toLocaleString('en') + ' <img src="/assets/coin.png" class="coin-ico" alt="كونزه"></b> <span style="font-size:11px;color:var(--text-muted)">(' + f.tx_count + ' حركة)</span></div>' +
+        '</div>').join('') : '<div class="empty-text">لا توجد بيانات بعد</div>';
+    }
+
+    // أفضل 10 شاحنين
+    const tc = document.getElementById('rpt-top-chargers');
+    if (tc) {
+      const cs = reports.top_chargers || [];
+      tc.innerHTML = cs.length ? cs.map((u, i) =>
+        '<div class="admin-family-item">' +
+          '<div class="admin-family-name">' + (i + 1) + '. ' + escapeHtml(u.name) + '</div>' +
+          '<div class="admin-family-actions"><b>' + (+u.charged).toLocaleString('en') + ' <img src="/assets/coin.png" class="coin-ico" alt="كونزه"></b> <span style="font-size:11px;color:var(--text-muted)">≈ ' + (+u.charged_sar).toLocaleString('en') + ' ريال</span></div>' +
+        '</div>').join('') : '<div class="empty-text">لا توجد بيانات بعد</div>';
+    }
+
+    // طلبات السحب آخر 30 يوم
+    const wd = document.getElementById('rpt-withdrawals');
+    if (wd) {
+      const ws = reports.withdrawals || [];
+      wd.innerHTML = ws.length ? ws.map(w =>
+        '<div class="admin-family-item">' +
+          '<div class="admin-family-name">' + escapeHtml(w.user_name || '') + ' · ' + (+w.amount).toLocaleString('en') + ' ريال · ' + (w.method || '') + '</div>' +
+          '<div class="admin-family-actions">' + (w.status === 'paid' ? '✅ مدفوع' : '⏳ ' + (w.status || '')) + ' · ' + fmtDateTime(w.created_at) + '</div>' +
+        '</div>').join('') : '<div class="empty-text">لا توجد سحوبات في آخر 30 يوم</div>';
+    }
+
+    // تقارير المزادات
+    const al = document.getElementById('rpt-auction-logs');
+    if (al) {
+      const logs = auctionLogs.logs || [];
+      al.innerHTML = logs.length ? logs.map(l =>
+        '<div class="admin-family-item">' +
+          '<div class="admin-family-name">' + (l.event === 'sold' ? '🟢 بيع' : l.event === 'returned' ? '🔵 إرجاع' : '⚪ ' + escapeHtml(l.event || '')) + ' · ' + escapeHtml(l.code || '') + '</div>' +
+          '<div class="admin-family-actions"><b>' + (+l.amount).toLocaleString('en') + ' <img src="/assets/coin.png" class="coin-ico" alt="كونزه"></b> · ' + fmtDateTime(l.created_at) + '</div>' +
+        '</div>').join('') : '<div class="empty-text">لا توجد تقارير</div>';
+    }
+  } catch(e) { showToast(e.message || 'فشل تحميل التقارير', 'error'); }
+}
+
