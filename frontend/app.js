@@ -676,7 +676,7 @@ function connectSocket() {
     if (data.avatar) peerAvatars[data.userId] = data.avatar;
     if (data.level !== undefined) peerLevels[data.userId] = data.level;
     if (inLiveCall && data.userId !== state.user?.id) {
-      showEntryBanner(data.userName, data.avatar, 'انضم للديوانية 🎉');
+      showEntryBanner(data.userName, data.avatar, 'انضم للديوانية 🎉', data.level);
       if (!state.callMembers) state.callMembers = {};
       state.callMembers[data.userId] = data.userName;
       updateCallPresence();
@@ -976,7 +976,7 @@ function connectSocket() {
     // Fancy entry: show the first existing member banner briefly (TikTok style)
     if (data.participants.length && data.participants[0].userId !== state.user?.id) {
       const first = data.participants[0];
-      showEntryBanner(first.userName, first.avatar, 'موجود في الديوانية 👋');
+      showEntryBanner(first.userName, first.avatar, 'موجود في الديوانية 👋', first.level);
     }
     updateCallPresence();
   });
@@ -1812,14 +1812,40 @@ let peerLevels = {};
 
 // TikTok-style entry banner (shows for ~5s when a member enters)
 let entryBannerTimer = null;
-function showEntryBanner(name, avatar, subText) {
+// ألوان المستويات (نمط تيك توك): كل نطاق مستوى بلون مميز
+function levelThemeColor(level) {
+  const lv = parseInt(level) || 0;
+  if (lv >= 90) return { c1: '#ffd700', c2: '#ff2d95', c3: '#00e5ff' };   // أسطوري
+  if (lv >= 80) return { c1: '#ffd700', c2: '#ff9d00', c3: '#fff3b0' };   // ذهبي
+  if (lv >= 70) return { c1: '#ff6b35', c2: '#ff2d55', c3: '#ffd700' };   // ناري
+  if (lv >= 60) return { c1: '#ff2d55', c2: '#c026d3', c3: '#ff6b6b' };   // أحمر
+  if (lv >= 50) return { c1: '#ff2d95', c2: '#a855f7', c3: '#ffb6d9' };   // وردي
+  if (lv >= 40) return { c1: '#a855f7', c2: '#6366f1', c3: '#d8b4fe' };   // بنفسجي
+  if (lv >= 30) return { c1: '#3b82f6', c2: '#06b6d4', c3: '#93c5fd' };   // أزرق
+  if (lv >= 20) return { c1: '#06b6d4', c2: '#10b981', c3: '#67e8f9' };   // سماوي
+  if (lv >= 10) return { c1: '#10b981', c2: '#84cc16', c3: '#86efac' };   // أخضر
+  return { c1: '#94a3b8', c2: '#64748b', c3: '#e2e8f0' };                 // رمادي
+}
+
+function showEntryBanner(name, avatar, subText, level) {
   const banner = document.getElementById('entry-banner');
   if (!banner) return;
+  const lv = parseInt(level) || 0;
+  const theme = levelThemeColor(lv);
+  // لون الشارة حسب مستوى الداخل
+  banner.style.setProperty('--eb-c1', theme.c1);
+  banner.style.setProperty('--eb-c2', theme.c2);
+  banner.style.setProperty('--eb-c3', theme.c3);
   const nameEl = document.getElementById('entry-name');
   const subEl = document.getElementById('entry-sub');
   const avEl = document.getElementById('entry-avatar');
+  const lvEl = document.getElementById('entry-level');
   if (nameEl) nameEl.textContent = name || 'عضو';
   if (subEl) subEl.textContent = subText || 'انضم للديوانية 🎉';
+  if (lvEl) {
+    lvEl.innerHTML = levelImgHtml(lv) +
+      '<span class="eb-level-num">المستوى ' + lv + '</span>';
+  }
   if (avEl) {
     avEl.innerHTML = (avatar && avatar.startsWith('data:'))
       ? '<img src="' + avatar + '" alt="">'
@@ -1832,8 +1858,8 @@ function showEntryBanner(name, avatar, subText) {
   if (entryBannerTimer) clearTimeout(entryBannerTimer);
   entryBannerTimer = setTimeout(() => {
     banner.classList.remove('show');
-    setTimeout(() => { banner.style.display = 'none'; }, 600);
-  }, 6500);
+    setTimeout(() => { banner.style.display = 'none'; }, 800);
+  }, 5000);
 }
 
 // دعم الجلسة: { userId -> كونزات الهدايا التي استقبلها } لترتيب الأكثر دعماً أولاً
@@ -2239,7 +2265,7 @@ async function joinLiveAudio() {
     
     state.callMembers = {};
     updateCallPresence();
-    showEntryBanner(state.user?.name, state.user?.avatar, 'انضممت للديوانية 🎉');
+    showEntryBanner(state.user?.name, state.user?.avatar, 'انضممت للديوانية 🎉', state.user?.level);
     const presenceEl = document.getElementById('call-presence');
     if (presenceEl) presenceEl.style.display = 'block';
     const invBtn = document.getElementById('cam-invite-btn');

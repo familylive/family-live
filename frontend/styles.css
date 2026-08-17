@@ -2238,60 +2238,165 @@ body {
 #gift-box-btn:hover { box-shadow: 0 4px 22px rgba(232,184,48,.5), inset 0 1px 0 rgba(255,255,255,.12); }
 
 /* ===== TikTok-style entry banner ===== */
-.entry-banner {
+/* ===== شارة الدخول الفخمة (نصف الشاشة) ===== */
+.entry-banner.entry-badge {
+  --eb-c1: #ffd700;
+  --eb-c2: #ff9d00;
+  --eb-c3: #fff3b0;
   position: fixed;
-  top: 18px;
-  left: 50%;
-  transform: translateX(-50%) translateY(-120%);
-  z-index: 1250;
+  inset: 0;
+  z-index: 3800;
   display: flex;
-  align-items: center;
-  gap: 10px;
-  background: linear-gradient(135deg, rgba(232,184,48,.16), rgba(232,184,48,.05));
-  border: 1.5px solid rgba(232,184,48,.65);
-  border-radius: 40px;
-  padding: 8px 20px 8px 8px;
-  box-shadow: 0 8px 30px rgba(0,0,0,.5), 0 0 24px rgba(232,184,48,.25);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  opacity: 0;
-  transition: transform .5s cubic-bezier(.2,.9,.25,1.2), opacity .4s ease;
-  max-width: 88vw;
-}
-.entry-banner.show {
-  transform: translateX(-50%) translateY(0);
-  opacity: 1;
-}
-.entry-avatar {
-  width: 38px;
-  height: 38px;
-  min-width: 38px;
-  border-radius: 50%;
-  border: 2px solid var(--gold);
-  overflow: hidden;
-  display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: var(--bg-hover);
-  font-size: 20px;
-  box-shadow: 0 0 14px rgba(232,184,48,.5);
+  gap: 10px;
+  background: rgba(3, 8, 20, .82);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .45s ease;
 }
-.entry-avatar img { width: 100%; height: 100%; object-fit: cover; }
-.entry-text { display: flex; flex-direction: column; }
-.entry-name {
-  color: #ffd75e;
+.entry-banner.entry-badge.show { opacity: 1; }
+/* البطاقة الفخمة: نصف الشاشة تقريباً */
+.entry-banner.entry-badge::before {
+  content: '';
+  position: absolute;
+  width: min(420px, 86vw);
+  height: min(520px, 58vh);
+  border-radius: 34px;
+  background: linear-gradient(160deg, rgba(20,28,52,.96), rgba(8,14,32,.97));
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  box-shadow: 0 30px 80px rgba(0,0,0,.75), 0 0 60px color-mix(in srgb, var(--eb-c1) 45%, transparent);
+  animation: ebCardIn .55s cubic-bezier(.2,.9,.25,1.25);
+}
+/* الحدود المتوهجة المتحركة */
+.entry-banner.entry-badge::after {
+  content: '';
+  position: absolute;
+  width: min(420px, 86vw);
+  height: min(520px, 58vh);
+  border-radius: 34px;
+  padding: 3px;
+  background: linear-gradient(140deg, var(--eb-c1), var(--eb-c2), var(--eb-c3), var(--eb-c1));
+  background-size: 300% 300%;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  animation: ebBorderFlow 3s linear infinite, ebPulse 1.6s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes ebBorderFlow { 0% { background-position: 0% 50%; } 100% { background-position: 300% 50%; } }
+@keyframes ebPulse { 0%,100% { opacity: 1; } 50% { opacity: .6; } }
+@keyframes ebCardIn {
+  0% { transform: scale(.6) translateY(40px); opacity: 0; }
+  60% { transform: scale(1.04) translateY(-6px); opacity: 1; }
+  100% { transform: scale(1) translateY(0); }
+}
+/* اللمعان المار */
+.eb-shine {
+  position: absolute;
+  width: min(420px, 86vw);
+  height: min(520px, 58vh);
+  border-radius: 34px;
+  overflow: hidden;
+  pointer-events: none;
+}
+.eb-shine::after {
+  content: '';
+  position: absolute;
+  top: -30%; bottom: -30%;
+  left: -60%;
+  width: 40%;
+  background: linear-gradient(100deg, transparent, rgba(255,255,255,.28), transparent);
+  transform: skewX(-18deg);
+  animation: ebShineSweep 2.8s ease-in-out infinite;
+}
+@keyframes ebShineSweep { 0% { left: -60%; } 45%,100% { left: 130%; } }
+/* النص العلوي */
+.eb-label {
+  position: absolute;
+  top: 10%;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  background: linear-gradient(90deg, var(--eb-c1), var(--eb-c3));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: none;
+  animation: ebLabelIn .6s ease .15s backwards;
+}
+@keyframes ebLabelIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; } }
+/* الأفاتار الكبير */
+.entry-banner.entry-badge .entry-avatar {
+  width: 118px;
+  height: 118px;
+  min-width: 118px;
+  font-size: 54px;
+  border: 4px solid var(--eb-c1);
+  box-shadow: 0 0 34px color-mix(in srgb, var(--eb-c1) 65%, transparent), 0 0 90px color-mix(in srgb, var(--eb-c2) 40%, transparent);
+  animation: ebAvatarPop .7s cubic-bezier(.2,.9,.25,1.4) .1s backwards;
+}
+@keyframes ebAvatarPop {
+  0% { transform: scale(.2) rotate(-14deg); opacity: 0; }
+  70% { transform: scale(1.12) rotate(3deg); }
+  100% { transform: scale(1) rotate(0); }
+}
+/* المستوى */
+.eb-level {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.eb-level img { width: 64px !important; height: 24px !important; }
+.eb-level-num {
+  color: var(--eb-c1);
+  font-size: 17px;
   font-weight: 900;
+  text-shadow: 0 0 14px color-mix(in srgb, var(--eb-c1) 70%, transparent);
+}
+/* الاسم */
+.entry-banner.entry-badge .entry-name {
+  font-size: 30px;
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 0 18px color-mix(in srgb, var(--eb-c1) 80%, transparent);
+  animation: ebNameIn .6s ease .3s backwards;
+}
+@keyframes ebNameIn { from { opacity: 0; transform: translateY(16px) scale(.8); } to { opacity: 1; } }
+.entry-banner.entry-badge .entry-sub {
   font-size: 14px;
-  text-shadow: 0 0 10px rgba(232,184,48,.6);
+  color: rgba(255,255,255,.85);
+  animation: ebNameIn .6s ease .4s backwards;
 }
-.entry-sub { color: #fff; font-size: 11px; opacity: .85; }
-.entry-confetti {
-  font-size: 20px;
-  animation: entryBounce .8s ease-in-out infinite;
+/* الجسيمات المتطايرة */
+.eb-particles { position: absolute; width: 100%; height: 100%; pointer-events: none; }
+.eb-particles span {
+  position: absolute;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--eb-c2);
+  opacity: 0;
+  animation: ebParticle 2.4s ease-in-out infinite;
 }
-@keyframes entryBounce {
-  0%,100% { transform: scale(1) rotate(0); }
-  50% { transform: scale(1.3) rotate(15deg); }
+.eb-particles span:nth-child(1) { left: 18%; top: 62%; animation-delay: .2s; }
+.eb-particles span:nth-child(2) { left: 30%; top: 74%; animation-delay: .7s; width: 6px; height: 6px; background: var(--eb-c1); }
+.eb-particles span:nth-child(3) { left: 46%; top: 80%; animation-delay: 1.1s; background: var(--eb-c3); }
+.eb-particles span:nth-child(4) { left: 58%; top: 70%; animation-delay: .4s; width: 7px; height: 7px; }
+.eb-particles span:nth-child(5) { left: 68%; top: 78%; animation-delay: 1.4s; background: var(--eb-c1); }
+.eb-particles span:nth-child(6) { left: 76%; top: 60%; animation-delay: .9s; }
+.eb-particles span:nth-child(7) { left: 40%; top: 58%; animation-delay: 1.7s; background: var(--eb-c3); }
+.eb-particles span:nth-child(8) { left: 84%; top: 72%; animation-delay: .5s; }
+@keyframes ebParticle {
+  0% { transform: translateY(0) scale(.4); opacity: 0; }
+  20% { opacity: 1; }
+  100% { transform: translateY(-150px) scale(1.4); opacity: 0; }
 }
 
 /* ===== Gift info box (sender/family/recipient/coins) ===== */
@@ -2468,9 +2573,9 @@ body {
 }
 
 /* Bigger entry banner */
-.entry-banner { padding: 10px 24px 10px 10px; }
-.entry-avatar { width: 46px; height: 46px; min-width: 46px; font-size: 24px; }
-.entry-name { font-size: 16px; }
+.entry-banner.entry-badge .entry-name { font-size: 30px; }
+.entry-banner.entry-badge .entry-avatar { width: 118px; height: 118px; min-width: 118px; font-size: 54px; }
+.entry-banner.entry-badge .entry-sub { font-size: 14px; }
 .entry-sub { font-size: 12px; }
 .entry-confetti { font-size: 24px; }
 
