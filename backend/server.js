@@ -282,6 +282,42 @@ app.post('/api/auth/reset-password', async (req, res) => {
   res.json({ message: 'تم تغيير كلمة المرور بنجاح ✅' });
 });
 
+// Pin a premium code as the family's subscription code (العضو يثبت رمزه المميز)
+app.post('/api/codes/pin', authMiddleware, asyncHandler(async (req, res) => {
+  const { code } = req.body;
+  if (!code) return res.status(400).json({ error: 'الرمز مطلوب' });
+  const result = await db.pinPremiumCode(req.user.id, code);
+  if (result?.error) return res.status(400).json(result);
+  res.json({
+    message: '📌 تم تثبيت الرمز ' + result.code + ' كرمز لعائلتك' + (result.released ? ' — رمزك السابق (' + result.released + ') رجع للقاعدة ويُصرف لمستفيد آخر بعد سنة' : ''),
+    ...result
+  });
+}));
+
+// Family whatsapp numbers — founder/admin only (للدعوات، وليست في الملفات العامة)
+app.get('/api/family/whatsapp-numbers', authMiddleware, asyncHandler(async (req, res) => {
+  if (req.user.role !== 'founder' && req.user.role !== 'admin' && req.user.role !== 'moderator') {
+    return res.status(403).json({ error: 'هذه الصلاحية للمؤسس فقط' });
+  }
+  if (!req.user.familyId && req.user.role !== 'admin') return res.json({ numbers: [] });
+  const numbers = await db.getFamilyWhatsappNumbers(req.user.familyId);
+  res.json({ numbers });
+}));
+
+// Public member profile — الاسم، المستوى، النقاط، رمز العضو فقط (خصوصية)
+app.get('/api/members/public/:id', authMiddleware, asyncHandler(async (req, res) => {
+  const profile = await db.getPublicMemberProfile(req.params.id);
+  if (!profile) return res.status(404).json({ error: 'العضو غير موجود' });
+  // يجب أن يكون العضو من نفس العائلة أو أدمن
+  if (req.user.role !== 'admin') {
+    if (!req.user.familyId || profile.family_id !== req.user.familyId) {
+      return res.status(403).json({ error: 'لا يمكنك عرض هذا الملف' });
+    }
+  }
+  const { family_id, ...pub } = profile;
+  res.json({ profile: pub });
+}));
+
 // Get all codes (admin only)
 app.get('/api/codes/admin/all', authMiddleware, adminMiddleware, async (req, res) => {
   try {

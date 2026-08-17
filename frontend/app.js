@@ -592,7 +592,7 @@ function connectSocket() {
     if (d && d.toId) { sessionGiftCoins[d.toId] = (sessionGiftCoins[d.toId] || 0) + (d.giftCoins || 0); updateCallPresence(); }
   });
   socket.on('diwaniya_message', (msg) => {
-    addChatMessage(msg.user_name, msg.message, msg.user_id === state.user?.id, msg.avatar, msg.user_level, msg.user_role === 'founder' ? (msg.family_verif || 'none') : 'none');
+    addChatMessage(msg.user_name, msg.message, msg.user_id === state.user?.id, msg.avatar, msg.user_level, msg.user_role === 'founder' ? (msg.family_verif || 'none') : 'none', msg.user_id);
     const tk = document.getElementById('tiktok-chat');
     if (tk && tk.style.display !== 'none') addTikTokChatMessage(msg.user_name, msg.message, msg.user_id === state.user?.id, msg.user_level, msg.user_role === 'founder' ? (msg.family_verif || 'none') : 'none');
   });
@@ -1186,7 +1186,7 @@ async function loadDiwaniyaMessages(sessionId, isPoll = false) {
     if (isPoll && ids === lastMsgIds && room.children.length > 0) return;
     if (ids !== lastMsgIds) {
       room.innerHTML = '';
-      messages.forEach(msg => addChatMessage(msg.user_name, msg.message, msg.user_id === state.user?.id, msg.avatar, msg.user_level, msg.user_role === 'founder' ? (msg.family_verif || 'none') : 'none'));
+      messages.forEach(msg => addChatMessage(msg.user_name, msg.message, msg.user_id === state.user?.id, msg.avatar, msg.user_level, msg.user_role === 'founder' ? (msg.family_verif || 'none') : 'none', msg.user_id));
       lastMsgIds = ids;
     }
     // Sync TikTok overlay chat if visible
@@ -1222,12 +1222,21 @@ function addInviteInput() {
 }
 
 // ==================== WHATSAPP INVITES ====================
-function inviteViaWhatsApp() {
+async function inviteViaWhatsApp() {
   const div = document.getElementById('whatsapp-members-select');
   const list = document.getElementById('whatsapp-members-list');
   if (div) div.style.display = div.style.display === 'none' ? 'block' : 'none';
   if (!list) return;
-  const withWhatsApp = (state.members || []).filter(m => m.whatsapp && m.id !== state.user?.id);
+  if (state.user?.role !== 'founder' && state.user?.role !== 'admin' && state.user?.role !== 'moderator') {
+    list.innerHTML = '<div class="empty-text" style="font-size:12px">أرقام الواتساب خاصة بالمؤسس فقط</div>';
+    return;
+  }
+  let members = [];
+  try {
+    const r = await api('GET', '/api/family/whatsapp-numbers');
+    members = r.numbers || [];
+  } catch(e) { members = []; }
+  const withWhatsApp = members.filter(m => m.whatsapp && m.name !== state.user?.name);
   if (!withWhatsApp.length) {
     list.innerHTML = '<div class="empty-text" style="font-size:12px">لا يوجد أعضاء سجلوا أرقام واتساب بعد</div>';
     return;
@@ -1339,6 +1348,35 @@ function updateOpponentSelect() {
 }
 
 // ==================== UI UPDATES ====================
+// فتح الملف العام لعضو (الاسم، المستوى، النقاط، رمز العضو فقط)
+async function openMemberProfile(memberOrId) {
+  let m = memberOrId;
+  if (typeof m === 'string') {
+    m = (state.members || []).find(x => x.id === m);
+    if (!m) {
+      try {
+        const r = await api('GET', '/api/members/public/' + memberOrId);
+        m = r.profile;
+      } catch(e) { return showToast(e.message || 'لا يمكن عرض الملف', 'error'); }
+    }
+  }
+  if (!m) return showToast('العضو غير موجود', 'error');
+  document.getElementById('mp-avatar').textContent = m.avatar || m.name?.charAt(0) || '👤';
+  document.getElementById('mp-name').innerHTML = (m.name || '') + verifBadge(m.role === 'founder' ? (m.family_verif || 'none') : 'none', 20);
+  document.getElementById('mp-role').textContent = m.role === 'founder' ? 'المؤسس 👑' : (m.role === 'admin' ? 'مدير التطبيق 🛡️' : (m.role === 'moderator' ? 'مشرف الديوانيات 🕵️' : 'عضو'));
+  const lv = parseInt(m.level) || 0;
+  document.getElementById('mp-level').innerHTML = (lv >= 0 && lv <= 100) ? levelImgHtml(lv) : ('Lv ' + lv);
+  document.getElementById('mp-points').textContent = (parseInt(m.points) || 0).toLocaleString('en');
+  document.getElementById('mp-public-id').textContent = m.public_id || '------';
+  document.getElementById('member-profile-modal').style.display = 'flex';
+}
+
+// جعل الاسم قابلاً للضغط لفتح الملف
+function clickableName(name, userId, verif) {
+  const onclk = userId ? ' onclick="event.stopPropagation();openMemberProfile(\'' + userId + '\')" style="cursor:pointer"' : '';
+  return '<span class="member-name-link"' + onclk + ' title="عرض الملف">' + (name || '') + '</span>' + verifBadge(verif, 17);
+}
+
 function updateMembersList() {
   const list = document.getElementById('members-list');
   if (!state.members?.length) {
@@ -1350,9 +1388,8 @@ function updateMembersList() {
   const famVerif = state.family?.verif_tier || 'none';
   list.innerHTML = state.members.map(m => {
     const isOnline = onlineIds.includes(m.id);
-    const vfHtml = (m.role === 'founder' && famVerif !== 'none') ? verifBadge(famVerif, 16) : '';
     return '<div class="member-item"><div class="member-avatar">' + (m.avatar || m.name?.charAt(0) || '👤') +
-    '</div><div class="member-info"><div class="member-name">' + (m.name || '') + ' ' + vfHtml +
+    '</div><div class="member-info"><div class="member-name">' + clickableName(m.name, m.id, (m.role === 'founder' && famVerif !== 'none') ? famVerif : 'none') +
     '<span class="online-status ' + (isOnline ? 'online' : 'offline') + '">' + (isOnline ? '● متصل الآن' : '○ غير متصل') + '</span></div>' +
     (m.role === 'founder' ? '<span class="member-role-tag">المؤسس</span>' : '') + '</div></div>';
   }).join('');
@@ -1504,7 +1541,7 @@ function enableChat(enabled) {
   if (btn) btn.disabled = !enabled;
 }
 
-function addChatMessage(name, text, isSent, avatar, level, verif) {
+function addChatMessage(name, text, isSent, avatar, level, verif, userId) {
   const room = document.getElementById('chat-room');
   if (!room) return;
   const empty = room.querySelector('.empty-state');
@@ -1512,11 +1549,12 @@ function addChatMessage(name, text, isSent, avatar, level, verif) {
   const msg = document.createElement('div');
   msg.className = 'chat-msg' + (isSent ? ' sent' : '');
   msg.avatar = avatar;
+  msg.dataset.userId = userId || '';
   const initial = name?.charAt(0) || '👤';
   const time = new Date().toLocaleTimeString('ar-SA', { hour:'2-digit', minute:'2-digit' });
   const badges = levelImgHtml(level) + verifBadge(verif, 17);
   msg.innerHTML = '<div class="chat-avatar">' + initial + '</div><div>' +
-    '<div class="chat-sender">' + (name || '') + ' ' + badges + '</div>' +
+    '<div class="chat-sender">' + clickableName(name, userId, verif) + ' ' + levelImgHtml(level) + '</div>' +
     '<div class="chat-bubble">' + text +
     '</div><div class="chat-time">' + time + '</div></div>';
   room.appendChild(msg);

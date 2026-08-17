@@ -3570,3 +3570,8 @@ body.bcast-open .modal-overlay { z-index: 2500 !important; }
 /* زر الصيانة البرتقالي */
 .btn-warning { background: #ff9800; color: #fff; }
 .btn-warning:hover { background: #e68900; }
+
+/* اسم العضو القابل للضغط (عرض الملف) */
+.member-name-link { color: var(--gold); font-weight: 700; }
+.member-name-link:hover { text-decoration: underline; opacity: .85; }
+#member-profile-modal .modal-content { border: 1.5px solid rgba(232,184,48,.35); }

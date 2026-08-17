@@ -55,6 +55,7 @@ async function initDb() {
   await run(`CREATE TABLE IF NOT EXISTS challenges (id TEXT PRIMARY KEY, family_id TEXT NOT NULL, game_type TEXT NOT NULL, challenger_id TEXT NOT NULL, opponent_id TEXT NOT NULL, status TEXT DEFAULT 'pending', winner_id TEXT, points INTEGER DEFAULT 10, challenger_score INTEGER DEFAULT 0, opponent_score INTEGER DEFAULT 0, created_at TEXT DEFAULT now(), completed_at TEXT)`);
   await run(`CREATE TABLE IF NOT EXISTS subscription_codes (code TEXT PRIMARY KEY, used INTEGER DEFAULT 0, family_id TEXT, type TEXT DEFAULT 'free', price INTEGER DEFAULT 0, purchased_by TEXT, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS user_codes (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, code TEXT NOT NULL, type TEXT DEFAULT 'free', purchase_date TEXT DEFAULT now())`);
+  try { await run(`ALTER TABLE subscription_codes ADD COLUMN IF NOT EXISTS available_after TEXT`); } catch(e) {}
   await run(`CREATE TABLE IF NOT EXISTS user_families (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, family_id TEXT NOT NULL, is_current INTEGER DEFAULT 0, joined_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)`);
   await run(`CREATE TABLE IF NOT EXISTS site_logs (id TEXT PRIMARY KEY, action TEXT NOT NULL, coins INTEGER DEFAULT 0, detail TEXT, by_user_id TEXT, by_user_name TEXT, created_at TEXT DEFAULT now())`);
@@ -162,14 +163,14 @@ async function userHasFamily(userId) { const u = await queryOne('SELECT family_i
 
 async function createFamily(name, subscriptionCode) {
   const id = uuidv4();
-  const code = await queryOne('SELECT * FROM subscription_codes WHERE code = $1 AND (used = 0 OR used IS NULL)', [subscriptionCode]);
+  const code = await queryOne("SELECT * FROM subscription_codes WHERE code = $1 AND (used = 0 OR used IS NULL) AND (available_after IS NULL OR available_after::timestamptz <= now())", [subscriptionCode]);
   if (!code) return null;
   await run('INSERT INTO families (id, name, subscription_code) VALUES ($1,$2,$3)', [id, name, subscriptionCode]);
   await run('UPDATE subscription_codes SET used = 1, family_id = $1 WHERE code = $2', [id, subscriptionCode]);
   return queryOne('SELECT * FROM families WHERE id = $1', [id]);
 }
 async function getFamily(id) { return queryOne('SELECT * FROM families WHERE id = $1', [id]); }
-async function validateSubscriptionCode(code) { return queryOne('SELECT * FROM subscription_codes WHERE code = $1 AND (used = 0 OR used IS NULL)', [code]); }
+async function validateSubscriptionCode(code) { return queryOne("SELECT * FROM subscription_codes WHERE code = $1 AND (used = 0 OR used IS NULL) AND (available_after IS NULL OR available_after::timestamptz <= now())", [code]); }
 async function updateFamilyFounder(familyId, userId) { await run('UPDATE families SET founder_id = $1 WHERE id = $2', [userId, familyId]); }
 async function leaveFamily(userId) {
   const user = await queryOne('SELECT * FROM users WHERE id = $1', [userId]);
@@ -256,6 +257,41 @@ async function purchaseCode(userId, code) {
   return queryOne('SELECT * FROM subscription_codes WHERE code = $1', [code]);
 }
 async function getUserCodes(userId) { return query('SELECT * FROM user_codes WHERE user_id = $1 ORDER BY purchase_date DESC', [userId]); }
+
+// تثبيت رمز مميز (اشتراه العضو) كرمز لعائلته — الرمز العشوائي القديم يرجع للقاعدة ويُصرف لمستفيد آخر بعد سنة
+async function pinPremiumCode(userId, code) {
+  const uc = await queryOne("SELECT * FROM user_codes WHERE user_id = $1 AND code = $2 AND type IN ('premium','custom')", [userId, code]);
+  if (!uc) return { error: 'هذا الرمز ليس من رموزك المميزة' };
+  const user = await getUserById(userId);
+  if (!user?.family_id) return { error: 'لا تملك عائلة لتثبيت الرمز عليها' };
+  const fam = await getFamily(user.family_id);
+  if (!fam) return { error: 'العائلة غير موجودة' };
+  if (fam.subscription_code === code) return { error: 'هذا الرمز مثبت بالفعل على عائلتك' };
+  const pinned = await queryOne("SELECT * FROM user_codes WHERE user_id = $1 AND code = $2 AND type = 'pinned'", [userId, code]);
+  if (pinned) return { error: 'هذا الرمز مثبت بالفعل' };
+  // الرمز العشوائي القديم → القاعدة، يُصرف لمستفيد آخر بعد سنة كاملة
+  let released = null;
+  if (fam.subscription_code) {
+    await run("UPDATE subscription_codes SET used = 0, purchased_by = NULL, family_id = NULL, available_after = to_char(now() + interval '1 year', 'YYYY-MM-DD\"T\"HH24:MI:SS') WHERE code = $1", [fam.subscription_code]);
+    released = fam.subscription_code;
+  }
+  // تثبيت الرمز المميز كرمز عائلة
+  await run('UPDATE families SET subscription_code = $1 WHERE id = $2', [code, fam.id]);
+  await run('UPDATE subscription_codes SET family_id = $1 WHERE code = $2', [fam.id, code]);
+  await run("INSERT INTO user_codes (id, user_id, code, type) VALUES ($1,$2,$3,'pinned')", [uuidv4(), userId, code]);
+  return { success: true, code, family_id: fam.id, released, family_name: fam.name };
+}
+
+// أعضاء العائلة: بيانات عامة فقط (خصوصية) — بدون ايميل/جوال/واتساب/شحن/صرف
+async function getFamilyMembers(familyId) { return query("SELECT u.id, u.name, u.role, u.avatar, u.points, u.public_id, u.level, u.last_seen, u.can_open_diwaniya, f.verif_tier as family_verif FROM users u LEFT JOIN families f ON u.family_id = f.id WHERE u.family_id = $1 ORDER BY u.role DESC, u.points DESC", [familyId]); }
+
+// أرقام الواتساب: للمؤسس فقط (دعوات التواصل) — لا تظهر في الملفات العامة
+async function getFamilyWhatsappNumbers(familyId) { return query("SELECT name, whatsapp FROM users WHERE family_id = $1 AND whatsapp IS NOT NULL AND whatsapp != ''", [familyId]); }
+
+// الملف العام لعضو: الاسم، المستوى، النقاط، رمز العضو فقط
+async function getPublicMemberProfile(userId) {
+  return queryOne('SELECT id, name, role, avatar, points, level, public_id, family_id, last_seen FROM users WHERE id = $1', [userId]);
+}
 async function getFirstAvailablePremiumCode() { const r = await queryOne("SELECT code FROM subscription_codes WHERE used = 0 AND type = 'premium' LIMIT 1"); return r ? r.code : null; }
 async function updatePrice(code, price) { await run('UPDATE subscription_codes SET price = $1 WHERE code = $2', [price, code]); }
 
@@ -1324,7 +1360,7 @@ module.exports = {
   getDb, initDb, queryAll, queryOne, run, execQuery, runRaw, getDbRaw,
   createUser, getUserByEmail, getUserById, getFamilyMembers, updateProfile, updateLastSeen, updatePassword, userHasFamily,
   createFamily, getFamily, validateSubscriptionCode, updateFamilyFounder, leaveFamily,
-  generateSubscriptionCodes, generatePremiumCode, generateSpecialCodes, addCustomCode, getAvailablePremiumCodes, purchaseCode, getUserCodes, getFirstAvailablePremiumCode, updatePrice,
+  generateSubscriptionCodes, generatePremiumCode, generateSpecialCodes, addCustomCode, getAvailablePremiumCodes, purchaseCode, getUserCodes, pinPremiumCode, getFirstAvailablePremiumCode, updatePrice, getFamilyWhatsappNumbers, getPublicMemberProfile,
   createInvitation, createInvitationByPhone, getInvitationsByFamily, getInvitationByToken, acceptInvitation,
   openDiwaniya, closeDiwaniya, getActiveDiwaniya, getDiwaniyaSessionById, verifyDiwaniyaCode, getDiwaniyaHistory, addDiwaniyaMessage, getDiwaniyaMessages,
   createChallenge, respondToChallenge, completeChallenge, getFamilyChallenges, getPendingChallenges, getFamilyLeaderboard,
