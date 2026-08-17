@@ -2794,18 +2794,34 @@ io.on('connection', (socket) => {
     // Fetch family name + level for the join chat notification
     let famName = '';
     let userLevel = 0;
+    let userEffect = null;
+    let userFamilyId = null;
+    let userRole = null;
     try {
       const u2 = await db.getUserById(userId);
       if (u2?.family_id) { const ff = await db.getFamily(u2.family_id); famName = ff?.name || ''; }
       userLevel = u2?.level || 0;
+      userEffect = u2?.selected_effect || null;
+      userFamilyId = u2?.family_id || null;
+      userRole = u2?.role || null;
     } catch(e) {}
+
+    // قاعدة البث العائلي: الكاميرا فقط للمؤسس (والأدمن) — عضو العائلة ينضم بالصوت فقط
+    if (!isObserver && wantsVideo && userFamilyId) {
+      try {
+        const sessRow = await db.getDiwaniyaSessionById(sessionId);
+        if (sessRow && sessRow.family_id === userFamilyId && !['founder','admin'].includes(userRole)) {
+          wantsVideo = false;
+        }
+      } catch(e) {}
+    }
     
     // Notify everyone in the session CHAT: "X انضم للبث"
     socket.to(`session_${sessionId}`).emit('session_member_joined', { name: userName, familyName: famName, avatar });
     
     // Tell existing participants about new user (observers included so they receive audio)
     participants.forEach(p => {
-      io.to(p.socketId).emit('user_joined_call', { userId, userName, avatar, level: userLevel, effect: u2?.selected_effect || null, isObserver: !!isObserver || forcedAudioOnly });
+      io.to(p.socketId).emit('user_joined_call', { userId, userName, avatar, level: userLevel, effect: userEffect, isObserver: !!isObserver || forcedAudioOnly, wantsVideo });
     });
     
     participants.push({ socketId: socket.id, userId, userName, avatar, level: userLevel, isObserver: !!isObserver || forcedAudioOnly, wantsVideo });
@@ -2870,10 +2886,16 @@ io.on('connection', (socket) => {
     if (!room) return;
     const me = room.find(p => p.socketId === socket.id);
     if (!me) return;
-    // If turning ON, enforce the video limit
+    // If turning ON, enforce the video limit + family-broadcast rule (only founder/admin cameras)
     if (on) {
       try {
         const sessRow = await db.getDiwaniyaSessionById(sessionId);
+        // قاعدة البث العائلي: عضو العائلة لا يفتح كاميرا أبداً
+        const meUser = await db.getUserById(me.userId);
+        if (sessRow && meUser && sessRow.family_id === meUser.family_id && !['founder','admin'].includes(meUser.role)) {
+          socket.emit('video_slots_full', { videoLimit: 1, message: '🎥 الكاميرا للمؤسس فقط في البث العائلي' });
+          return; // don't allow
+        }
         const videoLimit = sessRow?.video_limit || 6;
         const videoOnCount = room.filter(p => p.wantsVideo && !p.isObserver).length;
         if (videoOnCount >= videoLimit) {

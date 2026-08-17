@@ -3774,7 +3774,7 @@ async function openGiftBox() {
   const sel = document.getElementById('gift-recipient');
   sel.innerHTML = '<option value="">اختر العضو...</option>';
   Object.keys(peerConnections).forEach(pid => {
-    const name = document.getElementById('participant-' + pid)?.textContent?.replace('●', '')?.trim() || 'عضو';
+    const name = state.callMembers?.[pid] || 'عضو';
     sel.innerHTML += '<option value="' + pid + '">' + name + '</option>';
   });
   // Load gift items grid

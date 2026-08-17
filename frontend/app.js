@@ -2090,9 +2090,10 @@ async function joinLiveAudio() {
   const isModeratorVisit = (state.user?.role === 'moderator') || (state.user?.role === 'admin' && document.getElementById('moderator-send-box')?.style.display === 'block');
   
   try {
-    // الكاميرا فقط في أوضاع الفيديو (video/all) — المكالمة الصوتية بدون كاميرا
+    // الكاميرا فقط للمؤسس (والأدمن) في أوضاع الفيديو — أعضاء العائلة ينضمون بالصوت فقط
     const isVideoMode = ['video', 'all'].includes(state.diwaniyaMode);
-    const wantVideo = !isModeratorVisit && isVideoMode;
+    const isHost = state.isFounder || state.user?.role === 'admin';
+    const wantVideo = !isModeratorVisit && isVideoMode && isHost;
     localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: wantVideo ? { facingMode: state.cameraFacing || 'environment' } : false });
     
     if (isModeratorVisit) {
@@ -2159,11 +2160,13 @@ async function joinLiveAudio() {
       const stateEl = document.getElementById('my-tile-state');
       if (stateEl) stateEl.textContent = '🕵️ مراقب - يسمع فقط';
     } else {
-      if (!isVideoMode) {
+      if (!wantVideo) {
         const stateEl = document.getElementById('my-tile-state');
         if (stateEl) stateEl.textContent = '🎤 صوت فقط';
       }
-      showToast(isVideoMode ? '🎥 أنت في بث الفيديو الآن' : '🎤 أنت في البث الصوتي الآن', 'success');
+      const preCam = document.getElementById('pre-cam-btn');
+      if (preCam) preCam.style.display = isHost ? 'inline-block' : 'none';
+      showToast(!isHost ? '🎤 انضممت للبث بالصوت فقط (الكاميرا للمؤسس)' : (isVideoMode ? '🎥 أنت في بث الفيديو الآن' : '🎤 أنت في البث الصوتي الآن'), 'success');
     }
   } catch(e) {
     showToast('الرجاء السماح بالميكروفون', 'error');
@@ -3268,6 +3271,7 @@ function addRemoteAudio(peerId, peerName, stream) {
         '<div class="cam-off-label">كاميرا مغلقة</div>' +
       '</div>' +
       '<div class="video-name">' + peerName + '</div>';
+    videoGrid.appendChild(tile);
     const video = tile.querySelector('video');
     const videoTracks = stream.getVideoTracks();
     // If participant has NO video track at all (audio-only listener) -> show overlay
@@ -3565,10 +3569,13 @@ function updateAudioCallUI(inCall) {
     btn.className = 'btn btn-danger btn-full';
     document.getElementById('call-controls').style.display = 'block';
     document.getElementById('video-grid').style.display = 'grid';
-    // زر الكاميرا يظهر فقط في أوضاع الفيديو — الصوتية بدون كاميرا
+    // زر الكاميرا يظهر فقط في أوضاع الفيديو وللمضيف فقط (المؤسس/الأدمن) — الأعضاء بدون كاميرا
     const isVideoMode2 = ['video', 'all'].includes(state.diwaniyaMode);
+    const isHost2 = state.isFounder || state.user?.role === 'admin';
     const camBtn3 = document.getElementById('cam-toggle-btn');
-    if (camBtn3) camBtn3.style.display = isVideoMode2 ? 'flex' : 'none';
+    if (camBtn3) camBtn3.style.display = (isVideoMode2 && isHost2) ? 'flex' : 'none';
+    const flipBtn3 = document.getElementById('flip-cam-btn');
+    if (flipBtn3) flipBtn3.style.display = (isVideoMode2 && isHost2) ? 'flex' : 'none';
     // البث شاشة منفصلة تغطي كل الشاشة (بدون مغادرة الصفحة)
     document.body.classList.add('bcast-open');
     moveControlsIntoGrid();
