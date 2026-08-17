@@ -3278,10 +3278,10 @@ body {
   border-radius: 16px;
   padding: 6px 12px;
   font-size: 13px;
-  animation: tkMsgIn .3s ease, tkFade 5s ease forwards;
+  animation: tkMsgIn .3s ease;
   backdrop-filter: blur(3px);
 }
-@keyframes tkFade { 0%,80% { opacity: 1; } 100% { opacity: 0; } }
+/* لا تختفي الرسائل — تبقى حتى يُحدّ الحد الأقصى (30) */
 .tiktok-chat-name { color: var(--gold); font-weight: 800; }
 
 /* زر متابعة */

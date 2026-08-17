@@ -499,19 +499,33 @@ async function computeUserLevel(userId) {
   }
   return { level, spent, next };
 }
+
+// المستوى الموحد: الأكبر بين مستوى النشاط (level_points) ومستوى الدعم
+async function recalcLevel(userId) {
+  const u = await queryOne('SELECT level_points, support_spent FROM users WHERE id = $1', [userId]);
+  const pts = parseInt(u?.level_points) || 0;
+  const spent = parseInt(u?.support_spent) || 0;
+  const cfg = await getLevelConfig();
+  let supLevel = 0;
+  for (const c of cfg) {
+    if (spent >= parseInt(c.coins_needed)) supLevel = c.level;
+    else break;
+  }
+  const level = Math.max(pts, supLevel);
+  await run('UPDATE users SET level = $1 WHERE id = $2', [level, userId]);
+  await refreshFamilyVerifForUser(userId).catch(() => {});
+  return level;
+}
 async function addUserSupport(userId, coins) {
   await run('UPDATE users SET support_spent = support_spent + $1 WHERE id = $2', [coins, userId]);
-  const info = await computeUserLevel(userId);
-  await run('UPDATE users SET level = $1 WHERE id = $2', [info.level, userId]);
-  await refreshFamilyVerifForUser(userId);
-  return info;
+  // المستوى الموحد — لا يطمس مستوى النشاط
+  await recalcLevel(userId);
+  return getUserById(userId);
 }
 async function addUserCharged(userId, coins) {
   await run('UPDATE users SET total_charged = total_charged + $1 WHERE id = $2', [coins, userId]);
-  const info = await computeUserLevel(userId);
-  await run('UPDATE users SET level = $1 WHERE id = $2', [info.level, userId]);
-  await refreshFamilyVerifForUser(userId);
-  return info;
+  await recalcLevel(userId);
+  return getUserById(userId);
 }
 
 // =============== FAMILY VERIFICATION (توثيق العائلات) ===============
@@ -971,8 +985,8 @@ async function addLevelPoints(userId, points, type) {
   await run('UPDATE users SET level_points = level_points + $1 WHERE id = $2', [points, userId]);
   if (type === 'charge') await run('UPDATE users SET charges_count = charges_count + 1 WHERE id = $2'.replace('$2', '$1'), [userId]);
   if (type === 'broadcast') await run('UPDATE users SET broadcasts_count = broadcasts_count + 1 WHERE id = $2'.replace('$2', '$1'), [userId]);
-  // Level = level_points
-  await run('UPDATE users SET level = level_points WHERE id = $1', [userId]);
+  // المستوى الموحد (نشاط + دعم) — لا يطمس أحدهما الآخر
+  await recalcLevel(userId);
   return getUserById(userId);
 }
 async function getUserLevel(userId) { return queryOne('SELECT level, level_points, charges_count, broadcasts_count FROM users WHERE id = $1', [userId]); }
@@ -1394,7 +1408,7 @@ module.exports = {
   getFamilyVerificationSettings, saveFamilyVerificationSettings, computeVerifTierForLevel, recomputeFamilyVerification, recomputeAllFamilyVerifications, refreshFamilyVerifForUser,
   getEffects, getEffectById, addEffect, getUserEffects, buyEffect, selectEffect, addFamilyBattleWin,
   getPricing, getPricingByFeature, setPricing, deletePricing, getSarToCoinsRate, setSarToCoinsRate, payWithCoins, settleAuction, getSiteTotalCoins,
-  addLevelPoints, getUserLevel, getLevelConfig, getLevelByNum, setLevelConfig, deleteLevelConfig, seedLevels, computeUserLevel, addUserCharged, addUserSupport,
+  addLevelPoints, getUserLevel, getLevelConfig, getLevelByNum, setLevelConfig, deleteLevelConfig, seedLevels, computeUserLevel, recalcLevel, addUserCharged, addUserSupport,
   getWithdrawFee, setWithdrawFee,
   isDiwaniyaRestricted, restrictFromDiwaniya, unrestrictFromDiwaniya, getDiwaniyaRestrictions,
   getDiwaniyaGlobalSettings, setDiwaniyaGlobalSettings, setDiwaniyaMaintenance, clearDiwaniyaMaintenance, getAllDiwaniyaSessions, closeAllDiwaniyas, closeDiwaniyaByAdmin,

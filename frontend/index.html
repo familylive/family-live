@@ -3984,6 +3984,7 @@ async function sendGiftItem(giftId) {
       const r = await api('POST', '/api/battles/support', { battleId: currentBattle.id, side, coins: g.coins });
       showToast(r.message || '🎁 دعمت الفريق!', 'success');
       updateGiftBarBalance();
+      document.getElementById('gift-box-modal').style.display = 'none';
       showGiftOnCamera({ giftName: g.name, giftEmoji: g.emoji, giftCoins: g.coins, giftImage: g.gift_image || null, fromName: state.user?.name, toName: side === 'a' ? currentBattle.player_a_name : currentBattle.player_b_name, familyName: '', toId: toId, fromId: state.user?.id });
       return;
     } catch(e) { return showToast(e.message || 'فشل الإرسال', 'error'); }
@@ -4000,6 +4001,8 @@ async function sendGiftItem(giftId) {
     const result = await api('POST', '/api/gifts/send', { giftId, toId, sessionId: state.activeSession.id });
     showToast(result.message, 'success');
     updateGiftBarBalance();
+    // يغلق صندوق الهدايا بعد الإرسال ليشاهد المستخدم الهدية على الشاشة
+    document.getElementById('gift-box-modal').style.display = 'none';
   } catch(e) { showToast(e.message || 'فشل إرسال الهدية', 'error'); }
 }
 
