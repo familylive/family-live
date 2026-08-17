@@ -3816,6 +3816,9 @@ function updateAudioCallUI(inCall) {
     if (barCam) barCam.style.display = (isVideoMode2 && isHost2) ? 'flex' : 'none';
     const barMic = document.getElementById('tt-bar-mic');
     if (barMic) barMic.style.display = 'flex';
+    // زر العوائل المتصلة + PK للمضيف فقط
+    const barFam = document.getElementById('tt-bar-families');
+    if (barFam) barFam.style.display = isHost2 ? 'flex' : 'none';
     // البث شاشة منفصلة تغطي كل الشاشة (بدون مغادرة الصفحة)
     document.body.classList.add('bcast-open');
     moveControlsIntoGrid();

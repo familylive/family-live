@@ -678,6 +678,9 @@
               <button class="tt-bar-btn" id="tt-bar-pk" onclick="openBattleModal()" title="تحدي PK" style="display:none">
                 <span class="tt-bar-ico">⚔️</span><span class="tt-bar-label">PK</span>
               </button>
+              <button class="tt-bar-btn" id="tt-bar-families" onclick="openConnectedFamilies()" title="العوائل المتصلة" style="display:none">
+                <span class="tt-bar-ico">👥</span><span class="tt-bar-label">عوائل</span>
+              </button>
               <button class="tt-bar-btn" id="tt-bar-effects" onclick="openEffectsModal()" title="المؤثرات">
                 <span class="tt-bar-ico">✨</span><span class="tt-bar-label">تأثير</span>
               </button>
@@ -3837,9 +3840,16 @@ async function openGiftBox() {
     const mB = (state.members || []).find(m => m.id === currentBattle.player_b_id);
     const avA = mA?.avatar || peerAvatars[currentBattle.player_a_id] || '👤';
     const avB = mB?.avatar || peerAvatars[currentBattle.player_b_id] || '👤';
-    chips.innerHTML =
+    let chipsHtml =
       '<div class="gift-recipient-chip pk-chip-a" data-pk="a" onclick="selectGiftRecipientChip(this,\'pk:a\')"><span class="chip-av">' + ava(avA) + '</span>⭐ ' + (currentBattle.player_a_name || 'أ') + '</div>' +
       '<div class="gift-recipient-chip pk-chip-b" data-pk="b" onclick="selectGiftRecipientChip(this,\'pk:b\')"><span class="chip-av">' + ava(avB) + '</span>⭐ ' + (currentBattle.player_b_name || 'ب') + '</div>';
+    // دعم نفسي فوري (بدون نافذة): للمؤسس/اللاعب — يرفع نقاط فريقه
+    const isPlayer = currentBattle.player_a_id === state.user?.id || currentBattle.player_b_id === state.user?.id;
+    if (isPlayer) {
+      const mySide = currentBattle.player_a_id === state.user?.id ? 'a' : 'b';
+      chipsHtml += '<div class="gift-recipient-chip" style="border-color:var(--gold)" onclick="quickSelfSupport(\'' + mySide + '\')">🙋 دعم نفسي (+100)</div>';
+    }
+    chips.innerHTML = chipsHtml;
   } else {
     const mems = (state.members || []);
     const participants = Object.keys(peerConnections);
@@ -3932,6 +3942,16 @@ function selectGiftRecipientChip(el, val) {
 }
 
 function sendSelectedGift() { window._sendSelectedGift && window._sendSelectedGift(); }
+
+// دعم ذاتي فوري في PK: لمسة واحدة = +100 لنقاطك ويرفع ترتيب عائلتك
+async function quickSelfSupport(side) {
+  if (!currentBattle || currentBattle.status !== 'active') return showToast('لا يوجد تحدي PK نشط', 'error');
+  try {
+    const r = await api('POST', '/api/battles/support', { battleId: currentBattle.id, side, coins: 100 });
+    showToast('🙋 دعمت نفسك بـ 100 — ارتفعت نقاطك وعائلتك', 'success');
+    refreshWalletHeader();
+  } catch(e) { showToast(e.message || 'فشل الدعم الذاتي', 'error'); }
+}
 
 async function sendGiftItem(giftId) {
   const g = giftItems.find(x => x.id === giftId);
