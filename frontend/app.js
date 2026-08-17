@@ -934,6 +934,13 @@ function dwMaintenanceActive() {
   return !!(dwGlobal.maintenance && dwGlobal.maintenance.active);
 }
 
+
+function dwJoinBtnText(mode) {
+  if (mode === 'video') return '🎥 انضم لمكالمة الفيديو';
+  if (mode === 'all') return '🎥🎤 انضم للمكالمة (فيديو + صوت)';
+  return '🎤 انضم للمكالمة الصوتية';
+}
+
 function updateDiwaniyaStat() {
   const stat = document.getElementById('stat-diwaniya');
   if (!stat) return;
@@ -1025,6 +1032,8 @@ async function toggleDiwaniya() {
     }
     state.diwaniyaOpen = true; state.activeSession = session;
     state.diwaniyaMode = mode;
+    const modeSelAfterOpen = document.getElementById('diwaniya-mode');
+    if (modeSelAfterOpen) modeSelAfterOpen.value = mode;
     document.getElementById('diwaniya-toggle-btn').textContent = '🔒 إغلاق الديوانية';
     updateDiwaniyaStat();
     const modeLabel = { text: '✍️ كتابي', audio: '🎤 صوتي', video: '🎥 فيديو', both: '📝🎤 كتابي+صوتي', all: '📝🎥🎤 كل شي' };
@@ -1041,7 +1050,7 @@ async function toggleDiwaniya() {
     const joinBtn = document.getElementById('join-audio-btn');
     if (joinBtn && ['audio','video','both','all'].includes(mode)) {
       joinBtn.style.display = 'block';
-      joinBtn.textContent = '🎥 انضم لمكالمة الفيديو';
+      joinBtn.textContent = dwJoinBtnText(mode);
       joinBtn.className = 'btn btn-accent btn-full';
     }
     if (socket?.connected) socket.emit('join_session', session.id);
@@ -1092,6 +1101,8 @@ function applyDiwaniyaSession(session) {
     state.activeSession = session;
     const mode = session.mode || 'text';
     state.diwaniyaMode = mode;
+    const modeSelLive = document.getElementById('diwaniya-mode');
+    if (modeSelLive) modeSelLive.value = mode;
     const btn = document.getElementById('diwaniya-toggle-btn');
     if (btn) btn.textContent = '🔒 إغلاق الديوانية';
     const stat = document.getElementById('stat-diwaniya');
@@ -1110,7 +1121,7 @@ function applyDiwaniyaSession(session) {
     const joinBtn = document.getElementById('join-audio-btn');
     if (joinBtn && ['audio','video','both','all'].includes(mode)) {
       joinBtn.style.display = 'block';
-      joinBtn.textContent = '🎥 انضم لمكالمة الفيديو';
+      joinBtn.textContent = dwJoinBtnText(mode);
       joinBtn.className = 'btn btn-accent btn-full';
     }
     if (!wasOpen) {
@@ -3451,7 +3462,7 @@ function updateAudioCallUI(inCall) {
       myVideo.style.display = 'block';
     }
   } else {
-    btn.textContent = '🎥 انضم لمكالمة الفيديو';
+    btn.textContent = dwJoinBtnText(state.diwaniyaMode || 'text');
     btn.className = 'btn btn-accent btn-full';
     document.getElementById('call-controls').style.display = 'none';
     document.getElementById('video-grid').style.display = 'none';
