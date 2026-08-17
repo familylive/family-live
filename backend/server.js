@@ -231,8 +231,8 @@ app.post('/api/codes/purchase', authMiddleware, async (req, res) => {
   res.json({ message: 'تم شراء الرمز المميز بنجاح بقيمة 200 ريال ✅', code: result });
 });
 
-// Generate premium code
-app.post('/api/codes/generate-premium', async (req, res) => {
+// Generate premium code (admin only)
+app.post('/api/codes/generate-premium', authMiddleware, adminMiddleware, async (req, res) => {
   const code = await db.generatePremiumCode();
   res.json({ code, message: 'تم إنشاء رمز مميز: ' + code });
 });
@@ -264,8 +264,8 @@ app.post('/api/auth/reset-password', async (req, res) => {
   res.json({ message: 'تم تغيير كلمة المرور بنجاح ✅' });
 });
 
-// Get all codes (admin)
-app.get('/api/codes/admin/all', authMiddleware, async (req, res) => {
+// Get all codes (admin only)
+app.get('/api/codes/admin/all', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     const codes = await db.execQuery("SELECT code, type, price, purchased_by, used FROM subscription_codes ORDER BY type DESC, code ASC");
     res.json({ codes });
@@ -274,8 +274,8 @@ app.get('/api/codes/admin/all', authMiddleware, async (req, res) => {
   }
 });
 
-// Update code price (admin)
-app.post('/api/codes/admin/update-price', authMiddleware, async (req, res) => {
+// Update code price (admin only)
+app.post('/api/codes/admin/update-price', authMiddleware, adminMiddleware, async (req, res) => {
   const { code, price } = req.body;
   if (!code || price === undefined) return res.status(400).json({ error: 'الرمز والسعر مطلوبان' });
   await db.updatePrice(code, parseInt(price));

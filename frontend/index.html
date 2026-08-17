@@ -798,7 +798,7 @@
         <div class="premium-codes-grid" id="premium-codes-list">
           <div class="empty-state"><div class="empty-text">لا توجد رموز متاحة حالياً</div></div>
         </div>
-        <button class="btn btn-accent btn-full" onclick="generateNewPremiumCode()" style="margin-top:10px">🔄 توليد رمز مميز جديد</button>
+        <button class="btn btn-accent btn-full" id="generate-premium-btn" onclick="generateNewPremiumCode()" style="margin-top:10px;display:none">🔄 توليد رمز مميز جديد</button>
       </div>
 
       <div class="card">
@@ -2178,11 +2178,17 @@ async function toggleLang() {
 
 // ==================== CODES MANAGEMENT ====================
 async function loadCodesPage() {
+  const isAdmin = state.user?.role === 'admin';
+  // إخفاء أدوات الأدمن عن غير الأدمن
+  const genBtn = document.getElementById('generate-premium-btn');
+  if (genBtn) genBtn.style.display = isAdmin ? 'block' : 'none';
+  const adminCard = document.getElementById('admin-codes-section');
+  if (adminCard) adminCard.style.display = isAdmin ? 'block' : 'none';
   try {
     const [avail, my, allCodes] = await Promise.all([
       api('GET', '/api/codes/available'),
       api('GET', '/api/codes/my'),
-      api('GET', '/api/codes/admin/all'),
+      isAdmin ? api('GET', '/api/codes/admin/all') : Promise.resolve({ codes: [] }),
     ]);
     
     const availList = document.getElementById('premium-codes-list');
