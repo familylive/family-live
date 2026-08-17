@@ -828,7 +828,7 @@
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
           <div class="form-group">
             <label>النوع</label>
-            <select class="form-input" id="spec-len">
+            <select class="form-input" id="spec-len" onchange="specLenChanged()">
               <option value="1">🔢 مفردة (1 حرف)</option>
               <option value="2">🔢 ثنائية (2 أحرف)</option>
               <option value="3">🔢 ثلاثية (3 أحرف)</option>
@@ -838,6 +838,7 @@
               <option value="7">🔢 سباعية (7 أحرف)</option>
               <option value="8">💎 ثمانية (8 أحرف — مميزة)</option>
               <option value="9">🔢 تساعية (9 أحرف)</option>
+              <option value="custom">✏️ رمز مخصص (اكتبه بنفسك)</option>
             </select>
           </div>
           <div class="form-group">
@@ -848,7 +849,7 @@
               <option value="both">🔤🔢 أرقام وحروف</option>
             </select>
           </div>
-          <div class="form-group">
+          <div class="form-group" id="spec-count-group">
             <label>العدد</label>
             <input class="form-input" id="spec-count" type="number" value="10" min="1" max="36">
           </div>
@@ -856,6 +857,10 @@
             <label>السعر لكل رمز (ريال)</label>
             <input class="form-input" id="spec-price" type="number" value="200" min="0">
           </div>
+        </div>
+        <div class="form-group" id="spec-custom-group" style="display:none">
+          <label>✏️ اكتب الرمز المخصص (حروف وأرقام فقط، بدون مسافات)</label>
+          <input class="form-input" id="spec-custom-code" type="text" placeholder="مثال: MOHAMMED77" dir="ltr" style="letter-spacing:2px;text-transform:uppercase">
         </div>
         <button class="btn btn-accent btn-full" onclick="generateSpecialCodesNow()">⚡ توليد الرموز</button>
         <div id="spec-result" style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px"></div>
@@ -2313,7 +2318,7 @@ async function loadCodesPage() {
       adminDiv.innerHTML = '<table class="admin-codes-table"><thead><tr><th>الرمز</th><th>النوع</th><th>الحالة</th><th>السعر (ريال)</th><th>تعديل</th></tr></thead><tbody>' +
         allCodes.codes.map(c => {
           const status = c.purchased_by ? 'مباع' : (c.used ? 'مستخدم' : 'متاح');
-          const typeMap = { premium: '💎 مميز', vip1: '🔢 مفردة', vip2: '🔢 ثنائية', vip3: '🔢 ثلاثية', vip4: '🔢 رباعية', vip5: '🔢 خماسية', vip6: '🔢 سداسية', vip7: '🔢 سباعية', vip8: '🔢 ثمانية', vip9: '🔢 تساعية' };
+          const typeMap = { premium: '💎 مميز', custom: '✏️ مخصص', vip1: '🔢 مفردة', vip2: '🔢 ثنائية', vip3: '🔢 ثلاثية', vip4: '🔢 رباعية', vip5: '🔢 خماسية', vip6: '🔢 سداسية', vip7: '🔢 سباعية', vip8: '🔢 ثمانية', vip9: '🔢 تساعية' };
           const typeLabel = typeMap[c.type] || (c.type === 'free' ? '🎁 مجاني' : c.type);
           return '<tr>' +
             '<td class="code-cell">' + c.code + '</td>' +
@@ -2503,12 +2508,34 @@ async function generateNewPremiumCode() {
   }
 }
 
-// توليد أرقام/رموز مميزة قصيرة (مفردة/ثنائية/ثلاثية/رباعية)
+// توليد أرقام/رموز مميزة قصيرة (مفردة/ثنائية/ثلاثية/رباعية...) + رمز مخصص
+function specLenChanged() {
+  const custom = document.getElementById('spec-len').value === 'custom';
+  document.getElementById('spec-custom-group').style.display = custom ? 'block' : 'none';
+  document.getElementById('spec-count-group').style.display = custom ? 'none' : 'block';
+  document.getElementById('spec-charset').disabled = custom;
+}
 async function generateSpecialCodesNow() {
-  const length = parseInt(document.getElementById('spec-len').value) || 1;
+  const length = document.getElementById('spec-len').value;
+  const price = parseInt(document.getElementById('spec-price').value) || 0;
+  // رمز مخصص
+  if (length === 'custom') {
+    const code = document.getElementById('spec-custom-code').value.trim();
+    if (!code) return showToast('✏️ اكتب الرمز المخصص أولاً', 'error');
+    try {
+      const r = await api('POST', '/api/codes/add-custom', { code, price });
+      const box = document.getElementById('spec-result');
+      box.innerHTML = '<span style="background:var(--bg-hover);border:1px solid rgba(232,184,48,.4);border-radius:8px;padding:4px 10px;font-size:13px;font-weight:700;direction:ltr">' + r.code.code +
+        ' <span style="font-size:10px;color:var(--gold);font-weight:400">' + (r.code.price || 0) + ' ر.س</span></span>';
+      showToast(r.message, 'success');
+      document.getElementById('spec-custom-code').value = '';
+      loadCodesPage();
+    } catch(e) { showToast(e.message || 'فشل الإضافة', 'error'); }
+    return;
+  }
+  const len = parseInt(length) || 1;
   const charset = document.getElementById('spec-charset').value;
   const count = parseInt(document.getElementById('spec-count').value) || 10;
-  const price = parseInt(document.getElementById('spec-price').value) || 0;
   try {
     const r = await api('POST', '/api/codes/generate-special', { length, charset, count, price });
     const box = document.getElementById('spec-result');
@@ -4723,7 +4750,7 @@ async function loadAvailableCodesDropdowns() {
     const { codes } = await api('GET', '/api/admin/auctions/available-codes');
     if (!state.sarRate) { try { const { rate } = await api('GET', '/api/pricing'); state.sarRate = rate || 50; } catch(e) {} }
     const rate = state.sarRate || 50;
-    const typeMap = { premium: '💎', vip1: '🔢', vip2: '🔢', vip3: '🔢', vip4: '🔢', vip5: '🔢', vip6: '🔢', vip7: '🔢', vip8: '🔢', vip9: '🔢' };
+    const typeMap = { premium: '💎', custom: '✏️', vip1: '🔢', vip2: '🔢', vip3: '🔢', vip4: '🔢', vip5: '🔢', vip6: '🔢', vip7: '🔢', vip8: '🔢', vip9: '🔢' };
     const opts = '<option value="">اختر رمزاً...</option>' + codes.map(c =>
       '<option value="' + c.code + '" data-price="' + (c.price || 0) + '">' + (typeMap[c.type] || '') + ' ' + c.code + ' — 🪙 ' + ((c.price || 0) * rate) + ' <img src="/assets/coin.png" class="coin-ico" alt=""> (' + (c.price || 0) + ' ريال)</option>'
     ).join('');

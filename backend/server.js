@@ -238,6 +238,14 @@ app.post('/api/codes/generate-premium', authMiddleware, adminMiddleware, async (
   res.json({ code, message: 'تم إنشاء رمز مميز: ' + code });
 });
 
+// Add a custom code typed by the admin (✏️ رمز مخصص — admin only)
+app.post('/api/codes/add-custom', authMiddleware, adminMiddleware, asyncHandler(async (req, res) => {
+  const { code, price } = req.body;
+  const result = await db.addCustomCode(code, price);
+  if (result?.error) return res.status(400).json(result);
+  res.json({ message: '✏️ تمت إضافة الرمز المخصص: ' + result.code + (parseInt(price) ? ' (' + parseInt(price) + ' ريال)' : ''), code: result });
+}));
+
 // Generate special short codes (أرقام/رموز مفردة ثنائية ثلاثية رباعية — admin only)
 app.post('/api/codes/generate-special', authMiddleware, adminMiddleware, async (req, res) => {
   const { length, charset, count, price } = req.body;

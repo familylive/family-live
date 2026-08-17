@@ -234,7 +234,20 @@ async function generateSpecialCodes(length, charset, count, price) {
   }
   return out;
 }
-async function getAvailablePremiumCodes() { return query("SELECT * FROM subscription_codes WHERE type = 'premium' AND (used = 0 OR used IS NULL) AND purchased_by IS NULL"); }
+// إضافة رمز مخصص (يكتبه الأدمن بنفسه) — type: 'custom'
+async function addCustomCode(code, price) {
+  const c = String(code || '').trim().toUpperCase();
+  if (!c) return { error: 'الرمز مطلوب' };
+  if (!/^[A-Z0-9]+$/.test(c)) return { error: 'الرمز يجب أن يحتوي حروفاً وأرقاماً فقط (بدون مسافات أو رموز)' };
+  if (c.length < 1 || c.length > 20) return { error: 'طول الرمز يجب أن يكون بين 1 و 20 حرفاً' };
+  const existing = await queryOne('SELECT * FROM subscription_codes WHERE code = $1', [c]);
+  if (existing) return { error: 'هذا الرمز موجود مسبقاً' };
+  const priceV = Math.max(0, parseInt(price) || 0);
+  await run('INSERT INTO subscription_codes (code, type, price) VALUES ($1,$2,$3)', [c, 'custom', priceV]);
+  return queryOne('SELECT * FROM subscription_codes WHERE code = $1', [c]);
+}
+
+async function getAvailablePremiumCodes() { return query("SELECT * FROM subscription_codes WHERE type IN ('premium','custom') AND (used = 0 OR used IS NULL) AND purchased_by IS NULL"); }
 async function purchaseCode(userId, code) {
   const c = await queryOne("SELECT * FROM subscription_codes WHERE code = $1 AND type = 'premium' AND (used = 0 OR used IS NULL) AND purchased_by IS NULL", [code]);
   if (!c) return null;
@@ -543,7 +556,7 @@ async function releaseAuctionCode(auctionId) {
   return getAuctionById(auctionId);
 }
 async function isAuctionParticipant(auctionId, userId) { return queryOne('SELECT * FROM auction_participants WHERE auction_id = $1 AND user_id = $2', [auctionId, userId]); }
-async function getAvailableAuctionCodes() { return query("SELECT * FROM subscription_codes WHERE type IN ('premium','vip1','vip2','vip3','vip4','vip5','vip6','vip7','vip8','vip9') AND (used = 0 OR used IS NULL) AND code IS NOT NULL AND code != '' AND code != '{}' ORDER BY LENGTH(code) ASC, code ASC"); }
+async function getAvailableAuctionCodes() { return query("SELECT * FROM subscription_codes WHERE type IN ('premium','custom','vip1','vip2','vip3','vip4','vip5','vip6','vip7','vip8','vip9') AND (used = 0 OR used IS NULL) AND code IS NOT NULL AND code != '' AND code != '{}' ORDER BY LENGTH(code) ASC, code ASC"); }
 
 // =============== ADMIN: FAMILIES & USERS ===============
 async function getAllFamilies() { return query('SELECT f.*, (SELECT COUNT(*) FROM users WHERE family_id = f.id) as members_count, u.name as founder_name, u.last_seen as founder_last_seen FROM families f LEFT JOIN users u ON f.founder_id = u.id ORDER BY f.created_at DESC'); }
@@ -1311,7 +1324,7 @@ module.exports = {
   getDb, initDb, queryAll, queryOne, run, execQuery, runRaw, getDbRaw,
   createUser, getUserByEmail, getUserById, getFamilyMembers, updateProfile, updateLastSeen, updatePassword, userHasFamily,
   createFamily, getFamily, validateSubscriptionCode, updateFamilyFounder, leaveFamily,
-  generateSubscriptionCodes, generatePremiumCode, generateSpecialCodes, getAvailablePremiumCodes, purchaseCode, getUserCodes, getFirstAvailablePremiumCode, updatePrice,
+  generateSubscriptionCodes, generatePremiumCode, generateSpecialCodes, addCustomCode, getAvailablePremiumCodes, purchaseCode, getUserCodes, getFirstAvailablePremiumCode, updatePrice,
   createInvitation, createInvitationByPhone, getInvitationsByFamily, getInvitationByToken, acceptInvitation,
   openDiwaniya, closeDiwaniya, getActiveDiwaniya, getDiwaniyaSessionById, verifyDiwaniyaCode, getDiwaniyaHistory, addDiwaniyaMessage, getDiwaniyaMessages,
   createChallenge, respondToChallenge, completeChallenge, getFamilyChallenges, getPendingChallenges, getFamilyLeaderboard,
