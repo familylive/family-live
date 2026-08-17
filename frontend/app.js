@@ -33,6 +33,17 @@ async function api(method, path, body = null) {
 }
 
 // ==================== INIT ====================
+// تحديث بيانات المستخدم من الخادم (المستوى/الرصيد/الصورة) — يبقيها حية
+async function refreshUserProfile() {
+  try {
+    const { user } = await api('GET', '/api/auth/verify');
+    if (user) {
+      state.user = { ...(state.user || {}), ...user };
+      if (typeof updateTikTokLiveInfo === 'function') updateTikTokLiveInfo();
+    }
+  } catch(e) {}
+}
+
 // تنبيه انتهاء الرصيد: يظهر مرة واحدة ويدعو لصفحة الشحن
 let _rechargePromptLock = false;
 function offerRecharge(detail) {
@@ -1212,6 +1223,8 @@ function startDiwaniyaStatusPoll() {
     } catch(e) {}
     // مزامنة التحدي النشط (شريط PK) كل دورة
     try { await loadBattleStatus(); } catch(e) {}
+    // تحديث مستوى/رصيد المستخدم الحقيقي (يظهر بعد الدعم مباشرة)
+    try { await refreshUserProfile(); } catch(e) {}
   }, 15000);
 }
 
@@ -2211,6 +2224,9 @@ async function joinLiveAudio() {
     }
     
     inLiveCall = true;
+    
+    // مستوى حقيقي فور الدخول للبث (بدون انتظار الدورة)
+    refreshUserProfile();
     
     // Notify server we're joining (observer flag for moderators)
     socket.emit('join_audio_call', { 

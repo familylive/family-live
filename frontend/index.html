@@ -3876,19 +3876,25 @@ async function openGiftBox() {
   }
   // Load gift items grid
   const grid = document.getElementById('gift-items-list');
-  let selectedGiftId = null;
+  window._lastGiftId = null;
   window._selectGift = (id, el) => {
     // إرسال فوري بلمسة واحدة (نمط تيك توك) — مع إشارة سريعة
     const g = giftItems.find(x => x.id === id);
+    window._lastGiftId = id;
     document.querySelectorAll('.gift-item').forEach(el2 => el2.classList.remove('selected'));
     const clicked = document.getElementById('gift-item-' + id);
     if (clicked) clicked.classList.add('selected');
     setTimeout(() => { if (clicked) clicked.classList.remove('selected'); }, 400);
+    // تحديث شريط الإرسال
+    const area = document.getElementById('gift-send-area');
+    const label = document.getElementById('gift-selected-label');
+    if (area) area.style.display = 'flex';
+    if (label && g) label.innerHTML = 'الهدية: ' + (g.gift_image ? '' : g.emoji + ' ') + g.name + ' · <img src="/assets/coin.png" class="coin-ico" alt="🪙"> ' + g.coins;
     sendGiftItem(id);
   };
   window._sendSelectedGift = () => {
-    if (!selectedGiftId) return showToast('اختر الهدية أولاً', 'error');
-    sendGiftItem(selectedGiftId);
+    if (window._lastGiftId) { sendGiftItem(window._lastGiftId); return; }
+    showToast('اختر الهدية أولاً', 'error');
   };
   if (giftItems.length) {
     grid.innerHTML = giftItems.map(g => {
@@ -3904,7 +3910,13 @@ async function openGiftBox() {
   } else {
     grid.innerHTML = '<div class="empty-text" style="grid-column:span 2">لا توجد هدايا</div>';
   }
-  document.getElementById('gift-send-area').style.display = 'none';
+  // شريط الإرسال ظاهر دائماً (زر إرسال واضح)
+  const sendArea = document.getElementById('gift-send-area');
+  if (sendArea) {
+    sendArea.style.display = 'flex';
+    const lbl = document.getElementById('gift-selected-label');
+    if (lbl) lbl.innerHTML = '<span style="opacity:.7">لمس أي هدية للإرسال الفوري، أو اختر ثم اضغط إرسال</span>';
+  }
   document.getElementById('gift-box-modal').style.display = 'flex';
 }
 

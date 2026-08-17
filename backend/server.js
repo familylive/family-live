@@ -1667,6 +1667,18 @@ app.post('/api/gifts/send', authMiddleware, asyncHandler(async (req, res) => {
     if (!w) return res.status(400).json({ error: 'رصيدك لا يكفي' });
     if (fromUser?.family_id) await db.addFamilySupportPoints(fromUser.family_id, gift[0].coins);
     await db.runRaw("INSERT INTO coin_transactions (id, user_id, type, coins, detail) VALUES ($1,$2,'self_support',$3,$4)", [require('crypto').randomUUID(), req.user.id, gift[0].coins, 'دعم ذاتي: ' + gift[0].emoji + ' ' + gift[0].name]);
+    // بث الأنيميشن أيضاً (كان يُحسم بدون ظهور على الشاشة)
+    io.to(`session_${sessionId}`).emit('gift_on_camera', {
+      giftName: gift[0].name,
+      giftEmoji: gift[0].emoji,
+      giftCoins: gift[0].coins,
+      giftImage: gift[0].gift_image || null,
+      fromName: fromUser.name,
+      toName: fromUser.name,
+      familyName: '',
+      toId: toId,
+      fromId: req.user.id
+    });
     return res.json({ message: '🙋 دعمت نفسك بـ ' + gift[0].coins + ' كوينز - ارتفعت نقاط عائلتك!', wallet: w });
   }
   const result = await db.sendGift(req.user.id, toId, gift[0].coins, 'هدية: ' + gift[0].emoji + ' ' + gift[0].name);

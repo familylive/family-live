@@ -2323,7 +2323,7 @@ body {
 .gift-fullscreen {
   position: fixed;
   inset: 0;
-  z-index: 1400;
+  z-index: 3500; /* فوق صندوق الهدايا والنوافذ حتى يظهر الأنيميشن دائماً */
   display: flex;
   flex-direction: column;
   align-items: center;
