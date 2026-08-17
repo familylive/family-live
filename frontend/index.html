@@ -2234,13 +2234,15 @@ async function loadCodesPage() {
     
     const availList = document.getElementById('premium-codes-list');
     if (avail.codes?.length) {
-      availList.innerHTML = avail.codes.map(c =>
-        '<div class="premium-code-card">' +
+      availList.innerHTML = avail.codes.map(c => {
+        const priceSar = parseInt(c.price) || 200;
+        const priceCoins = priceSar * (state.sarRate || 50);
+        return '<div class="premium-code-card">' +
           '<div class="premium-code-value">' + c.code + '</div>' +
-          '<div class="premium-code-price"><img src="/assets/coin.png" class="coin-ico" alt="كونزه"> ' + ((c.price || 200) * (state.sarRate || 50)) + '</div>' +
-          '<button class="btn btn-sm btn-accent" onclick="purchaseCode(\'' + c.code + '\')">شراء</button>' +
-        '</div>'
-      ).join('');
+          '<div class="premium-code-price"><img src="/assets/coin.png" class="coin-ico" alt="كونزه"> ' + priceCoins + ' <span style="font-size:11px;color:var(--text-muted)">(' + priceSar.toLocaleString('en') + ' ريال)</span></div>' +
+          '<button class="btn btn-sm btn-accent" onclick="purchaseCode(\'' + c.code + '\',' + priceSar + ')">شراء</button>' +
+        '</div>';
+      }).join('');
     } else {
       availList.innerHTML = '<div class="empty-state"><div class="empty-text">لا توجد رموز متاحة حالياً</div></div>';
     }
@@ -2452,8 +2454,10 @@ async function generateNewPremiumCode() {
   }
 }
 
-async function purchaseCode(code) {
-  if (!confirm('شراء الرمز ' + code + ' بقيمة 200 ريال؟')) return;
+async function purchaseCode(code, price) {
+  const p = parseInt(price) || 200;
+  const coins = p * (state.sarRate || 50);
+  if (!confirm('شراء الرمز ' + code + ' بقيمة ' + p.toLocaleString('en') + ' ريال (' + coins.toLocaleString('en') + ' 🪙)؟')) return;
   try {
     const result = await api('POST', '/api/codes/purchase', { code });
     showToast('✅ ' + result.message, 'success');

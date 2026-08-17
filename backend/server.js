@@ -228,7 +228,8 @@ app.post('/api/codes/purchase', authMiddleware, async (req, res) => {
   if (!code) return res.status(400).json({ error: 'الرمز مطلوب' });
   const result = await db.purchaseCode(req.user.id, code);
   if (!result) return res.status(400).json({ error: 'الرمز غير متاح للشراء' });
-  res.json({ message: 'تم شراء الرمز المميز بنجاح بقيمة 200 ريال ✅', code: result });
+  const price = parseInt(result.price) || 200;
+  res.json({ message: 'تم شراء الرمز المميز بنجاح بقيمة ' + price + ' ريال ✅', code: result, price });
 });
 
 // Generate premium code (admin only)
