@@ -640,7 +640,7 @@ function connectSocket() {
     if (typeof updateViewerCount === 'function') updateViewerCount();
   });
   socket.on('call_full', (data) => {
-    showToast(data.message || 'المكالمة ممتلئة', 'error');
+    showToast(data.message || 'البث ممتلئ', 'error');
     leaveLiveAudio();
   });
   socket.on('recording_attempt_announce', (data) => {
@@ -660,7 +660,7 @@ function connectSocket() {
   });
   socket.on('audio_kick', (data) => {
     if (data.userId === state.user?.id) {
-      showToast('👢 تم طردك من المكالمة', 'error');
+      showToast('👢 تم طردك من البث', 'error');
       leaveLiveAudio();
     } else {
       removeRemoteAudio(data.userId);
@@ -948,9 +948,9 @@ function dwMaintenanceActive() {
 
 
 function dwJoinBtnText(mode) {
-  if (mode === 'video') return '🎥 انضم لمكالمة الفيديو';
-  if (mode === 'all') return '🎥🎤 انضم للمكالمة (فيديو + صوت)';
-  return '🎤 انضم للمكالمة الصوتية';
+  if (mode === 'video') return '🎥 انضم لبث الفيديو';
+  if (mode === 'all') return '🎥🎤 انضم للبث (فيديو + صوت)';
+  return '🎤 انضم للبث الصوتي';
 }
 
 function updateDiwaniyaStat() {
@@ -1593,7 +1593,7 @@ function setupChatMode(mode) {
     modeLabel.className = 'mode-indicator';
     if (chatRoom?.parentNode) chatRoom.parentNode.insertBefore(modeLabel, chatRoom);
   }
-  const labels = { text: '✍️ الديوانية كتابية', audio: '🎤 الديوانية صوتية - مكالمة مباشرة', video: '🎥 مكالمة فيديو - حد أقصى 6', both: '📝🎤 كتابية + صوتية', all: '📝🎥🎤 كل شي' };
+  const labels = { text: '✍️ الديوانية كتابية', audio: '🎤 الديوانية صوتية - بث مباشر', video: '🎥 بث فيديو - حد أقصى 6', both: '📝🎤 كتابية + صوتية', all: '📝🎥🎤 كل شي' };
   modeLabel.textContent = labels[mode] || '✍️ الديوانية';
 
   // Show/hide live video section
@@ -1821,7 +1821,7 @@ let camOff = false;
 
 // تبديل الكاميرا (أمامية/خلفية) - تعمل الآن
 async function flipCamera() {
-  if (!localStream) return showToast('ادخل المكالمة أولاً', 'error');
+  if (!localStream) return showToast('ادخل البث أولاً', 'error');
   state.cameraFacing = state.cameraFacing === 'environment' ? 'user' : 'environment';
   try {
     const newVideo = await navigator.mediaDevices.getUserMedia({ video: { facingMode: state.cameraFacing, width: { ideal: 1280 }, height: { ideal: 720 } } });
@@ -1860,6 +1860,31 @@ function toggleMic() {
   updateCallPresence();
 }
 
+
+function refreshCamOffOverlay() {
+  const myTile = document.getElementById('my-video-tile');
+  if (!myTile) return;
+  myTile.classList.toggle('has-video', !camOff);
+  const av = (typeof state !== 'undefined' && state?.user) ? (state.user.avatar || '') : '';
+  const isImg = av.startsWith('data:') || av.startsWith('http') || av.startsWith('/');
+  let overlay = myTile.querySelector('.cam-off-overlay');
+  if (camOff) {
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.className = 'cam-off-overlay';
+      myTile.appendChild(overlay);
+    }
+    // إعادة بناء دائمة: الصورة المختارة تملأ المربع بدل الكاميرا
+    overlay.innerHTML = isImg
+      ? '<img class="cam-off-img" src="' + av + '" alt="">' +
+        '<div class="cam-off-chip">🚫 كاميرا مغلقة</div>'
+      : '<div class="cam-off-circle">' + avatarHtml(av) + '</div><div class="cam-off-icon">🚫</div><div class="cam-off-label">كاميرا مغلقة</div>';
+    overlay.style.display = 'flex';
+  } else if (overlay) {
+    overlay.style.display = 'none';
+  }
+}
+
 function toggleCamera() {
   if (!localStream) return;
   camOff = !camOff;
@@ -1877,20 +1902,7 @@ function toggleCamera() {
     myVideo.style.display = camOff ? 'none' : 'block';
     if (!camOff && !myVideo.srcObject) myVideo.srcObject = localStream;
   }
-  // Mark tile state so audio-mode CSS shows the video when ON
-  const myTile = document.getElementById('my-video-tile');
-  if (myTile) {
-    myTile.classList.toggle('has-video', !camOff);
-    let overlay = myTile.querySelector('.cam-off-overlay');
-    if (!overlay) {
-      overlay = document.createElement('div');
-      overlay.className = 'cam-off-overlay';
-      overlay.style.display = 'none';
-      overlay.innerHTML = '<div class="cam-off-circle">' + avatarHtml(globalThis.state?.user?.avatar) + '</div><div class="cam-off-icon">🚫</div><div class="cam-off-label">كاميرا مغلقة</div>';
-      myTile.appendChild(overlay);
-    }
-    overlay.style.display = camOff ? 'flex' : 'none';
-  }
+  refreshCamOffOverlay();
   const tileState = document.getElementById('my-tile-state');
   if (tileState) {
     tileState.textContent = '';
@@ -2081,7 +2093,7 @@ async function joinLiveAudio() {
     // الكاميرا فقط في أوضاع الفيديو (video/all) — المكالمة الصوتية بدون كاميرا
     const isVideoMode = ['video', 'all'].includes(state.diwaniyaMode);
     const wantVideo = !isModeratorVisit && isVideoMode;
-    localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: wantVideo ? { facingMode: state.cameraFacing || 'user' } : false });
+    localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: wantVideo ? { facingMode: state.cameraFacing || 'environment' } : false });
     
     if (isModeratorVisit) {
       // Forced observer: mute mic immediately, no camera at all
@@ -2125,8 +2137,7 @@ async function joinLiveAudio() {
     // الكاميرا تفتح تلقائياً فقط في أوضاع الفيديو — الصوتية تبدأ بالكاميرا مغلقة
     const myVideo2 = document.getElementById('my-video');
     if (myVideo2) { myVideo2.srcObject = localStream; myVideo2.style.display = camOff ? 'none' : 'block'; }
-    const myTile2 = document.getElementById('my-video-tile');
-    if (myTile2) myTile2.classList.toggle('has-video', !camOff);
+    refreshCamOffOverlay();
     const camBtn2 = document.getElementById('cam-toggle-btn');
     if (camBtn2) camBtn2.classList.toggle('off', camOff);
     const exitBtn = document.getElementById('call-exit-btn');
@@ -2152,7 +2163,7 @@ async function joinLiveAudio() {
         const stateEl = document.getElementById('my-tile-state');
         if (stateEl) stateEl.textContent = '🎤 صوت فقط';
       }
-      showToast(isVideoMode ? '🎥 أنت في مكالمة الفيديو الآن' : '🎤 أنت في المكالمة الصوتية الآن', 'success');
+      showToast(isVideoMode ? '🎥 أنت في بث الفيديو الآن' : '🎤 أنت في البث الصوتي الآن', 'success');
     }
   } catch(e) {
     showToast('الرجاء السماح بالميكروفون', 'error');
@@ -2218,7 +2229,7 @@ function leaveLiveAudio() {
   // Reset my video
   const myVideo = document.getElementById('my-video');
   if (myVideo) { myVideo.srcObject = null; myVideo.style.display = 'none'; }
-  showToast('غادرت المكالمة');
+  showToast('غادرت البث');
 }
 
 function createPeerConnection(peerId, peerName) {
@@ -2417,7 +2428,7 @@ function openBattleModal() {
   Object.entries(pool).forEach(([id, name]) => {
     if (id !== state.user?.id) sel.innerHTML += '<option value="' + id + '">' + (typeof name === 'string' ? name : name.name || 'عضو') + '</option>';
   });
-  if (sel.options.length <= 1) return showToast('لا يوجد أعضاء لتحديهم - ادخلوا المكالمة أولاً', 'error');
+  if (sel.options.length <= 1) return showToast('لا يوجد أعضاء لتحديهم - ادخلوا البث أولاً', 'error');
   document.getElementById('battle-modal').style.display = 'flex';
 }
 
@@ -3043,7 +3054,11 @@ function ensureAudioOverlays() {
     const overlay = document.createElement('div');
     overlay.className = 'cam-off-overlay';
     overlay.style.display = 'none';
-    overlay.innerHTML = '<div class="cam-off-circle">' + avatarHtml(state.user?.avatar) + '</div><div class="cam-off-icon">🚫</div><div class="cam-off-label">كاميرا مغلقة</div>';
+    const av = state.user?.avatar || '';
+    const isImg = av.startsWith('data:') || av.startsWith('http') || av.startsWith('/');
+    overlay.innerHTML = isImg
+      ? '<img class="cam-off-img" src="' + av + '" alt=""><div class="cam-off-chip">🚫 كاميرا مغلقة</div>'
+      : '<div class="cam-off-circle">' + avatarHtml(av) + '</div><div class="cam-off-icon">🚫</div><div class="cam-off-label">كاميرا مغلقة</div>';
     myTile.appendChild(overlay);
   }
   document.querySelectorAll('.video-tile:not(.local)').forEach(tile => {
@@ -3171,6 +3186,50 @@ function avatarHtml(avatar) {
   return '<div class="avatar-emoji">' + (avatar || '👤') + '</div>';
 }
 
+// ==================== PRESET AVATARS (صور جاهزة للمؤسس) ====================
+const PRESET_AVATARS = [
+  { emoji: '🧔', bg1: '#2b3a67', bg2: '#0e1526' },
+  { emoji: '👨‍🦱', bg1: '#5b2c6f', bg2: '#1a0f2e' },
+  { emoji: '👨‍🦳', bg1: '#6d4c41', bg2: '#2c1a12' },
+  { emoji: '👩‍🦰', bg1: '#8d2f47', bg2: '#33101c' },
+  { emoji: '👧', bg1: '#1f6f5c', bg2: '#0b2e25' },
+  { emoji: '🦸', bg1: '#7a3c1d', bg2: '#2b1205' },
+  { emoji: '🧙', bg1: '#3c3f92', bg2: '#14163f' },
+  { emoji: '🤴', bg1: '#a67c00', bg2: '#3d2d00' },
+  { emoji: '👳', bg1: '#2874a6', bg2: '#0d2b40' },
+  { emoji: '🐱', bg1: '#c2672f', bg2: '#4a240b' },
+  { emoji: '🦁', bg1: '#8a6d1f', bg2: '#33280a' },
+  { emoji: '🦅', bg1: '#5d4037', bg2: '#221712' },
+];
+function presetAvatarDataURI(emoji, bg1, bg2) {
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200">' +
+    '<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="' + bg1 + '"/><stop offset="1" stop-color="' + bg2 + '"/></linearGradient></defs>' +
+    '<rect width="200" height="200" rx="100" fill="url(#g)"/>' +
+    '<circle cx="100" cy="100" r="86" fill="rgba(255,255,255,.08)"/>' +
+    '<text x="100" y="135" font-size="120" text-anchor="middle">' + emoji + '</text></svg>';
+  return 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
+}
+function renderPresetAvatars() {
+  const box = document.getElementById('preset-avatars-grid');
+  if (!box) return;
+  box.innerHTML = PRESET_AVATARS.map((p, i) => {
+    const uri = presetAvatarDataURI(p.emoji, p.bg1, p.bg2);
+    return '<div class="preset-avatar" onclick="choosePresetAvatar(' + i + ')" title="اختر هذه الصورة">' +
+      '<img src="' + uri + '" alt="' + p.emoji + '"></div>';
+  }).join('');
+}
+let chosenPresetIndex = -1;
+function choosePresetAvatar(i) {
+  const p = PRESET_AVATARS[i];
+  if (!p) return;
+  chosenPresetIndex = i;
+  profileAvatarBase64 = presetAvatarDataURI(p.emoji, p.bg1, p.bg2);
+  const preview = document.getElementById('profile-avatar-preview');
+  if (preview) { preview.src = profileAvatarBase64; preview.style.display = 'block'; }
+  document.querySelectorAll('#preset-avatars-grid .preset-avatar').forEach((el, idx) => el.classList.toggle('selected', idx === i));
+  showToast('🎨 اخترت صورة جاهزة — اضغط حفظ التعديلات', 'success');
+}
+
 function setRemoteCamOverlay(peerId, off) {
   const tile = document.getElementById('video-' + peerId);
   if (!tile) return;
@@ -3241,7 +3300,7 @@ function openCameraInvite() {
   if (!sel) return;
   sel.innerHTML = '<option value="">اختر العضو...</option>';
   const members = state.callMembers || {};
-  if (!Object.keys(members).length) return showToast('لا يوجد متواجدون في المكالمة حالياً', 'error');
+  if (!Object.keys(members).length) return showToast('لا يوجد متواجدون في البث حالياً', 'error');
   Object.entries(members).forEach(([id, name]) => {
     sel.innerHTML += '<option value="' + id + '">' + name + '</option>';
   });
@@ -3502,7 +3561,7 @@ function updateAudioCallUI(inCall) {
   if (!btn) return;
   
   if (inCall) {
-    btn.textContent = '🔴 إنهاء المكالمة';
+    btn.textContent = '🔴 إنهاء البث';
     btn.className = 'btn btn-danger btn-full';
     document.getElementById('call-controls').style.display = 'block';
     document.getElementById('video-grid').style.display = 'grid';
