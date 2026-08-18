@@ -734,6 +734,26 @@ function connectSocket() {
   socket.on('screen_share_denied', (data) => {
     showToast(data?.message || 'مشاركة الشاشة للمؤسس فقط', 'error');
   });
+  // 🎬 مشاهدة معاً
+  socket.on('watch_started', (data) => {
+    if (data?.url) renderWatchPlayer(data);
+  });
+  socket.on('watch_control', (data) => {
+    if (!watchTogether || watchIsHost || !data) return; // المضيف يتحكم بنفسه
+    if (watchYT) {
+      if (data.action === 'pause') watchYT.pauseVideo();
+      else if (data.action === 'play') watchYT.playVideo();
+      if (typeof data.time === 'number') { try { watchYT.seekTo(data.time, true); } catch (e) {} }
+    } else if (watchVideo) {
+      if (typeof data.time === 'number') { try { watchVideo.currentTime = data.time; } catch (e) {} }
+      if (data.action === 'pause') watchVideo.pause();
+      else if (data.action === 'play') watchVideo.play().catch(() => {});
+    }
+  });
+  socket.on('watch_stopped', () => {
+    hideWatchPlayer();
+    showToast('🎬 انتهت المشاهدة المشتركة', 'success');
+  });
   socket.on('call_full', (data) => {
     showToast(data.message || 'البث ممتلئ', 'error');
     leaveLiveAudio();
@@ -2335,6 +2355,209 @@ function applyScreenShareToTile(peerId, active) {
   if (!active) { screenRotation[peerId] = 0; applyScreenRotation(peerId); }
 }
 
+// ==================== 🎬 مشاهدة معاً (Watch Together) ====================
+let watchTogether = null;       // { url, playing, time, byName }
+let watchIsHost = false;
+let watchYT = null;             // مشغل يوتيوب
+let watchVideo = null;          // عنصر فيديو HTML5
+let watchPosTimer = null;
+
+function ytVideoId(url) {
+  try {
+    const u = new URL(url);
+    if (u.hostname.includes('youtu.be')) return u.pathname.slice(1).split('/')[0] || null;
+    if (u.hostname.includes('youtube.com')) {
+      if (u.pathname.startsWith('/embed/') || u.pathname.startsWith('/shorts/')) return u.pathname.split('/')[2] || null;
+      return u.searchParams.get('v');
+    }
+  } catch (e) {}
+  return null;
+}
+
+function loadYTIframeApi() {
+  if (window.YT && window.YT.Player) return Promise.resolve();
+  return new Promise((resolve) => {
+    if (window.__ytApiLoading) return setTimeout(resolve, 9000);
+    window.__ytApiLoading = true;
+    window.onYouTubeIframeAPIReady = () => resolve();
+    const s = document.createElement('script');
+    s.src = 'https://www.youtube.com/iframe_api';
+    document.head.appendChild(s);
+    setTimeout(resolve, 9000);
+  });
+}
+
+function fmtTime(s) {
+  s = Math.floor(s || 0);
+  const m = Math.floor(s / 60);
+  return m + ':' + String(s % 60).padStart(2, '0');
+}
+
+async function renderWatchPlayer(data) {
+  watchTogether = { url: data.url, playing: !!data.playing, time: data.time || 0, byName: data.byName || '' };
+  watchIsHost = !!(state.isFounder || state.user?.role === 'admin');
+  const ov = document.getElementById('watch-player-overlay');
+  const stage = document.getElementById('watch-stage');
+  if (!ov || !stage) return;
+  ov.style.display = 'block';
+  const hostEl = document.getElementById('watch-host');
+  if (hostEl) hostEl.textContent = watchIsHost ? 'أنت تتحكم — العائلة تشاهد معك' : ('مع ' + (data.byName || 'المؤسس'));
+  const ctrls = document.getElementById('watch-controls');
+  if (ctrls) ctrls.style.display = watchIsHost ? 'flex' : 'none';
+  if (watchYT) { try { watchYT.destroy(); } catch (e) {} watchYT = null; }
+  stage.innerHTML = '';
+  const hint = document.getElementById('watch-tap-hint');
+  if (hint) hint.style.display = 'none';
+  const vid = ytVideoId(data.url);
+  if (vid) {
+    const iframe = document.createElement('iframe');
+    iframe.id = 'watch-yt-frame';
+    iframe.setAttribute('allow', 'autoplay; encrypted-media; picture-in-picture');
+    iframe.setAttribute('allowfullscreen', 'true');
+    iframe.src = 'https://www.youtube.com/embed/' + vid + '?enablejsapi=1&autoplay=1&playsinline=1';
+    stage.appendChild(iframe);
+    await loadYTIframeApi();
+    watchYT = new YT.Player(iframe.id, {
+      events: {
+        onReady: () => {
+          try {
+            watchYT.seekTo(watchTogether.time, true);
+            if (watchTogether.playing) watchYT.playVideo(); else watchYT.pauseVideo();
+          } catch (e) {}
+          watchStartPosLoop();
+        },
+        onStateChange: (ev) => {
+          if (!watchIsHost) return;
+          if (ev.data === YT.PlayerState.PLAYING) emitWatchControl('play', watchYT.getCurrentTime());
+          if (ev.data === YT.PlayerState.PAUSED) emitWatchControl('pause', watchYT.getCurrentTime());
+        }
+      }
+    });
+  } else {
+    const v = document.createElement('video');
+    v.id = 'watch-video';
+    v.autoplay = true;
+    v.playsInline = true;
+    stage.appendChild(v);
+    watchVideo = v;
+    const playIt = () => { v.play().catch(() => { const h = document.getElementById('watch-tap-hint'); if (h) h.style.display = 'flex'; }); };
+    if (/\.m3u8(\?|$)/i.test(data.url) && !v.canPlayType('application/vnd.apple.mpegurl')) {
+      if (!window.Hls) {
+        await new Promise((res) => {
+          const s = document.createElement('script');
+          s.src = 'https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js';
+          s.onload = res; s.onerror = res;
+          document.head.appendChild(s);
+        });
+      }
+      if (window.Hls && window.Hls.isSupported()) {
+        const hls = new Hls();
+        hls.loadSource(data.url);
+        hls.attachMedia(v);
+        hls.on(Hls.Events.MANIFEST_PARSED, () => { try { v.currentTime = watchTogether.time; } catch (e) {} playIt(); });
+      } else { v.src = data.url; playIt(); }
+    } else {
+      v.src = data.url;
+      v.addEventListener('loadedmetadata', () => {
+        try { v.currentTime = watchTogether.time; } catch (e) {}
+        if (watchTogether.playing) playIt(); else v.pause();
+      });
+      playIt();
+    }
+    v.addEventListener('play', () => { if (watchIsHost) emitWatchControl('play', v.currentTime); });
+    v.addEventListener('pause', () => { if (watchIsHost) emitWatchControl('pause', v.currentTime); });
+    stage.onclick = () => { v.muted = false; v.play().catch(() => {}); const h = document.getElementById('watch-tap-hint'); if (h) h.style.display = 'none'; };
+    watchStartPosLoop();
+  }
+  const wm = document.getElementById('watch-modal');
+  if (wm) wm.style.display = 'none';
+  if (!data.silent) showToast('🎬 ' + (data.byName || 'المؤسس') + ' يشارك فيديو — مشاهدة معاً!', 'success');
+}
+
+function watchDuration() {
+  if (watchYT && watchYT.getDuration) return watchYT.getDuration() || 0;
+  if (watchVideo) return watchVideo.duration || 0;
+  return 0;
+}
+
+function watchStartPosLoop() {
+  if (watchPosTimer) clearInterval(watchPosTimer);
+  watchPosTimer = setInterval(() => {
+    let t = 0, d = 0;
+    if (watchYT && watchYT.getCurrentTime) { t = watchYT.getCurrentTime() || 0; d = watchYT.getDuration() || 0; }
+    else if (watchVideo) { t = watchVideo.currentTime || 0; d = watchVideo.duration || 0; }
+    const seek = document.getElementById('watch-seek');
+    const timeEl = document.getElementById('watch-time');
+    if (seek && d > 0) seek.value = Math.min(1000, Math.round(t / d * 1000));
+    if (timeEl) timeEl.textContent = fmtTime(t) + ' / ' + fmtTime(d);
+    if (watchIsHost && watchTogether) watchTogether.time = t;
+  }, 500);
+}
+
+function emitWatchControl(action, time) {
+  if (!watchTogether || !state.activeSession?.id || !socket?.connected) return;
+  socket.emit('watch_control', { sessionId: state.activeSession.id, action, time: typeof time === 'number' ? time : watchTogether.time });
+}
+
+function watchTogglePlay() {
+  const btn = document.getElementById('watch-play-btn');
+  if (watchYT) {
+    const st = watchYT.getPlayerState();
+    if (st === 1) { watchYT.pauseVideo(); if (btn) btn.textContent = '▶️'; }
+    else { watchYT.playVideo(); if (btn) btn.textContent = '⏸️'; }
+  } else if (watchVideo) {
+    if (watchVideo.paused) { watchVideo.play().catch(() => {}); if (btn) btn.textContent = '⏸️'; }
+    else { watchVideo.pause(); if (btn) btn.textContent = '▶️'; }
+  }
+}
+
+function watchSeekInput(el) {
+  const t = watchDuration() * (el.value / 1000);
+  const timeEl = document.getElementById('watch-time');
+  if (timeEl) timeEl.textContent = fmtTime(t) + ' / ' + fmtTime(watchDuration());
+}
+
+function watchSeekChange(el) {
+  const t = watchDuration() * (el.value / 1000);
+  if (watchYT) watchYT.seekTo(t, true);
+  else if (watchVideo) { try { watchVideo.currentTime = t; } catch (e) {} }
+  emitWatchControl('seek', t);
+  const btn = document.getElementById('watch-play-btn');
+  if (btn && watchTogether) btn.textContent = watchTogether.playing ? '⏸️' : '▶️';
+}
+
+function openWatchModal() {
+  if (!state.activeSession?.id) return showToast('افتح البث أولاً', 'error');
+  const input = document.getElementById('watch-url-input');
+  if (input) input.value = '';
+  document.getElementById('watch-modal').style.display = 'flex';
+}
+
+async function startWatchTogether() {
+  const url = document.getElementById('watch-url-input').value.trim();
+  if (!/^https?:\/\//i.test(url)) return showToast('أدخل رابطاً صحيحاً يبدأ بـ https://', 'error');
+  if (!state.activeSession?.id) return showToast('افتح البث أولاً', 'error');
+  socket.emit('watch_start', { sessionId: state.activeSession.id, url });
+  document.getElementById('watch-modal').style.display = 'none';
+}
+
+function stopWatchTogether() {
+  if (!state.activeSession?.id) return;
+  socket.emit('watch_stop', { sessionId: state.activeSession.id });
+  hideWatchPlayer();
+}
+
+function hideWatchPlayer() {
+  if (watchPosTimer) { clearInterval(watchPosTimer); watchPosTimer = null; }
+  if (watchYT) { try { watchYT.destroy(); } catch (e) {} watchYT = null; }
+  if (watchVideo) { try { watchVideo.pause(); watchVideo.src = ''; } catch (e) {} watchVideo = null; }
+  watchTogether = null;
+  const ov = document.getElementById('watch-player-overlay');
+  if (ov) ov.style.display = 'none';
+  const stage = document.getElementById('watch-stage');
+  if (stage) stage.innerHTML = '';
+}
+
 let diwaniyaCodeVerified = false;
 let pendingCallJoin = false;
 
@@ -2555,6 +2778,8 @@ async function joinLiveAudio() {
     if (famBtn) famBtn.style.display = (state.isFounder || state.user?.role === 'admin') ? 'block' : 'none';
     const scrBtn = document.getElementById('tt-bar-screen');
     if (scrBtn) scrBtn.style.display = (state.isFounder || state.user?.role === 'admin') ? 'block' : 'none';
+    const watchBtn = document.getElementById('tt-bar-watch');
+    if (watchBtn) watchBtn.style.display = (state.isFounder || state.user?.role === 'admin') ? 'block' : 'none';
     const mmBtn = document.getElementById('mic-manage-btn');
     if (mmBtn) mmBtn.style.display = (state.isFounder || state.user?.role === 'admin') ? 'block' : 'none';
 
@@ -2629,6 +2854,7 @@ function leaveLiveAudio() {
   }
   remoteScreenShare = {};
   screenRotation = {};
+  hideWatchPlayer();
   // Close all peer connections
   Object.values(peerConnections).forEach(pc => pc.close());
   peerConnections = {};

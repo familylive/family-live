@@ -1221,6 +1221,7 @@ app.get('/api/diwaniya/secret-room', authMiddleware, async (req, res) => {
 
 // ============ تشخيص الأجهزة (مشاكل الفيديو/مشاركة الشاشة) ============
 globalThis.diagReports = [];
+globalThis.watchSessions = {}; // sessionId -> { url, playing, time, byName, ts } — مشاهدة معاً
 app.post('/api/diag', (req, res) => {
   try {
     const r = req.body || {};
@@ -2178,6 +2179,8 @@ app.post('/api/diwaniya/open', authMiddleware, async (req, res) => {
 app.post('/api/diwaniya/close/:sessionId', authMiddleware, async (req, res) => {
   // Reset mic/camera room state for this session
   if (audioRooms[req.params.sessionId]) delete audioRooms[req.params.sessionId];
+  // إيقاف جلسة مشاهدة معاً عند إغلاق البث
+  if (globalThis.watchSessions[req.params.sessionId]) delete globalThis.watchSessions[req.params.sessionId];
   // Stop the bot gifting loop immediately when the broadcast closes
   if (botGiftTimer) { clearInterval(botGiftTimer); botGiftTimer = null; }
   const userFull = await db.getUserById(req.user.id);
@@ -2931,6 +2934,11 @@ io.on('connection', (socket) => {
     socket.emit('call_participants', { 
       participants: participants.filter(p => p.socketId !== socket.id).map(p => ({ ...p, screenShare: !!p.screenShare }))
     });
+    // مشاهدة معاً: المنضم لاحقاً يستلم حالة المشاهدة الحالية (إن وجدت)
+    const wsNow = globalThis.watchSessions[sessionId];
+    if (wsNow && wsNow.url) {
+      socket.emit('watch_started', { url: wsNow.url, playing: wsNow.playing, time: wsNow.time + Math.max(0, (Date.now() - wsNow.ts) / 1000) * (wsNow.playing ? 1 : 0), byName: wsNow.byName, silent: true });
+    }
     
     // Tell restricted member they are listen-only
     if (forcedAudioOnly) {
@@ -3026,6 +3034,66 @@ io.on('connection', (socket) => {
     } catch(e) { return; }
     me.screenShare = !!active;
     io.to(`session_${sessionId}`).emit('screen_share_state', { userId: me.userId, userName: me.userName, active: !!active });
+  });
+
+  // ============ مشاهدة معاً (Watch Together): المؤسس يشارك رابط فيديو والكل يشاهد ============
+  socket.on('watch_start', async (data) => {
+    const { sessionId, url } = data;
+    const room = audioRooms[sessionId];
+    if (!room) return;
+    const me = room.find(p => p.socketId === socket.id);
+    if (!me) return;
+    try {
+      const sessRow = await db.getDiwaniyaSessionById(sessionId);
+      const meUser = await db.getUserById(me.userId);
+      if (!sessRow || !meUser) return;
+      const isHost = sessRow.opened_by === meUser.id || meUser.role === 'admin';
+      if (!isHost) return;
+      const cleanUrl = String(url || '').trim().slice(0, 600);
+      if (!/^https?:\/\//i.test(cleanUrl)) return;
+      globalThis.watchSessions[sessionId] = { url: cleanUrl, playing: true, time: 0, byName: me.userName, ts: Date.now() };
+      io.to(`session_${sessionId}`).emit('watch_started', { url: cleanUrl, playing: true, time: 0, byName: me.userName });
+      console.log(`🎬 مشاهدة معاً: ${me.userName} شارك ${cleanUrl.slice(0, 60)}`);
+    } catch(e) {}
+  });
+
+  socket.on('watch_control', async (data) => {
+    const { sessionId, action, time } = data;
+    const room = audioRooms[sessionId];
+    if (!room) return;
+    const me = room.find(p => p.socketId === socket.id);
+    if (!me) return;
+    try {
+      const sessRow = await db.getDiwaniyaSessionById(sessionId);
+      const meUser = await db.getUserById(me.userId);
+      if (!sessRow || !meUser) return;
+      const isHost = sessRow.opened_by === meUser.id || meUser.role === 'admin';
+      if (!isHost) return;
+      const st = globalThis.watchSessions[sessionId];
+      if (!st) return;
+      if (action === 'play' || action === 'pause') st.playing = action === 'play';
+      if (typeof time === 'number' && isFinite(time)) st.time = Math.max(0, time);
+      st.ts = Date.now();
+      socket.to(`session_${sessionId}`).emit('watch_control', { action, time: st.time, byName: me.userName });
+    } catch(e) {}
+  });
+
+  socket.on('watch_stop', async (data) => {
+    const { sessionId } = data;
+    const room = audioRooms[sessionId];
+    if (!room) return;
+    const me = room.find(p => p.socketId === socket.id);
+    if (!me) return;
+    try {
+      const sessRow = await db.getDiwaniyaSessionById(sessionId);
+      const meUser = await db.getUserById(me.userId);
+      if (!sessRow || !meUser) return;
+      const isHost = sessRow.opened_by === meUser.id || meUser.role === 'admin';
+      if (!isHost) return;
+      delete globalThis.watchSessions[sessionId];
+      io.to(`session_${sessionId}`).emit('watch_stopped', {});
+      console.log(`🎬 إيقاف مشاهدة معاً (${sessionId.slice(0, 8)})`);
+    } catch(e) {}
   });
 
   // Member left the diwaniya -> chat message for everyone

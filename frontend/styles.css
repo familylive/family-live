@@ -2707,6 +2707,116 @@ body {
   background: rgba(0, 0, 0, .68);
   bottom: 6px;
 }
+/* ===== 🎬 مشاهدة معاً (Watch Together) ===== */
+.watch-player-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  background: #000;
+  display: flex;
+  flex-direction: column;
+}
+.watch-head {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  left: 8px;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  align-items: center;
+  z-index: 3;
+  pointer-events: none;
+}
+.watch-badge {
+  background: rgba(0, 0, 0, .6);
+  border: 1px solid rgba(232, 184, 48, .7);
+  color: #ffd75e;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 3px 10px;
+  border-radius: 20px;
+}
+.watch-host {
+  background: rgba(0, 0, 0, .6);
+  color: #fff;
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 20px;
+}
+.watch-stage {
+  flex: 1;
+  position: relative;
+  background: #000;
+}
+.watch-stage iframe,
+.watch-stage video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border: none;
+  background: #000;
+}
+.watch-tap-hint {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, .7);
+  border: 1px solid rgba(255, 255, 255, .3);
+  color: #fff;
+  font-size: 12px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  z-index: 4;
+  cursor: pointer;
+  animation: ebPulse 1.6s ease-in-out infinite;
+}
+.watch-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: rgba(0, 0, 0, .75);
+  border-top: 1px solid rgba(255, 255, 255, .12);
+}
+.watch-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .12);
+  border: 1px solid rgba(255, 255, 255, .3);
+  color: #fff;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.watch-btn:active { transform: scale(.92); }
+.watch-stop {
+  width: auto;
+  border-radius: 20px;
+  padding: 0 14px;
+  font-size: 12px;
+  background: rgba(255, 45, 85, .3);
+  border-color: rgba(255, 45, 85, .6);
+}
+.watch-seek {
+  flex: 1;
+  accent-color: var(--gold);
+  height: 20px;
+  min-width: 0;
+}
+.watch-time {
+  color: #fff;
+  font-size: 11px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
 .video-grid.tiktok-mode .video-tile .video-name {
   font-size: 10px;
   bottom: 4px;

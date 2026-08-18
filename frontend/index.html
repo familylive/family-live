@@ -16,6 +16,19 @@
 <script src="/i18n.js?v=1785498511"></script>
 <script src="/vendor/livekit-client.umd.min.js"></script>
 <script src="/app.js?v=1785498511"></script>
+<!-- 🎬 مشاهدة معاً: نافذة إدخال الرابط -->
+<div class="modal-overlay" id="watch-modal" style="display:none" onclick="if(event.target===this)this.style.display='none'">
+  <div class="modal-box" style="max-width:340px">
+    <h3 style="margin-bottom:6px">🎬 مشاهدة معاً</h3>
+    <p style="font-size:12px;color:var(--text-secondary);margin-bottom:10px">شارك رابط المباراة/المسلسل مع العائلة في البث — الجميع يشاهد بنفس الوقت.</p>
+    <p style="font-size:11px;color:var(--text-muted);margin-bottom:8px">✅ يدعم: روابط يوتيوب، روابط فيديو مباشرة (mp4)، روابط بث (m3u8)</p>
+    <input class="form-input" id="watch-url-input" type="url" dir="ltr" placeholder="https://youtube.com/watch?v=... أو رابط مباشر" style="text-align:left;font-size:13px">
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn btn-accent" style="flex:1" onclick="startWatchTogether()">🎬 ابدأ المشاهدة</button>
+      <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('watch-modal').style.display='none'">إلغاء</button>
+    </div>
+  </div>
+</div>
 </head>
 <body>
 <!-- Splash Screen -->
@@ -670,6 +683,22 @@
             </div>
             <!-- TikTok viewers stack (right edge) -->
             <div class="tt-viewers" id="tt-viewers" style="display:none" onclick="openTikTokViewersList()"></div>
+            <!-- مشاهدة معاً: مشغل الفيديو المشترك -->
+            <div class="watch-player-overlay" id="watch-player-overlay" style="display:none">
+              <div class="watch-head">
+                <span class="watch-badge">🎬 مشاهدة معاً</span>
+                <span class="watch-host" id="watch-host"></span>
+              </div>
+              <div class="watch-stage" id="watch-stage">
+                <div class="watch-tap-hint" id="watch-tap-hint" style="display:none">🔊 اضغط لتشغيل الصوت</div>
+              </div>
+              <div class="watch-controls" id="watch-controls" style="display:none">
+                <button class="watch-btn" id="watch-play-btn" onclick="watchTogglePlay()">⏸️</button>
+                <input type="range" class="watch-seek" id="watch-seek" min="0" max="1000" value="0" oninput="watchSeekInput(this)" onchange="watchSeekChange(this)">
+                <span class="watch-time" id="watch-time">0:00 / 0:00</span>
+                <button class="watch-btn watch-stop" onclick="stopWatchTogether()">⏹️ إيقاف</button>
+              </div>
+            </div>
             <!-- TikTok bottom icons bar -->
             <div class="tt-bottom-bar" id="tt-bottom-bar">
               <button class="tt-bar-btn tt-bar-gift" id="tt-bar-gift" onclick="openGiftBox()" title="الهدايا">
@@ -680,6 +709,9 @@
               </button>
               <button class="tt-bar-btn" id="tt-bar-comment" onclick="focusTikTokChat()" title="تعليق">
                 <span class="tt-bar-ico">💬</span><span class="tt-bar-label">تعليق</span>
+              </button>
+              <button class="tt-bar-btn" id="tt-bar-watch" onclick="openWatchModal()" title="مشاهدة معاً" style="display:none">
+                <span class="tt-bar-ico">🎬</span><span class="tt-bar-label">مشاهدة</span>
               </button>
               <button class="tt-bar-btn" id="tt-bar-screen" onclick="toggleScreenShare()" title="مشاركة الشاشة" style="display:none">
                 <span class="tt-bar-ico" id="tt-bar-screen-ico">🖥️</span><span class="tt-bar-label" id="tt-bar-screen-label">شاشة</span>
