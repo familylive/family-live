@@ -17,8 +17,20 @@ window.addEventListener('error', function (e) {
     banner.textContent = '⚠️ خطأ تقني: ' + (e.message || 'خطأ') + (src ? ' — ' + src + ':' + e.lineno : '');
     clearTimeout(banner._t);
     banner._t = setTimeout(() => { banner.style.display = 'none'; }, 12000);
+    sendDiag('error:' + (e.message || ''), { file: src, line: e.lineno });
   } catch (err) {}
 });
+
+// إرسال تقرير تشخيصي للسيرفر (يساعد في حل مشاكل الفيديو/الشاشة من جهاز المستخدم)
+function sendDiag(msg, extra) {
+  try {
+    fetch(API_BASE + '/api/diag', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ msg, ua: navigator.userAgent, data: extra || {} })
+    }).catch(() => {});
+  } catch (e) {}
+}
 
 async function api(method, path, body = null) {
   const opts = { method, headers: { 'Content-Type': 'application/json' } };
@@ -2141,6 +2153,7 @@ async function renegotiatePeer(peerId) {
 async function toggleScreenShare() {
   // تنبيه فوري عند أي ضغطة — لا صمت أبداً
   showToast('🖥️ جارٍ تجهيز مشاركة الشاشة...', 'success');
+  sendDiag('share_press', { inLive: !!inLiveCall, hasStream: !!localStream, founder: state?.isFounder, role: state?.user?.role, gdm: typeof (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia), secure: !!window.isSecureContext });
   const isHost = state.isFounder || state.user?.role === 'admin';
   if (!isHost) return showToast('مشاركة الشاشة للمؤسس فقط', 'error');
   if (!localStream || !inLiveCall) return showToast('ادخل البث أولاً', 'error');
@@ -2154,11 +2167,15 @@ async function toggleScreenShare() {
   let sc = null;
   try {
     sc = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 30 } }, audio: true });
+    sendDiag('gdm_first_ok', { tracks: sc.getTracks().map(t => t.kind) });
   } catch(e1) {
+    sendDiag('gdm_first_fail', { err: e1.name + ':' + e1.message });
     // بعض أجهزة أندرويد ترفض صوت الشاشة — نجرّب بدون صوت
     try {
       sc = await navigator.mediaDevices.getDisplayMedia({ video: true });
+      sendDiag('gdm_retry_ok', {});
     } catch(e2) {
+      sendDiag('gdm_retry_fail', { err: e2.name + ':' + e2.message });
       if (e2.name === 'AbortError' || e2.name === 'NotAllowedError') {
         return showToast('🚫 ألغيت مشاركة الشاشة', 'error');
       }
@@ -2196,6 +2213,7 @@ async function toggleScreenShare() {
     updateScreenShareUI();
     screenRotation['me'] = 0;
     applyScreenRotation('me');
+    sendDiag('share_started', { vids: localStream.getVideoTracks().length });
     showToast('🖥️ أنت تشارك شاشتك الآن — العائلة تشاهد معك', 'success');
     // لو المستخدم أوقف المشاركة من نافذة المتصفح (Stop sharing)
     vid.addEventListener('ended', () => stopScreenShare(true));
@@ -2203,6 +2221,7 @@ async function toggleScreenShare() {
     setTimeout(() => {
       const mv = document.getElementById('my-video');
       if (screenShareActive && mv && mv.srcObject && (mv.videoWidth === 0 || !mv.videoWidth)) {
+        sendDiag('screen_black_detected', { w: mv.videoWidth, h: mv.videoHeight });
         stopScreenShare(true);
         showToast('🖥️ المصدر المحدد يظهر أسود — اضغط زر الشاشة واختر (الشاشة كاملة) أو تبويب آخر', 'error');
       }
@@ -2255,6 +2274,7 @@ async function stopScreenShare(auto) {
     screenRotation['me'] = 0;
     applyScreenRotation('me');
     updateScreenShareUI();
+    sendDiag('share_stopped', { auto: !!auto });
     showToast(auto ? '🖥️ انتهت مشاركة الشاشة' : '🖥️ أوقفت مشاركة الشاشة — رجعت الكاميرا', 'success');
   } catch(e) {
     showToast('خطأ بإيقاف المشاركة: ' + (e.message || ''), 'error');
@@ -2496,6 +2516,7 @@ async function joinLiveAudio() {
     refreshUserProfile();
     
     // Notify server we're joining (observer flag for moderators)
+    sendDiag('join_live', { wantVideo, role: state.user?.role, founder: state.isFounder, ua: navigator.userAgent });
     socket.emit('join_audio_call', { 
       sessionId: state.activeSession.id, 
       userId: state.user.id, 
@@ -2534,6 +2555,7 @@ async function joinLiveAudio() {
       setTimeout(() => {
         const mv = document.getElementById('my-video');
         if (mv && mv.style.display !== 'none' && mv.srcObject && (mv.videoWidth === 0 || !mv.videoWidth)) {
+          sendDiag('camera_black_detected', { w: mv.videoWidth, h: mv.videoHeight });
           showToast('📷 الكاميرا لا تعطي صورة — افحص إذن الكاميرا للمتصفح أو أعد فتح البث', 'error');
         }
       }, 3000);

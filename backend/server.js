@@ -1219,6 +1219,30 @@ app.get('/api/diwaniya/secret-room', authMiddleware, async (req, res) => {
   res.json(await db.getSecretRoomStatus(req.user.familyId));
 });
 
+// ============ تشخيص الأجهزة (مشاكل الفيديو/مشاركة الشاشة) ============
+globalThis.diagReports = [];
+app.post('/api/diag', (req, res) => {
+  try {
+    const r = req.body || {};
+    globalThis.diagReports.push({
+      t: new Date().toISOString(),
+      ua: String(r.ua || '').slice(0, 200),
+      msg: String(r.msg || '').slice(0, 200),
+      data: JSON.stringify(r.data || {}).slice(0, 600)
+    });
+    if (globalThis.diagReports.length > 300) globalThis.diagReports.shift();
+    console.log('🩺 DIAG:', r.msg, '|', String(r.ua || '').slice(0, 90));
+  } catch (e) {}
+  res.json({ ok: true });
+});
+app.get('/api/diag', authMiddleware, async (req, res) => {
+  try {
+    const u = await db.getUserById(req.user.id);
+    if (u && (u.role === 'admin' || u.role === 'founder')) return res.json({ reports: globalThis.diagReports || [] });
+  } catch (e) {}
+  res.status(403).json({ error: 'ممنوع' });
+});
+
 // Purchase secret room (creates payment, admin confirms)
 app.post('/api/diwaniya/secret-room/purchase', authMiddleware, async (req, res) => {
   if (!req.user.familyId) return res.status(400).json({ error: 'لا يوجد عائلة' });
