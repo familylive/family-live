@@ -2199,6 +2199,14 @@ async function toggleScreenShare() {
     showToast('🖥️ أنت تشارك شاشتك الآن — العائلة تشاهد معك', 'success');
     // لو المستخدم أوقف المشاركة من نافذة المتصفح (Stop sharing)
     vid.addEventListener('ended', () => stopScreenShare(true));
+    // كاشف المصدر الأسود: بعض الأندرويد يعطي فيديو أسود عند اختيار تبويب خاطئ
+    setTimeout(() => {
+      const mv = document.getElementById('my-video');
+      if (screenShareActive && mv && mv.srcObject && (mv.videoWidth === 0 || !mv.videoWidth)) {
+        stopScreenShare(true);
+        showToast('🖥️ المصدر المحدد يظهر أسود — اضغط زر الشاشة واختر (الشاشة كاملة) أو تبويب آخر', 'error');
+      }
+    }, 2500);
   } catch(e) {
     screenShareActive = false;
     try { sc.getTracks().forEach(t => t.stop()); } catch(e2) {}
@@ -2521,6 +2529,15 @@ async function joinLiveAudio() {
     const myVideo2 = document.getElementById('my-video');
     if (myVideo2) { myVideo2.srcObject = localStream; myVideo2.style.display = camOff ? 'none' : 'block'; }
     refreshCamOffOverlay();
+    // كاشف الكاميرا السوداء: إذا الصورة ما وصلت بعد 3 ثوانٍ → تنبيه بالإذن
+    if (!camOff && wantVideo) {
+      setTimeout(() => {
+        const mv = document.getElementById('my-video');
+        if (mv && mv.style.display !== 'none' && mv.srcObject && (mv.videoWidth === 0 || !mv.videoWidth)) {
+          showToast('📷 الكاميرا لا تعطي صورة — افحص إذن الكاميرا للمتصفح أو أعد فتح البث', 'error');
+        }
+      }, 3000);
+    }
     const camBtn2 = document.getElementById('cam-toggle-btn');
     if (camBtn2) camBtn2.classList.toggle('off', camOff);
     const barCamIco2 = document.getElementById('tt-bar-cam-ico');
@@ -2637,7 +2654,9 @@ function createPeerConnection(peerId, peerName) {
   const pc = new RTCPeerConnection({
     iceServers: [
       { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'stun:stun1.l.google.com:19302' }
+      { urls: 'stun:stun1.l.google.com:19302' },
+      // TURN مجاني — يضمن الاتصال حتى بين الشبكات المقيدة (NAT متماثل)
+      { urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443', 'turn:openrelay.metered.ca:443?transport=tcp'], username: 'openrelayproject', credential: 'openrelayproject' }
     ]
   });
   
@@ -3485,7 +3504,7 @@ socket?.on('broadcast_started', (data) => {
 function updateTikTokLiveInfo() {
   const lv = parseInt(state.user?.level) || 0;
   const lvEl = document.getElementById('tt-host-level');
-  if (lvEl) lvEl.innerHTML = (lv >= 0 && lv <= 100) ? '<img src="/assets/levels/level_' + lv + '.' + (lv >= 1 && lv <= 10 ? 'gif' : 'png') + '?v=5" style="width:40px;height:15px;vertical-align:middle">' : '';
+  if (lvEl) lvEl.innerHTML = (lv >= 0 && lv <= 100) ? '<img src="/assets/levels/level_' + lv + '.' + (lv >= 1 && lv <= 10 ? 'gif' : 'png') + '?v=5" style="width:40px;height:15px;vertical-align:middle">' + '<span class="tt-host-lv-num">' + lv + '</span>' : '';
   const nameEl = document.getElementById('tt-host-name-text');
   if (nameEl) nameEl.textContent = state.user?.name || '';
   const avEl = document.getElementById('tt-host-avatar');
