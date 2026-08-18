@@ -2408,7 +2408,24 @@ async function renderWatchPlayer(data) {
   stage.innerHTML = '';
   const hint = document.getElementById('watch-tap-hint');
   if (hint) hint.style.display = 'none';
+  // صندوق الخطأ الواضح (بدل الشاشة السوداء الصامتة)
+  const errBox = document.createElement('div');
+  errBox.className = 'watch-err';
+  errBox.style.display = 'none';
+  errBox.innerHTML = '⚠️ تعذر تشغيل هذا الرابط<br><small>تأكد أنه: رابط يوتيوب، أو رابط فيديو مباشر (ينتهي بـ .mp4)، أو رابط بث (m3u8)<br>المواقع العادية (صفحات المباريات) لا تدعم التضمين</small>';
+  stage.appendChild(errBox);
+  // مؤشر تحميل
+  const loadBox = document.createElement('div');
+  loadBox.className = 'watch-loading';
+  loadBox.textContent = '⏳ جاري تحميل الفيديو...';
+  stage.appendChild(loadBox);
+  const showErr = (why) => {
+    loadBox.style.display = 'none';
+    errBox.style.display = 'flex';
+    if (why) sendDiag('watch_video_error', { url: (watchTogether && watchTogether.url || '').slice(0, 200), why });
+  };
   const vid = ytVideoId(data.url);
+  sendDiag('watch_start_render', { kind: vid ? 'youtube' : 'other', url: data.url.slice(0, 160) });
   if (vid) {
     const iframe = document.createElement('iframe');
     iframe.id = 'watch-yt-frame';
@@ -2416,6 +2433,7 @@ async function renderWatchPlayer(data) {
     iframe.setAttribute('allowfullscreen', 'true');
     iframe.src = 'https://www.youtube.com/embed/' + vid + '?enablejsapi=1&autoplay=1&playsinline=1';
     stage.appendChild(iframe);
+    loadBox.style.display = 'none';
     await loadYTIframeApi();
     watchYT = new YT.Player(iframe.id, {
       events: {
@@ -2426,13 +2444,28 @@ async function renderWatchPlayer(data) {
           } catch (e) {}
           watchStartPosLoop();
         },
+        onError: () => showErr('youtube-error'),
         onStateChange: (ev) => {
+          if (ev.data === YT.PlayerState.ENDED && watchIsHost) emitWatchControl('pause', watchYT.getDuration());
           if (!watchIsHost) return;
           if (ev.data === YT.PlayerState.PLAYING) emitWatchControl('play', watchYT.getCurrentTime());
           if (ev.data === YT.PlayerState.PAUSED) emitWatchControl('pause', watchYT.getCurrentTime());
         }
       }
     });
+    // الأعضاء: اضغط على المشغل لتشغيل الصوت/الفيديو (iOS يمنع التشغيل التلقائي بالصوت)
+    stage.onclick = () => {
+      const h = document.getElementById('watch-tap-hint');
+      if (h) h.style.display = 'none';
+      if (watchYT && watchYT.getPlayerState) {
+        try { if (watchYT.getPlayerState() !== 1) watchYT.playVideo(); } catch (e) {}
+      }
+    };
+    if (!watchIsHost) {
+      setTimeout(() => {
+        try { if (watchYT && watchYT.getPlayerState && watchYT.getPlayerState() !== 1) { const h = document.getElementById('watch-tap-hint'); if (h) h.style.display = 'flex'; } } catch (e) {}
+      }, 3000);
+    }
   } else {
     const v = document.createElement('video');
     v.id = 'watch-video';
@@ -2441,6 +2474,7 @@ async function renderWatchPlayer(data) {
     stage.appendChild(v);
     watchVideo = v;
     const playIt = () => { v.play().catch(() => { const h = document.getElementById('watch-tap-hint'); if (h) h.style.display = 'flex'; }); };
+    v.addEventListener('playing', () => { loadBox.style.display = 'none'; errBox.style.display = 'none'; });
     if (/\.m3u8(\?|$)/i.test(data.url) && !v.canPlayType('application/vnd.apple.mpegurl')) {
       if (!window.Hls) {
         await new Promise((res) => {
@@ -2454,7 +2488,8 @@ async function renderWatchPlayer(data) {
         const hls = new Hls();
         hls.loadSource(data.url);
         hls.attachMedia(v);
-        hls.on(Hls.Events.MANIFEST_PARSED, () => { try { v.currentTime = watchTogether.time; } catch (e) {} playIt(); });
+        hls.on(Hls.Events.MANIFEST_PARSED, () => { loadBox.style.display = 'none'; try { v.currentTime = watchTogether.time; } catch (e) {} playIt(); });
+        hls.on(Hls.Events.ERROR, (ev, hd) => { if (hd && hd.fatal) showErr('hls-' + (hd.type || '?')); });
       } else { v.src = data.url; playIt(); }
     } else {
       v.src = data.url;
@@ -2466,6 +2501,13 @@ async function renderWatchPlayer(data) {
     }
     v.addEventListener('play', () => { if (watchIsHost) emitWatchControl('play', v.currentTime); });
     v.addEventListener('pause', () => { if (watchIsHost) emitWatchControl('pause', v.currentTime); });
+    // أخطاء الفيديو: رسالة واضحة بدل الشاشة السوداء
+    v.addEventListener('error', () => { if (v.src) showErr('video-error'); });
+    v.addEventListener('loadedmetadata', () => { loadBox.style.display = 'none'; errBox.style.display = 'none'; v.style.display = 'block'; });
+    // مهلة تحميل: لو ما تحمّل خلال 15 ثانية → رسالة
+    setTimeout(() => {
+      if (watchVideo === v && v.readyState < 2 && !v.error && loadBox.style.display !== 'none') showErr('timeout');
+    }, 15000);
     stage.onclick = () => { v.muted = false; v.play().catch(() => {}); const h = document.getElementById('watch-tap-hint'); if (h) h.style.display = 'none'; };
     watchStartPosLoop();
   }
