@@ -2150,6 +2150,23 @@ async function renegotiatePeer(peerId) {
   } catch(e) {}
 }
 
+// نافذة توضيح لعدم دعم مشاركة الشاشة (الآيفون — قيد من أبل)
+function showScreenUnsupportedModal() {
+  const ov = document.createElement('div');
+  ov.className = 'modal-overlay';
+  ov.style.display = 'flex';
+  ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
+  ov.innerHTML =
+    '<div class="modal-box" style="max-width:330px;text-align:center">' +
+      '<div style="font-size:44px;margin-bottom:6px">📱🚫</div>' +
+      '<h3 style="margin-bottom:8px">مشاركة الشاشة لا تعمل على الآيفون</h3>' +
+      '<p style="font-size:13px;color:var(--text-secondary);margin-bottom:8px">كروم الآيفون بنفس محرك سفاري — <b>أبل تمنع مشاركة الشاشة من المتصفح على الآيفون</b> (قيد تقني لا يمكن تجاوزه).</p>' +
+      '<p style="font-size:13px;color:var(--text-muted);margin-bottom:14px">لبث المباراة/المسلسل استخدم:<br>🖥️ <b>كمبيوتر</b> (كروم/إيدج) أو 📱 <b>جوال أندرويد</b></p>' +
+      '<button class="btn btn-accent" style="width:100%" onclick="this.closest(\'.modal-overlay\').remove()">فهمت 👍</button>' +
+    '</div>';
+  document.body.appendChild(ov);
+}
+
 async function toggleScreenShare() {
   // تنبيه فوري عند أي ضغطة — لا صمت أبداً
   showToast('🖥️ جارٍ تجهيز مشاركة الشاشة...', 'success');
@@ -2158,10 +2175,12 @@ async function toggleScreenShare() {
   if (!isHost) return showToast('مشاركة الشاشة للمؤسس فقط', 'error');
   if (!localStream || !inLiveCall) return showToast('ادخل البث أولاً', 'error');
   if (screenShareActive) { stopScreenShare(false); return; }
-  // دعم المتصفح: الآيفون/سفاري لا يدعم مشاركة الشاشة
+  // دعم المتصفح: الآيفون/سفاري لا يدعم مشاركة الشاشة — نافذة واضحة لا تُفوَّت
   if (!window.isSecureContext) return showToast('مشاركة الشاشة تحتاج اتصالاً آمناً (HTTPS)', 'error');
   if (!navigator.mediaDevices || typeof navigator.mediaDevices.getDisplayMedia !== 'function') {
-    return showToast('🖥️ متصفحك لا يدعم مشاركة الشاشة (الآيفون/سفاري لا تدعمها) — استخدم كروم أندرويد أو الكمبيوتر', 'error');
+    sendDiag('share_unsupported_device', {});
+    showScreenUnsupportedModal();
+    return;
   }
   showToast('📡 فتح نافذة المشاركة — اختر الشاشة أو التبويب', 'success');
   let sc = null;
@@ -3267,7 +3286,8 @@ function confirmExitCall(go) {
   document.getElementById('exit-call-modal').style.display = 'none';
   if (go) {
     // المؤسس/فاتح البث: ✕ يغلق البث للجميع
-    if (isSessionHost() && state.activeSession?.id) {
+    const isHostUser = state.isFounder || state.user?.role === 'admin';
+    if (isHostUser && state.activeSession?.id) {
       closePopOut();
       closeDiwaniya();
       return;

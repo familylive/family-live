@@ -2342,6 +2342,12 @@ body {
   box-shadow: 0 0 34px color-mix(in srgb, var(--eb-c1) 65%, transparent), 0 0 90px color-mix(in srgb, var(--eb-c2) 40%, transparent);
   animation: ebAvatarPop .7s cubic-bezier(.2,.9,.25,1.4) .1s backwards;
 }
+.entry-banner.entry-badge .entry-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
 @keyframes ebAvatarPop {
   0% { transform: scale(.2) rotate(-14deg); opacity: 0; }
   70% { transform: scale(1.12) rotate(3deg); }
