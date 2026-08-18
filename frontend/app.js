@@ -2105,16 +2105,51 @@ function screenFullscreenBtn(peerId) {
   else tile.requestFullscreen().catch(() => showToast('التكبير غير مدعوم هنا', 'error'));
 }
 
+// إعادة تفاوض مع طرف واحد (عند إضافة مسار فيديو لاحقاً — مثل حالة انضمام بصوت فقط)
+async function renegotiatePeer(peerId) {
+  const pc = peerConnections[peerId];
+  if (!pc || pc.signalingState !== 'stable') return;
+  try {
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    socket.emit('audio_offer', {
+      to: peerId, offer: pc.localDescription,
+      sessionId: state.activeSession?.id,
+      userName: state.user?.name, fromUserId: state.user?.id
+    });
+  } catch(e) {}
+}
+
 async function toggleScreenShare() {
   const isHost = state.isFounder || state.user?.role === 'admin';
   if (!isHost) return showToast('مشاركة الشاشة للمؤسس فقط', 'error');
   if (!localStream || !inLiveCall) return showToast('ادخل البث أولاً', 'error');
   if (screenShareActive) { stopScreenShare(false); return; }
+  // دعم المتصفح: الآيفون/سفاري لا يدعم مشاركة الشاشة
+  if (!window.isSecureContext) return showToast('مشاركة الشاشة تحتاج اتصالاً آمناً (HTTPS)', 'error');
+  if (!navigator.mediaDevices || typeof navigator.mediaDevices.getDisplayMedia !== 'function') {
+    return showToast('🖥️ متصفحك لا يدعم مشاركة الشاشة (الآيفون/سفاري لا تدعمها) — استخدم كروم أندرويد أو الكمبيوتر', 'error');
+  }
+  showToast('📡 فتح نافذة المشاركة — اختر الشاشة أو التبويب', 'success');
+  let sc = null;
   try {
-    const sc = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 30 } }, audio: true });
-    screenShareStream = sc;
-    screenShareActive = true;
-    screenWasCamOff = camOff;
+    sc = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 30 } }, audio: true });
+  } catch(e1) {
+    // بعض أجهزة أندرويد ترفض صوت الشاشة — نجرّب بدون صوت
+    try {
+      sc = await navigator.mediaDevices.getDisplayMedia({ video: true });
+    } catch(e2) {
+      if (e2.name === 'AbortError' || e2.name === 'NotAllowedError') {
+        return showToast('🚫 ألغيت مشاركة الشاشة', 'error');
+      }
+      showToast('فشل فتح مشاركة الشاشة: ' + (e2.message || e2.name || ''), 'error');
+      return;
+    }
+  }
+  screenShareStream = sc;
+  screenShareActive = true;
+  screenWasCamOff = camOff;
+  try {
     const vid = sc.getVideoTracks()[0];
     const aud = sc.getAudioTracks()[0];
     // الشاشة تحل محل الكاميرا عند الإرسال للجميع
@@ -2125,10 +2160,15 @@ async function toggleScreenShare() {
     const myVideo = document.getElementById('my-video');
     if (myVideo) { myVideo.srcObject = localStream; myVideo.style.display = 'block'; }
     refreshCamOffOverlay();
-    // إعادة توجيه المسار الجديد لكل المتصلين (بدون إعادة تفاوض)
-    Object.values(peerConnections).forEach(pc => {
+    // إعادة توجيه المسار الجديد لكل المتصلين
+    Object.entries(peerConnections).forEach(([pid, pc]) => {
       const s = pc.getSenders().find(s => s.track && s.track.kind === 'video');
-      if (s) s.replaceTrack(vid).catch(() => {});
+      if (s) {
+        s.replaceTrack(vid).catch(() => {});
+      } else {
+        // لا يوجد باعث فيديو (المؤسس دخل بث صوتي) — نضيف المسار ونعيد التفاوض
+        try { pc.addTrack(vid, localStream); renegotiatePeer(pid); } catch(e) {}
+      }
     });
     if (socket?.connected && state.activeSession?.id) {
       socket.emit('screen_share_state', { sessionId: state.activeSession.id, active: true });
@@ -2140,22 +2180,26 @@ async function toggleScreenShare() {
     // لو المستخدم أوقف المشاركة من نافذة المتصفح (Stop sharing)
     vid.addEventListener('ended', () => stopScreenShare(true));
   } catch(e) {
-    if (e.name === 'NotAllowedError' || e.name === 'AbortError') return;
-    showToast('فشل مشاركة الشاشة: ' + (e.message || ''), 'error');
+    screenShareActive = false;
+    try { sc.getTracks().forEach(t => t.stop()); } catch(e2) {}
+    showToast('خطأ ببدء المشاركة: ' + (e.message || ''), 'error');
   }
 }
 
 async function stopScreenShare(auto) {
-  if (!screenShareStream && !screenShareActive) return;
+  const hadStream = !!screenShareStream;
+  const wasCamOff = screenWasCamOff;
   screenShareActive = false;
-  try {
-    if (screenShareStream) {
-      screenShareStream.getVideoTracks().forEach(t => { try { t.stop(); } catch(e) {} });
+  if (hadStream) {
+    try {
+      screenShareStream.getVideoTracks().forEach(t => t.stop());
       screenShareStream.getAudioTracks().forEach(t => { try { if (localStream) localStream.removeTrack(t); t.stop(); } catch(e) {} });
-      screenShareStream = null;
-    }
+    } catch(e) {}
+    screenShareStream = null;
+  }
+  try {
     // استعادة الكاميرا (إلا إذا كانت مغلقة قبل المشاركة)
-    if (!screenWasCamOff) {
+    if (!wasCamOff) {
       const cam = await navigator.mediaDevices.getUserMedia({ video: { facingMode: state.cameraFacing || 'environment' } });
       const camTrack = cam.getVideoTracks()[0];
       localStream.getVideoTracks().forEach(t => { try { localStream.removeTrack(t); t.stop(); } catch(e) {} });
@@ -2164,13 +2208,20 @@ async function stopScreenShare(auto) {
         const s = pc.getSenders().find(s => s.track && s.track.kind === 'video');
         if (s) s.replaceTrack(camTrack).catch(() => {});
       });
+    } else {
+      // كانت الكاميرا مغلقة: نوقف إرسال الفيديو تماماً
+      localStream.getVideoTracks().forEach(t => { try { localStream.removeTrack(t); t.stop(); } catch(e) {} });
+      Object.values(peerConnections).forEach(pc => {
+        const s = pc.getSenders().find(s => s.track && s.track.kind === 'video');
+        if (s) s.replaceTrack(null).catch(() => {});
+      });
     }
     if (socket?.connected && state.activeSession?.id) {
       socket.emit('screen_share_state', { sessionId: state.activeSession.id, active: false });
     }
     const myVideo = document.getElementById('my-video');
     if (myVideo) myVideo.srcObject = localStream;
-    camOff = screenWasCamOff;
+    camOff = wasCamOff;
     if (myVideo) myVideo.style.display = camOff ? 'none' : 'block';
     refreshCamOffOverlay();
     screenRotation['me'] = 0;
