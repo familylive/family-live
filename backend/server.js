@@ -2413,7 +2413,7 @@ app.post('/api/battles/join-invite', authMiddleware, asyncHandler(async (req, re
   if (globalThis.BOT_USER && toUserId === globalThis.BOT_USER.id) {
     try {
       if (!audioRooms[sessionId]) audioRooms[sessionId] = [];
-      const botEntry = { socketId: 'bot-socket-' + Date.now(), userId: globalThis.BOT_USER.id, userName: globalThis.BOT_USER.name, avatar: '🤖', isObserver: true, wantsVideo: false };
+      const botEntry = { socketId: 'bot-socket-' + Date.now(), userId: globalThis.BOT_USER.id, userName: globalThis.BOT_USER.name, avatar: '🤖', isObserver: true, wantsVideo: false, screenShare: false };
       audioRooms[sessionId].push(botEntry);
       const botLevel = (await db.getUserById(globalThis.BOT_USER.id))?.level || 0;
       io.to(`session_${sessionId}`).emit('user_joined_call', { userId: globalThis.BOT_USER.id, userName: globalThis.BOT_USER.name, avatar: '🤖', effect: null, isObserver: true, level: botLevel });
@@ -2502,7 +2502,7 @@ app.post('/api/battles/start', authMiddleware, asyncHandler(async (req, res) => 
     try {
       // Bot joins the audio room (appears in the broadcast)
       if (!audioRooms[sessionId]) audioRooms[sessionId] = [];
-      const botEntry = { socketId: 'bot-socket', userId: globalThis.BOT_USER.id, userName: globalThis.BOT_USER.name, avatar: '🤖', isObserver: true, wantsVideo: false };
+      const botEntry = { socketId: 'bot-socket', userId: globalThis.BOT_USER.id, userName: globalThis.BOT_USER.name, avatar: '🤖', isObserver: true, wantsVideo: false, screenShare: false };
       audioRooms[sessionId].push(botEntry);
       const botLevel = (await db.getUserById(globalThis.BOT_USER.id))?.level || 0;
       io.to(`session_${sessionId}`).emit('user_joined_call', { userId: globalThis.BOT_USER.id, userName: globalThis.BOT_USER.name, avatar: '🤖', effect: null, isObserver: true, level: botLevel });
@@ -2901,11 +2901,11 @@ io.on('connection', (socket) => {
       io.to(p.socketId).emit('user_joined_call', { userId, userName, avatar, level: userLevel, effect: userEffect, isObserver: !!isObserver || forcedAudioOnly, wantsVideo });
     });
     
-    participants.push({ socketId: socket.id, userId, userName, avatar, level: userLevel, isObserver: !!isObserver || forcedAudioOnly, wantsVideo });
+    participants.push({ socketId: socket.id, userId, userName, avatar, level: userLevel, isObserver: !!isObserver || forcedAudioOnly, wantsVideo, screenShare: false });
     
     // Send current participants to the new user
     socket.emit('call_participants', { 
-      participants: participants.filter(p => p.socketId !== socket.id)
+      participants: participants.filter(p => p.socketId !== socket.id).map(p => ({ ...p, screenShare: !!p.screenShare }))
     });
     
     // Tell restricted member they are listen-only
@@ -2982,6 +2982,26 @@ io.on('connection', (socket) => {
       } catch(e) {}
     }
     me.wantsVideo = on;
+  });
+
+  // مشاركة الشاشة: المؤسس/الأدمن فقط — يبث حاليته للجميع في الجلسة
+  socket.on('screen_share_state', async (data) => {
+    const { sessionId, active } = data;
+    const room = audioRooms[sessionId];
+    if (!room) return;
+    const me = room.find(p => p.socketId === socket.id);
+    if (!me) return;
+    try {
+      const sessRow = await db.getDiwaniyaSessionById(sessionId);
+      const meUser = await db.getUserById(me.userId);
+      if (!sessRow || !meUser) return;
+      // قاعدة البث العائلي: الشاشة مثل الكاميرا — للمؤسس/الأدمن فقط
+      const isHost = sessRow.opened_by === meUser.id;
+      const isAdmin = meUser.role === 'admin';
+      if (!isHost && !isAdmin) { socket.emit('screen_share_denied', { message: 'مشاركة الشاشة للمؤسس فقط' }); return; }
+    } catch(e) { return; }
+    me.screenShare = !!active;
+    io.to(`session_${sessionId}`).emit('screen_share_state', { userId: me.userId, userName: me.userName, active: !!active });
   });
 
   // Member left the diwaniya -> chat message for everyone

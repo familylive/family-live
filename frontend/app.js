@@ -688,8 +688,21 @@ function connectSocket() {
   socket.on('user_left_call', (data) => {
     removeRemoteAudio(data.userId);
     if (state.callMembers) delete state.callMembers[data.userId];
+    delete remoteScreenShare[data.userId];
+    delete screenRotation[data.userId];
     updateCallPresence();
     if (typeof updateViewerCount === 'function') updateViewerCount();
+  });
+  // مشاركة الشاشة: وصول/توقف بث شاشة المؤسس
+  socket.on('screen_share_state', (data) => {
+    if (!data?.userId) return;
+    if (state.user?.id && data.userId === state.user.id) return; // معاينتي تدار محلياً
+    remoteScreenShare[data.userId] = !!data.active;
+    applyScreenShareToTile(data.userId, !!data.active);
+    if (data.active) showToast('🖥️ ' + (data.userName || 'المؤسس') + ' يشارك شاشته الآن', 'success');
+  });
+  socket.on('screen_share_denied', (data) => {
+    showToast(data?.message || 'مشاركة الشاشة للمؤسس فقط', 'error');
   });
   socket.on('call_full', (data) => {
     showToast(data.message || 'البث ممتلئ', 'error');
@@ -968,6 +981,7 @@ function connectSocket() {
     data.participants.forEach(p => {
       if (p.avatar) peerAvatars[p.userId] = p.avatar;
       if (p.level !== undefined) peerLevels[p.userId] = p.level;
+      if (p.screenShare) remoteScreenShare[p.userId] = true;
       if (p.userId !== state.user?.id) {
         state.callMembers[p.userId] = p.userName;
         setTimeout(() => createOffer(p.userId, p.userName), 500);
@@ -2055,6 +2069,154 @@ function toggleCamera() {
   if (barCamLbl) barCamLbl.textContent = camOff ? 'مغلقة' : 'كاميرا';
 }
 
+// ==================== مشاركة الشاشة (المؤسس يبث مباراة/مسلسل) ====================
+let screenShareStream = null;
+let screenShareActive = false;
+let screenWasCamOff = false;
+let remoteScreenShare = {};   // peerId -> true إذا يشارك شاشته
+let screenRotation = {};      // peerId/'me' -> 0/90/180/270
+
+function screenVideoEl(peerId) {
+  if (peerId === 'me') return document.getElementById('my-video');
+  const tile = document.getElementById('video-' + peerId);
+  return tile ? tile.querySelector('video') : null;
+}
+function screenTileEl(peerId) {
+  if (peerId === 'me') return document.getElementById('my-video-tile');
+  return document.getElementById('video-' + peerId);
+}
+function applyScreenRotation(peerId) {
+  const v = screenVideoEl(peerId);
+  if (!v) return;
+  const deg = screenRotation[peerId] || 0;
+  const mirror = (peerId === 'me' && !screenShareActive);
+  v.style.transform = deg ? (mirror ? 'scaleX(-1) rotate(' + deg + 'deg)' : 'rotate(' + deg + 'deg)') : '';
+}
+// 🔄 تدوير الشاشة (بالعرض/طول/مقلوب) — لكل مشاهد
+function screenRotateBtn(peerId) {
+  screenRotation[peerId] = ((screenRotation[peerId] || 0) + 90) % 360;
+  applyScreenRotation(peerId);
+}
+// ⛶ تكبير الشاشة بالملء
+function screenFullscreenBtn(peerId) {
+  const tile = screenTileEl(peerId);
+  if (!tile) return;
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  else tile.requestFullscreen().catch(() => showToast('التكبير غير مدعوم هنا', 'error'));
+}
+
+async function toggleScreenShare() {
+  const isHost = state.isFounder || state.user?.role === 'admin';
+  if (!isHost) return showToast('مشاركة الشاشة للمؤسس فقط', 'error');
+  if (!localStream || !inLiveCall) return showToast('ادخل البث أولاً', 'error');
+  if (screenShareActive) { stopScreenShare(false); return; }
+  try {
+    const sc = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 30 } }, audio: true });
+    screenShareStream = sc;
+    screenShareActive = true;
+    screenWasCamOff = camOff;
+    const vid = sc.getVideoTracks()[0];
+    const aud = sc.getAudioTracks()[0];
+    // الشاشة تحل محل الكاميرا عند الإرسال للجميع
+    localStream.getVideoTracks().forEach(t => { try { localStream.removeTrack(t); t.stop(); } catch(e) {} });
+    localStream.addTrack(vid);
+    // صوت المباراة/المسلسل يندمج مع المايك
+    if (aud && !localStream.getAudioTracks().some(t => t.id === aud.id)) localStream.addTrack(aud);
+    const myVideo = document.getElementById('my-video');
+    if (myVideo) { myVideo.srcObject = localStream; myVideo.style.display = 'block'; }
+    refreshCamOffOverlay();
+    // إعادة توجيه المسار الجديد لكل المتصلين (بدون إعادة تفاوض)
+    Object.values(peerConnections).forEach(pc => {
+      const s = pc.getSenders().find(s => s.track && s.track.kind === 'video');
+      if (s) s.replaceTrack(vid).catch(() => {});
+    });
+    if (socket?.connected && state.activeSession?.id) {
+      socket.emit('screen_share_state', { sessionId: state.activeSession.id, active: true });
+    }
+    updateScreenShareUI();
+    screenRotation['me'] = 0;
+    applyScreenRotation('me');
+    showToast('🖥️ أنت تشارك شاشتك الآن — العائلة تشاهد معك', 'success');
+    // لو المستخدم أوقف المشاركة من نافذة المتصفح (Stop sharing)
+    vid.addEventListener('ended', () => stopScreenShare(true));
+  } catch(e) {
+    if (e.name === 'NotAllowedError' || e.name === 'AbortError') return;
+    showToast('فشل مشاركة الشاشة: ' + (e.message || ''), 'error');
+  }
+}
+
+async function stopScreenShare(auto) {
+  if (!screenShareStream && !screenShareActive) return;
+  screenShareActive = false;
+  try {
+    if (screenShareStream) {
+      screenShareStream.getVideoTracks().forEach(t => { try { t.stop(); } catch(e) {} });
+      screenShareStream.getAudioTracks().forEach(t => { try { if (localStream) localStream.removeTrack(t); t.stop(); } catch(e) {} });
+      screenShareStream = null;
+    }
+    // استعادة الكاميرا (إلا إذا كانت مغلقة قبل المشاركة)
+    if (!screenWasCamOff) {
+      const cam = await navigator.mediaDevices.getUserMedia({ video: { facingMode: state.cameraFacing || 'environment' } });
+      const camTrack = cam.getVideoTracks()[0];
+      localStream.getVideoTracks().forEach(t => { try { localStream.removeTrack(t); t.stop(); } catch(e) {} });
+      localStream.addTrack(camTrack);
+      Object.values(peerConnections).forEach(pc => {
+        const s = pc.getSenders().find(s => s.track && s.track.kind === 'video');
+        if (s) s.replaceTrack(camTrack).catch(() => {});
+      });
+    }
+    if (socket?.connected && state.activeSession?.id) {
+      socket.emit('screen_share_state', { sessionId: state.activeSession.id, active: false });
+    }
+    const myVideo = document.getElementById('my-video');
+    if (myVideo) myVideo.srcObject = localStream;
+    camOff = screenWasCamOff;
+    if (myVideo) myVideo.style.display = camOff ? 'none' : 'block';
+    refreshCamOffOverlay();
+    screenRotation['me'] = 0;
+    applyScreenRotation('me');
+    updateScreenShareUI();
+    showToast(auto ? '🖥️ انتهت مشاركة الشاشة' : '🖥️ أوقفت مشاركة الشاشة — رجعت الكاميرا', 'success');
+  } catch(e) {
+    showToast('خطأ بإيقاف المشاركة: ' + (e.message || ''), 'error');
+    updateScreenShareUI();
+  }
+}
+
+function updateScreenShareUI() {
+  const btn = document.getElementById('tt-bar-screen');
+  const ico = document.getElementById('tt-bar-screen-ico');
+  const lbl = document.getElementById('tt-bar-screen-label');
+  if (btn) btn.classList.toggle('active-share', screenShareActive);
+  if (ico) ico.textContent = screenShareActive ? '⏹️' : '🖥️';
+  if (lbl) lbl.textContent = screenShareActive ? 'إيقاف' : 'شاشة';
+  // أخفي زر الكاميرا أثناء المشاركة (الشاشة مكانها)
+  const camBtn = document.getElementById('tt-bar-cam');
+  const isHost = state.isFounder || state.user?.role === 'admin';
+  if (camBtn) camBtn.style.display = screenShareActive ? 'none' : (isHost ? 'block' : 'none');
+  // أدوات التدوير/التكبير على معاينتي
+  const myTile = document.getElementById('my-video-tile');
+  if (myTile) {
+    myTile.classList.toggle('screen-active', screenShareActive);
+    const c = myTile.querySelector('.screen-controls');
+    if (c) c.style.display = screenShareActive ? 'flex' : 'none';
+    const b = myTile.querySelector('.screen-badge');
+    if (b) b.style.display = screenShareActive ? 'block' : 'none';
+  }
+}
+
+// جانب المشاهد: شاشة المؤسس تكبر + أزرار تدوير وتكبير
+function applyScreenShareToTile(peerId, active) {
+  const tile = document.getElementById('video-' + peerId);
+  if (!tile) return;
+  tile.classList.toggle('screen-active', !!active);
+  const controls = tile.querySelector('.screen-controls');
+  if (controls) controls.style.display = active ? 'flex' : 'none';
+  const badge = tile.querySelector('.screen-badge');
+  if (badge) badge.style.display = active ? 'block' : 'none';
+  if (!active) { screenRotation[peerId] = 0; applyScreenRotation(peerId); }
+}
+
 let diwaniyaCodeVerified = false;
 let pendingCallJoin = false;
 
@@ -2272,6 +2434,8 @@ async function joinLiveAudio() {
     if (invBtn) invBtn.style.display = (state.isFounder || state.user?.role === 'admin') ? 'block' : 'none';
     const famBtn = document.getElementById('families-btn');
     if (famBtn) famBtn.style.display = (state.isFounder || state.user?.role === 'admin') ? 'block' : 'none';
+    const scrBtn = document.getElementById('tt-bar-screen');
+    if (scrBtn) scrBtn.style.display = (state.isFounder || state.user?.role === 'admin') ? 'block' : 'none';
     const mmBtn = document.getElementById('mic-manage-btn');
     if (mmBtn) mmBtn.style.display = (state.isFounder || state.user?.role === 'admin') ? 'block' : 'none';
 
@@ -2326,6 +2490,16 @@ async function joinLiveAudio() {
 }
 
 function leaveLiveAudio() {
+  // إيقاف مشاركة الشاشة إن كانت مفعلة
+  if (screenShareActive) {
+    screenShareActive = false;
+    if (screenShareStream) {
+      try { screenShareStream.getTracks().forEach(t => t.stop()); } catch(e) {}
+      screenShareStream = null;
+    }
+  }
+  remoteScreenShare = {};
+  screenRotation = {};
   // Close all peer connections
   Object.values(peerConnections).forEach(pc => pc.close());
   peerConnections = {};
@@ -3573,6 +3747,11 @@ function addRemoteAudio(peerId, peerName, stream) {
     tile.className = 'video-tile';
     tile.innerHTML =
       '<video autoplay playsinline muted></video>' +
+      '<div class="screen-badge" style="display:none">🖥️ شاشة</div>' +
+      '<div class="screen-controls" style="display:none">' +
+        '<button onclick="screenRotateBtn(\'' + peerId + '\')" title="تدوير الشاشة">🔄</button>' +
+        '<button onclick="screenFullscreenBtn(\'' + peerId + '\')" title="تكبير بالملء">⛶</button>' +
+      '</div>' +
       '<div class="cam-off-overlay" style="display:none">' +
         '<div class="cam-off-circle">' + avatarHtml(peerAvatars[peerId]) + '</div>' +
         '<div class="cam-off-icon">🚫</div>' +
@@ -3580,6 +3759,8 @@ function addRemoteAudio(peerId, peerName, stream) {
       '</div>' +
       '<div class="video-name">' + peerName + '</div>';
     videoGrid.appendChild(tile);
+    // لو المؤسس يشارك شاشته بالفعل (انضممت بعد بدء المشاركة) -> فعّل العرض الكبير
+    if (remoteScreenShare[peerId]) applyScreenShareToTile(peerId, true);
     // ترتيب بلاطات الأعضاء: عمود على اليمين (بدل nth-of-type الذي ينكسر بالعناصر الجديدة)
     const peerTiles = [...videoGrid.querySelectorAll('.video-tile:not(.local)')];
     const idx = peerTiles.indexOf(tile);

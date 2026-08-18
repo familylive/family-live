@@ -627,6 +627,11 @@
           <div class="video-grid" id="video-grid" style="display:none">
             <div class="video-tile local" id="my-video-tile">
               <video id="my-video" autoplay playsinline muted style="display:none"></video>
+              <div class="screen-badge" style="display:none">🖥️ شاشة</div>
+              <div class="screen-controls" style="display:none">
+                <button onclick="screenRotateBtn('me')" title="تدوير الشاشة">🔄</button>
+                <button onclick="screenFullscreenBtn('me')" title="تكبير بالملء">⛶</button>
+              </div>
               <button class="tile-filter-btn" id="tile-filter-btn" onclick="toggleTileFilterBar()" title="الفلاتر">✨</button>
               <div class="tile-filter-bar" id="tile-filter-bar" style="display:none">
                 <div class="filter-opt" data-filter="" onclick="tileSelectFilter(this)"><span class="filter-demo demo-none">أ</span><span class="filter-name">بدون</span></div>
@@ -684,6 +689,9 @@
               </button>
               <button class="tt-bar-btn" id="tt-bar-effects" onclick="openEffectsModal()" title="المؤثرات">
                 <span class="tt-bar-ico">✨</span><span class="tt-bar-label">تأثير</span>
+              </button>
+              <button class="tt-bar-btn" id="tt-bar-screen" onclick="toggleScreenShare()" title="مشاركة الشاشة" style="display:none">
+                <span class="tt-bar-ico" id="tt-bar-screen-ico">🖥️</span><span class="tt-bar-label" id="tt-bar-screen-label">شاشة</span>
               </button>
               <button class="tt-bar-btn" id="tt-bar-mic" onclick="toggleMic()" title="المايك">
                 <span class="tt-bar-ico" id="tt-bar-mic-ico">🎤</span><span class="tt-bar-label" id="tt-bar-mic-label">صوت</span>
