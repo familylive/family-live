@@ -2,6 +2,24 @@
 const API_BASE = window.location.origin;
 let socket = null;
 
+// ==================== تشخيص مرئي للأخطاء التقنية ====================
+// أي خطأ غير متوقع يظهر في شريط أحمر أعلى الشاشة (يساعدنا نعرف سبب المشاكل)
+window.addEventListener('error', function (e) {
+  try {
+    let banner = document.getElementById('tech-err-banner');
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.id = 'tech-err-banner';
+      banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#c0392b;color:#fff;font-size:12px;padding:6px 10px;font-family:sans-serif;direction:rtl;';
+      document.body.appendChild(banner);
+    }
+    const src = e.filename ? e.filename.split('/').pop() : '';
+    banner.textContent = '⚠️ خطأ تقني: ' + (e.message || 'خطأ') + (src ? ' — ' + src + ':' + e.lineno : '');
+    clearTimeout(banner._t);
+    banner._t = setTimeout(() => { banner.style.display = 'none'; }, 12000);
+  } catch (err) {}
+});
+
 async function api(method, path, body = null) {
   const opts = { method, headers: { 'Content-Type': 'application/json' } };
   const token = localStorage.getItem('token');
@@ -2121,6 +2139,8 @@ async function renegotiatePeer(peerId) {
 }
 
 async function toggleScreenShare() {
+  // تنبيه فوري عند أي ضغطة — لا صمت أبداً
+  showToast('🖥️ جارٍ تجهيز مشاركة الشاشة...', 'success');
   const isHost = state.isFounder || state.user?.role === 'admin';
   if (!isHost) return showToast('مشاركة الشاشة للمؤسس فقط', 'error');
   if (!localStream || !inLiveCall) return showToast('ادخل البث أولاً', 'error');

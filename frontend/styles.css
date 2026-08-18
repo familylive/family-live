@@ -3668,8 +3668,10 @@ body {
   min-width: 52px;
   padding: 3px 6px;
   border-radius: 14px;
-  transition: background .2s;
+  transition: background .2s, transform .1s;
+  -webkit-tap-highlight-color: transparent;
 }
+.tt-bar-btn:active { transform: scale(.88); background: rgba(255,255,255,.18); }
 .tt-bar-btn:hover { background: rgba(255,255,255,.12); }
 .tt-bar-ico { font-size: 20px; line-height: 1; }
 .tt-bar-label { font-size: 9px; font-weight: 700; opacity: .85; }
