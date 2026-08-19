@@ -5325,9 +5325,9 @@ async function loadAdminFinance() {
         '</div>' +
         '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:6px;font-size:12px">' +
           '<span>🪙 <b>' + (w.coins ? Number(w.coins).toLocaleString('en') : '-') + '</b></span>' +
-          '<span>💵 إجمالي: <b>' + Number(w.sar_gross || 0).toFixed(2) + ' ريال</b></span>' +
+          '<span>💵 إجمالي: <b>' + Number(w.sar_gross || w.amount || 0).toFixed(2) + ' ريال</b></span>' +
           '<span style="color:#ff6b6b">🏢 حسم 30%: <b>' + Number(w.commission_sar || 0).toFixed(2) + '</b></span>' +
-          '<span style="color:#22c55e;font-weight:800">✅ صافي: <b>' + Number(w.sar_net || 0).toFixed(2) + ' ريال</b></span>' +
+          '<span style="color:#22c55e;font-weight:800">✅ صافي: <b>' + Number(w.sar_net || w.amount || 0).toFixed(2) + ' ريال</b></span>' +
         '</div>' +
         '<div style="font-size:11px;color:var(--text-muted);margin-top:4px">📞 ' + (w.phone || '-') + ' · ' + (w.created_at || '') + (w.transfer_days ? ' · ⏱️ ' + w.transfer_days + ' يوم' : '') + (w.transfer_date ? ' · 📅 ' + w.transfer_date : '') + (w.admin_note ? ' · 📝 ' + w.admin_note : '') + '</div>' +
         '<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">' +
