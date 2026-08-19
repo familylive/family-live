@@ -5439,3 +5439,86 @@ function printWdReport() {
   );
   win.document.close();
 }
+
+// ==================== 🔐 تبديل وتحويل الكونزات وطلبات السحب (محمي برمز سري) ====================
+function walletUnlocked() {
+  const t = parseInt(localStorage.getItem('wallet2fa_at') || '0', 10);
+  return !!t && (Date.now() - t) < 30 * 60000;
+}
+
+function toggleWalletExchange() {
+  const wrap = document.getElementById('wallet-exchange-wrap');
+  if (!wrap) return;
+  if (walletUnlocked()) {
+    wrap.style.display = wrap.style.display === 'none' ? 'block' : 'none';
+    const arr = document.getElementById('wallet-exchange-arrow');
+    if (arr) arr.textContent = wrap.style.display === 'none' ? '🔓' : '🔓';
+    return;
+  }
+  // مقفل: نطلب الرمز السري
+  document.getElementById('wallet-code-modal').style.display = 'flex';
+  const msg = document.getElementById('wallet-code-msg');
+  if (msg) msg.textContent = 'اضغط "إرسال الرمز لبريدي" أولاً';
+  document.getElementById('wallet-code-input').value = '';
+}
+
+async function sendWalletCode() {
+  const msg = document.getElementById('wallet-code-msg');
+  try {
+    const r = await api('POST', '/api/wallet/send-code');
+    if (msg) {
+      if (r.sent) msg.innerHTML = '✅ أُرسل الرمز إلى بريدك — تحقق من صندوق الوارد/السبام';
+      else msg.innerHTML = '⚠️ لم يُرسل البريد (الإعداد غير مفعل) — استخدم الرمز: <b style="letter-spacing:3px;color:var(--gold)">' + (r.devCode || '') + '</b>';
+    }
+  } catch (e) {
+    if (msg) msg.textContent = e.message;
+  }
+}
+
+async function verifyWalletCode() {
+  const code = document.getElementById('wallet-code-input').value.trim();
+  const msg = document.getElementById('wallet-code-msg');
+  if (!code) { if (msg) msg.textContent = 'أدخل الرمز أولاً'; return; }
+  try {
+    const r = await api('POST', '/api/wallet/verify-code', { code });
+    localStorage.setItem('wallet2fa_at', String(Date.now()));
+    document.getElementById('wallet-code-modal').style.display = 'none';
+    const wrap = document.getElementById('wallet-exchange-wrap');
+    if (wrap) wrap.style.display = 'block';
+    const arr = document.getElementById('wallet-exchange-arrow');
+    if (arr) arr.textContent = '🔓';
+    showToast(r.message || '✅ تم التحقق', 'success');
+  } catch (e) {
+    if (msg) msg.textContent = e.message;
+  }
+}
+
+// إعدادات البريد (SMTP) من الإدارة
+async function loadSmtpSettings() {
+  try {
+    const { smtp } = await api('GET', '/api/admin/smtp');
+    if (smtp) {
+      if (document.getElementById('smtp-host')) document.getElementById('smtp-host').value = smtp.host || '';
+      if (document.getElementById('smtp-port')) document.getElementById('smtp-port').value = smtp.port || '587';
+      if (document.getElementById('smtp-user')) document.getElementById('smtp-user').value = smtp.user || '';
+      if (document.getElementById('smtp-pass')) document.getElementById('smtp-pass').value = smtp.pass || '';
+      if (document.getElementById('smtp-from')) document.getElementById('smtp-from').value = smtp.from || '';
+      if (document.getElementById('smtp-secure')) document.getElementById('smtp-secure').checked = smtp.secure === '1';
+    }
+  } catch (e) {}
+}
+async function saveSmtpSettings() {
+  try {
+    const r = await api('POST', '/api/admin/smtp', {
+      host: document.getElementById('smtp-host').value.trim(),
+      port: document.getElementById('smtp-port').value.trim(),
+      user: document.getElementById('smtp-user').value.trim(),
+      pass: document.getElementById('smtp-pass').value.trim(),
+      from: document.getElementById('smtp-from').value.trim(),
+      secure: document.getElementById('smtp-secure').checked
+    });
+    showToast(r.message, 'success');
+    const msg = document.getElementById('smtp-msg');
+    if (msg) msg.textContent = 'جرّب الآن من أي عضو: قسم التحويل والسحب ← إرسال الرمز لبريدي';
+  } catch (e) { showToast(e.message, 'error'); }
+}

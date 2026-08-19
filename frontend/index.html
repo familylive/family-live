@@ -16,6 +16,21 @@
 <script src="/i18n.js?v=1785498511"></script>
 <script src="/vendor/livekit-client.umd.min.js"></script>
 <script src="/app.js?v=1785498511"></script>
+<!-- 🔐 مودال الرمز السري للتحويل والسحب -->
+<div class="modal-overlay" id="wallet-code-modal" style="display:none" onclick="if(event.target===this)this.style.display='none'">
+  <div class="modal-box" style="max-width:320px;text-align:center">
+    <div style="font-size:40px;margin-bottom:6px">🔐</div>
+    <h3 style="margin-bottom:6px">التحقق برمز سري</h3>
+    <p style="font-size:12px;color:var(--text-secondary);margin-bottom:10px">سيصلك رمز مكون من 6 أرقام على بريدك الإلكتروني — صالح 10 دقائق</p>
+    <button class="btn btn-accent btn-full" style="margin-bottom:10px" onclick="sendWalletCode()">📨 إرسال الرمز لبريدي</button>
+    <input class="form-input" id="wallet-code-input" type="text" inputmode="numeric" placeholder="الرمز السري (6 أرقام)" dir="ltr" style="text-align:center;letter-spacing:8px;font-size:20px;font-weight:900;margin-bottom:10px" maxlength="6" onkeydown="if(event.key==='Enter')verifyWalletCode()">
+    <div id="wallet-code-msg" style="font-size:12px;color:var(--text-muted);margin-bottom:10px"></div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-success" style="flex:1" onclick="verifyWalletCode()">✅ تحقق</button>
+      <button class="btn btn-secondary" style="flex:1" onclick="document.getElementById('wallet-code-modal').style.display='none'">إلغاء</button>
+    </div>
+  </div>
+</div>
 <!-- 🎬 مشاهدة معاً: نافذة إدخال الرابط -->
 <div class="modal-overlay" id="watch-modal" style="display:none" onclick="if(event.target===this)this.style.display='none'">
   <div class="modal-box" style="max-width:340px">
@@ -1202,6 +1217,14 @@
         </div>
         <button class="btn btn-accent btn-full" style="margin-top:10px" onclick="buyCustomCoins()">💳 اشتري الآن</button>
       </div>
+      <div class="card" style="border:1.5px solid rgba(59,130,246,.5);cursor:pointer;background:linear-gradient(135deg,rgba(59,130,246,.12),rgba(59,130,246,.03))" onclick="toggleWalletExchange()">
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;margin:0">
+          <span>💱 تبديل وتحويل الكونزات وطلبات السحب</span>
+          <span id="wallet-exchange-arrow" style="font-size:18px;color:var(--gold)">🔒</span>
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">محمي برمز سري يُرسل إلى بريدك الإلكتروني 🔐</div>
+      </div>
+      <div id="wallet-exchange-wrap" style="display:none">
       <div class="card">
         <div class="card-title">💰 تحويل الكونزات إلى مبلغ</div>
         <div style="display:flex;gap:8px">
@@ -1226,6 +1249,7 @@
         </div>
         <button class="btn btn-primary btn-full" onclick="requestWithdraw()">📤 تقديم طلب السحب</button>
         <div id="my-withdrawals" style="margin-top:10px"></div>
+      </div>
       </div>
 
       <div class="card">
@@ -1370,6 +1394,22 @@
     <!-- Admin Page - لوحة الإدارة -->
     <div id="page-admin" class="page-content">
       <div class="page-title">⚙️ لوحة الإدارة <button class="btn btn-sm btn-accent" style="float:left" onclick="navigateTo('reports')">📊 التقارير</button></div>
+      <div class="card" id="admin-smtp-card" style="border:1.5px solid rgba(59,130,246,.5)">
+        <div class="card-title">📧 إعدادات البريد (لإرسال الرمز السري للتحويل/السحب)</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">مثال: Gmail → host: smtp.gmail.com · port: 587 · مستخدم: بريدك · كلمة مرور: App Password · مرسل: بريدك</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <input class="form-input" id="smtp-host" placeholder="SMTP Host" dir="ltr" style="font-size:12px">
+          <input class="form-input" id="smtp-port" placeholder="Port (587)" dir="ltr" style="font-size:12px">
+          <input class="form-input" id="smtp-user" placeholder="البريد (user)" dir="ltr" style="font-size:12px">
+          <input class="form-input" id="smtp-pass" type="password" placeholder="كلمة مرور التطبيق" dir="ltr" style="font-size:12px">
+          <input class="form-input" id="smtp-from" placeholder="المرسل From" dir="ltr" style="font-size:12px;grid-column:1/3">
+        </div>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;margin:8px 0">
+          <input type="checkbox" id="smtp-secure" style="width:16px;height:16px"> اتصال آمن SSL (465)
+        </label>
+        <button class="btn btn-accent btn-full" onclick="saveSmtpSettings()">💾 حفظ إعدادات البريد</button>
+        <div id="smtp-msg" style="font-size:11px;color:var(--text-muted);margin-top:6px"></div>
+      </div>
       <div class="card" id="admin-finance-card" style="border:1.5px solid rgba(34,197,94,.5)">
         <div class="card-title">💼 القسم المالي — طلبات السحب <span id="wd-pending-badge"></span></div>
         <div id="wd-alert" style="display:none;background:rgba(255,80,80,.15);border:1px solid rgba(255,80,80,.5);color:#ff8b8b;border-radius:12px;padding:10px 14px;font-size:13px;font-weight:800;margin-bottom:10px;text-align:center">
@@ -2200,7 +2240,7 @@ function navigateTo(pageName) {
   if (pageName === 'codes' && state.isLoggedIn) loadCodesPage();
   if (pageName === 'auctions' && state.isLoggedIn) loadAuctionsPage();
   if (pageName === 'admin' && (state.user?.role === 'admin' || state.user?.role === 'finance')) {
-    if (state.user?.role === 'admin') { loadAdminPage(); loadAdminAuctions(); }
+    if (state.user?.role === 'admin') { loadAdminPage(); loadAdminAuctions(); loadSmtpSettings(); }
     loadAdminFinance(); loadWdStats();
     // المشرف المالي: القسم المالي فقط
     document.querySelectorAll('#page-admin .card').forEach(c => {

@@ -1245,6 +1245,78 @@ app.get('/api/diwaniya/secret-room', authMiddleware, async (req, res) => {
 });
 
 
+// ============ البريد (SMTP من الإدارة) + الرمز السري للتحويل/السحب ============
+async function sendEmailTo(to, subject, html) {
+  try {
+    const host = await db.getSetting('smtp_host', '');
+    const user = await db.getSetting('smtp_user', '');
+    const pass = await db.getSetting('smtp_pass', '');
+    const from = await db.getSetting('smtp_from', user || 'family-live@no-reply.com');
+    const port = parseInt(await db.getSetting('smtp_port', '587')) || 587;
+    const secure = (await db.getSetting('smtp_secure', '0')) === '1';
+    if (!host || !user) return { sent: false, reason: 'smtp-not-configured' };
+    const nodemailer = require('nodemailer');
+    const t = nodemailer.createTransport({ host, port, secure, auth: { user, pass } });
+    await t.sendMail({ from, to, subject, html });
+    return { sent: true };
+  } catch (e) { return { sent: false, reason: String(e.message || e).slice(0, 120) }; }
+}
+
+// رموز التحقق المؤقتة + توثيق المحفظة (30 دقيقة)
+globalThis.walletCodes = {};      // userId -> { code, expires }
+globalThis.walletVerified = {};   // userId -> timestamp
+
+app.post('/api/wallet/send-code', authMiddleware, async (req, res) => {
+  const user = await db.getUserById(req.user.id);
+  if (!user) return res.status(404).json({ error: 'المستخدم غير موجود' });
+  const code = String(Math.floor(100000 + Math.random() * 900000));
+  globalThis.walletCodes[req.user.id] = { code, expires: Date.now() + 10 * 60000 };
+  const html = '<div dir="rtl" style="font-family:Tahoma,Arial;padding:20px"><h2>رمز التحقق — Family Live</h2><p>مرحباً ' + (user.name || '') + '،</p><p>استخدم الرمز التالي لإتمام عملية تحويل الكونزات أو طلب السحب:</p><p style="font-size:30px;font-weight:bold;letter-spacing:6px;background:#f4f4f4;padding:12px;border-radius:10px;text-align:center">' + code + '</p><p>الرمز صالح لمدة <b>10 دقائق</b>. إذا لم تطلب هذا، تجاهل الرسالة.</p></div>';
+  const r = await sendEmailTo(user.email, '🔐 رمز التحقق — Family Live', html);
+  console.log('🔐 رمز محفظة لـ ' + user.email + ': ' + code + (r.sent ? ' (أُرسل بالبريد)' : ' (لم يُرسل: ' + r.reason + ')'));
+  res.json({ ok: true, sent: r.sent, reason: r.sent ? null : r.reason, devCode: r.sent ? null : code });
+});
+
+app.post('/api/wallet/verify-code', authMiddleware, (req, res) => {
+  const { code } = req.body;
+  const rec = globalThis.walletCodes[req.user.id];
+  if (!rec || !code || rec.code !== String(code).trim()) {
+    return res.status(400).json({ error: 'الرمز غير صحيح' });
+  }
+  if (Date.now() > rec.expires) {
+    delete globalThis.walletCodes[req.user.id];
+    return res.status(400).json({ error: 'انتهت صلاحية الرمز — اطلب رمزاً جديداً' });
+  }
+  delete globalThis.walletCodes[req.user.id];
+  globalThis.walletVerified[req.user.id] = Date.now();
+  res.json({ ok: true, message: '✅ تم التحقق — يمكنك التحويل والسحب' });
+});
+
+// حارس التحقق للمحفظة (30 دقيقة)
+function walletVerifiedOk(userId) {
+  const t = globalThis.walletVerified[userId];
+  return !!t && (Date.now() - t) < 30 * 60000;
+}
+
+// إعدادات SMTP من الإدارة
+app.get('/api/admin/smtp', authMiddleware, adminMiddleware, async (req, res) => {
+  res.json({ smtp: {
+    host: await db.getSetting('smtp_host', ''), port: await db.getSetting('smtp_port', '587'),
+    user: await db.getSetting('smtp_user', ''), pass: await db.getSetting('smtp_pass', ''),
+    from: await db.getSetting('smtp_from', ''), secure: await db.getSetting('smtp_secure', '0')
+  } });
+});
+app.post('/api/admin/smtp', authMiddleware, adminMiddleware, async (req, res) => {
+  const { host, port, user, pass, from, secure } = req.body || {};
+  await db.setSetting('smtp_host', host || '');
+  await db.setSetting('smtp_port', port || '587');
+  await db.setSetting('smtp_user', user || '');
+  await db.setSetting('smtp_pass', pass || '');
+  await db.setSetting('smtp_from', from || '');
+  await db.setSetting('smtp_secure', secure ? '1' : '0');
+  res.json({ message: '✅ تم حفظ إعدادات البريد' });
+});
+
 // ============ مهلة طلبات السحب: 5 أيام عمل مقسمة على المراحل ============
 const WD_SLA_DAYS = { received: 1, confirmed: 1, processing: 2, paid: 1 }; // الإجمالي 5 أيام عمل
 const WD_PHASES = ['received', 'confirmed', 'processing', 'paid'];
@@ -2063,6 +2135,7 @@ app.post('/api/wallet/gift', authMiddleware, async (req, res) => {
 
 // Convert coins to wallet money
 app.post('/api/wallet/convert', authMiddleware, async (req, res) => {
+  if (!walletVerifiedOk(req.user.id)) return res.status(403).json({ error: '🔐 أدخل الرمز السري أولاً (يُرسل لبريدك) من قسم تبديل وتحويل الكونزات' });
   const { coins } = req.body;
   if (!coins || coins < 1) return res.status(400).json({ error: 'عدد الكوينزات مطلوب' });
   const result = await db.convertCoinsToWallet(req.user.id, parseInt(coins));
@@ -2075,6 +2148,7 @@ app.post('/api/wallet/convert', authMiddleware, async (req, res) => {
 
 // Request withdrawal (بالكونزات — تحسب القيمة بالريال بعد حسم نسبة الموقع 30%)
 app.post('/api/wallet/withdraw', authMiddleware, async (req, res) => {
+  if (!walletVerifiedOk(req.user.id)) return res.status(403).json({ error: '🔐 أدخل الرمز السري أولاً (يُرسل لبريدك) من قسم تبديل وتحويل الكونزات' });
   const { coins, phone } = req.body;
   if (!coins || parseInt(coins) < 1) return res.status(400).json({ error: 'عدد الكونزات مطلوب' });
   const user = await db.getUserById(req.user.id);
