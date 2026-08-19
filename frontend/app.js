@@ -2511,7 +2511,7 @@ async function renderWatchPlayer(data) {
   } else {
     const v = document.createElement('video');
     v.id = 'watch-video';
-    v.autoplay = true;
+    v.autoplay = !!watchTogether.playing; // في وضع الإيقاف: لا تشغيل تلقائي — زر التشغيل هو البادئ
     v.playsInline = true;
     stage.appendChild(v);
     watchVideo = v;
