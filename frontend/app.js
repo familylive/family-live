@@ -2053,7 +2053,7 @@ async function flipCamera() {
 }
 
 function toggleMic() {
-  if (!localStream) return;
+  if (!localStream) return showToast('ادخل البث أولاً لتشغيل المايك 🎤', 'error');
   micMuted = !micMuted;
   localStream.getAudioTracks().forEach(t => t.enabled = !micMuted);
   const btn = document.getElementById('mic-toggle-btn');
@@ -4124,6 +4124,7 @@ function setTikTokMode(on) {
     showChatPanel();
   } else {
     recentCommentsLoaded = false;
+    closeMorePanel();
   }
   if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
 }
@@ -4632,6 +4633,23 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 let callExtrasOpen = false;
 function toggleCallExtras() {
+  const grid = document.getElementById('video-grid');
+  const isTt = grid?.classList.contains('tiktok-mode');
+  // وضع البث (تيك توك): لوحة منبثقة فوق الشريط
+  if (isTt) {
+    const panel = document.getElementById('tt-more-panel');
+    if (!panel) return;
+    callExtrasOpen = !callExtrasOpen;
+    if (callExtrasOpen) buildMorePanel();
+    panel.style.display = callExtrasOpen ? 'flex' : 'none';
+    const barBtn = document.getElementById('tt-bar-more');
+    if (barBtn) {
+      const ic = barBtn.querySelector('.tt-bar-ico');
+      if (ic) ic.textContent = callExtrasOpen ? '✕' : '⚙️';
+    }
+    return;
+  }
+  // الوضع الكلاسيكي: صف الأزرار الإضافي
   const row = document.querySelector('.call-buttons');
   callExtrasOpen = !callExtrasOpen;
   if (row) row.classList.toggle('extras-open', callExtrasOpen);
@@ -4639,6 +4657,43 @@ function toggleCallExtras() {
   if (btn) btn.textContent = callExtrasOpen ? '✕' : '⚙️';
   const giftBtn = document.getElementById('gift-box-btn');
   if (giftBtn) giftBtn.style.display = callExtrasOpen ? 'none' : 'flex';
+}
+
+// بناء محتوى لوحة "المزيد" حسب الصلاحية
+function buildMorePanel() {
+  const panel = document.getElementById('tt-more-panel');
+  if (!panel) return;
+  const isHost = state.isFounder || state.user?.role === 'admin';
+  const items = [];
+  items.push({ i: micMuted ? '🎤' : '🔇', t: micMuted ? 'فتح المايك' : 'كتم المايك', f: 'toggleMic()' });
+  if (isHost) items.push({ i: '📷', t: 'الكاميرا', f: 'toggleCamera()' });
+  if (isHost) items.push({ i: '🖥️', t: 'مشاركة الشاشة', f: 'toggleScreenShare()' });
+  if (isHost) items.push({ i: '🎬', t: 'مشاهدة معاً', f: 'openWatchModal()' });
+  if (isHost) items.push({ i: '⚔️', t: 'تحدي PK', f: 'openBattleModal()' });
+  if (isHost) items.push({ i: '👥', t: 'العوائل المتصلة', f: 'openConnectedFamilies()' });
+  items.push({ i: '✨', t: 'المؤثرات', f: 'openEffectsModal()' });
+  if (isHost) items.push({ i: '⚙️', t: 'إعدادات البث', f: 'openCallSettings()' });
+  items.push({ i: '✕', t: 'إغلاق', f: 'toggleCallExtras()' });
+  panel.innerHTML = items.map(x => '<div class="tt-more-item" onclick="' + x.f + '">' + '<span>' + x.i + '</span>' + x.t + '</div>').join('');
+}
+
+// فتح إعدادات البث (الزر الكلاسيكي إن وُجد)
+function openCallSettings() {
+  const sBtn = document.getElementById('call-settings-btn');
+  if (sBtn) sBtn.click();
+  else showToast('الإعدادات غير متاحة الآن', 'error');
+}
+
+// إغلاق لوحة المزيد عند مغادرة البث أو الخروج من وضع تيك توك
+function closeMorePanel() {
+  callExtrasOpen = false;
+  const panel = document.getElementById('tt-more-panel');
+  if (panel) panel.style.display = 'none';
+  const barBtn = document.getElementById('tt-bar-more');
+  if (barBtn) {
+    const ic = barBtn.querySelector('.tt-bar-ico');
+    if (ic) ic.textContent = '⚙️';
+  }
 }
 let bcastMoved = [];
 function moveControlsIntoGrid() {

@@ -2994,6 +2994,38 @@ body {
 .tiktok-chat { transition: transform .3s ease, opacity .3s ease; touch-action: pan-y; }
 .tiktok-chat.dragging { transition: none; }
 .tiktok-chat.chat-hidden { transform: translateX(-112%); pointer-events: none; }
+.tt-more-panel {
+  position: absolute;
+  bottom: 82px;
+  left: 8px;
+  z-index: 70;
+  background: rgba(10,10,15,.92);
+  border: 1px solid rgba(232,184,48,.35);
+  border-radius: 14px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 150px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 8px 30px rgba(0,0,0,.6);
+  animation: ttMoreIn .18s ease;
+}
+@keyframes ttMoreIn { from { transform: translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } }
+.tt-more-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tt-more-item span { font-size: 16px; }
+.tt-more-item:active { background: rgba(232,184,48,.18); }
 .tt-chat-tab {
   position: absolute;
   bottom: 76px;
