@@ -5665,6 +5665,11 @@ function buildHistoryMsg(m) {
 
 // ==================== 🎁 إدارة الهدايا (لوحة التحكم) ====================
 let giftEditId = null;
+function isGiftVideo(src) {
+  if (!src) return false;
+  if (/^data:video\//i.test(src)) return true;
+  return /\.(mp4|webm|ogv|mov|m4v)(\?|$)/i.test(src);
+}
 async function loadAdminGifts() {
   try {
     const { gifts } = await api('GET', '/api/admin/gift-items');
@@ -5683,7 +5688,9 @@ async function loadAdminGifts() {
         : '<span style="color:var(--success);font-weight:800">✅ مفعلة</span>';
       const fmt = d => d ? d.toLocaleString('ar-SA-u-nu-latn', { year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' }) : '—';
       const gIcon = g.gift_image
-        ? '<img src="' + g.gift_image + '" style="width:30px;height:30px;object-fit:contain;vertical-align:middle;border-radius:8px;margin-left:4px">'
+        ? (isGiftVideo(g.gift_image)
+            ? '<video src="' + g.gift_image + '" style="width:34px;height:30px;object-fit:contain;vertical-align:middle;border-radius:8px;margin-left:4px" muted autoplay loop playsinline preload="metadata"></video>'
+            : '<img src="' + g.gift_image + '" style="width:30px;height:30px;object-fit:contain;vertical-align:middle;border-radius:8px;margin-left:4px">')
         : (g.emoji || '🎁');
       return '<div class="admin-family-item">' +
         '<div class="admin-family-name">' + gIcon + ' <b>' + escapeHtml(g.name) + '</b> — ' + (parseInt(g.coins)||0).toLocaleString('en') + ' كونزه' + (parseInt(g.price) ? ' · 💰' + g.price + ' ريال' : '') +
@@ -5718,6 +5725,8 @@ function resetGiftForm() {
   if (imgFile) imgFile.value = '';
   const prev = document.getElementById('gift-image-preview');
   if (prev) { prev.style.display = 'none'; prev.src = ''; }
+  const vPrev = document.getElementById('gift-video-preview');
+  if (vPrev) { vPrev.style.display = 'none'; vPrev.src = ''; }
   const st = document.getElementById('gift-status');
   if (st) st.value = 'active';
   const btn = document.getElementById('gift-save-btn');
@@ -5771,9 +5780,19 @@ async function editGiftAdmin(id) {
     const imgFile = document.getElementById('gift-image-file');
     if (imgFile) imgFile.value = '';
     const prev = document.getElementById('gift-image-preview');
-    if (prev) {
-      if (g.gift_image) { prev.src = g.gift_image; prev.style.display = 'block'; giftImageBase64 = g.gift_image; }
-      else { prev.style.display = 'none'; prev.src = ''; }
+    const vPrev = document.getElementById('gift-video-preview');
+    if (prev && vPrev) {
+      if (g.gift_image && isGiftVideo(g.gift_image)) {
+        vPrev.src = g.gift_image; vPrev.style.display = 'block';
+        prev.style.display = 'none'; prev.src = '';
+      } else if (g.gift_image) {
+        prev.src = g.gift_image; prev.style.display = 'block';
+        vPrev.style.display = 'none'; vPrev.src = '';
+      } else {
+        prev.style.display = 'none'; prev.src = '';
+        vPrev.style.display = 'none'; vPrev.src = '';
+      }
+      giftImageBase64 = g.gift_image || '';
     }
     const st = document.getElementById('gift-status');
     if (st) st.value = g.status || 'active';

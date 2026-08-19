@@ -1637,8 +1637,12 @@
           </div>
           <div class="form-group">
             <label>🖼️ صورة الهدية (من جهازك — اختياري، تظهر بالبث بدل الرمز)</label>
-            <input class="form-input" id="gift-image-file" type="file" accept="image/*,.gif" onchange="previewGiftImage(this)">
-            <img id="gift-image-preview" style="display:none;width:80px;height:80px;object-fit:contain;margin-top:6px;border-radius:10px;background:rgba(255,255,255,.06)">
+            <input class="form-input" id="gift-image-file" type="file" accept="image/*,.gif,video/*,.mp4,.webm,.mov,.m4v" onchange="previewGiftImage(this)">
+            <div style="display:flex;gap:8px;margin-top:6px">
+              <img id="gift-image-preview" style="display:none;width:80px;height:80px;object-fit:contain;border-radius:10px;background:rgba(255,255,255,.06)">
+              <video id="gift-video-preview" style="display:none;width:100px;height:80px;object-fit:contain;border-radius:10px;background:rgba(255,255,255,.06)" muted autoplay loop playsinline></video>
+            </div>
+            <div style="font-size:10.5px;color:var(--text-muted);margin-top:4px">🎬 يقبل الفيديو (MP4/WebM/MOV — حتى ~80MB) والصور/GIF</div>
           </div>
           <div style="display:flex;gap:8px">
             <div class="form-group" style="flex:1"><label>السعر (ريال، اختياري)</label><input class="form-input" id="gift-price" type="number" placeholder="0"></div>
@@ -4101,7 +4105,9 @@ async function openGiftBox() {
   if (giftItems.length) {
     grid.innerHTML = giftItems.map(g => {
       const media = g.gift_image
-        ? '<img src="' + g.gift_image + '" style="width:56px;height:56px;object-fit:contain;margin:0 auto">'
+        ? (isGiftVideo(g.gift_image)
+            ? '<video src="' + g.gift_image + '" style="width:56px;height:56px;object-fit:contain;margin:0 auto;border-radius:8px" muted autoplay loop playsinline preload="metadata"></video>'
+            : '<img src="' + g.gift_image + '" style="width:56px;height:56px;object-fit:contain;margin:0 auto">')
         : '<div style="font-size:34px">' + g.emoji + '</div>';
       return '<div class="gift-item" id="gift-item-' + g.id + '" onclick="window._selectGift(\'' + g.id + '\',this)">' +
         media +
@@ -4218,9 +4224,11 @@ function showGiftOnCamera(data) {
   giftOverlay.id = 'gift-fullscreen-overlay';
   giftOverlay.className = 'gift-fullscreen';
   
-  // If animated image (GIF) provided, use it; else big animated emoji
+  // If animated image/GIF/video provided, use it; else big animated emoji
   const media = data.giftImage
-    ? '<img class="gift-fs-img" src="' + data.giftImage + '" alt="' + data.giftName + '">'
+    ? (isGiftVideo(data.giftImage)
+        ? '<video class="gift-fs-img gift-fs-video" src="' + data.giftImage + '" autoplay muted loop playsinline alt="' + data.giftName + '"></video>'
+        : '<img class="gift-fs-img" src="' + data.giftImage + '" alt="' + data.giftName + '">')
     : '<div class="gift-fs-emoji">' + data.giftEmoji + '</div>';
   
   giftOverlay.innerHTML =
@@ -4255,16 +4263,25 @@ let giftImageBase64 = '';
 function previewGiftImage(input) {
   const file = input.files?.[0];
   const preview = document.getElementById('gift-image-preview');
+  const vPrev = document.getElementById('gift-video-preview');
   if (!file) return;
-  if (file.size > 3 * 1024 * 1024) {
-    showToast('الصورة كبيرة - الحد الأقصى 3MB', 'error');
+  const isVideo = (file.type || '').startsWith('video/');
+  const max = isVideo ? 80 * 1024 * 1024 : 5 * 1024 * 1024;
+  if (file.size > max) {
+    showToast(isVideo ? 'الفيديو كبير - الحد الأقصى 80MB' : 'الصورة كبيرة - الحد الأقصى 5MB', 'error');
     input.value = '';
     return;
   }
   const reader = new FileReader();
   reader.onload = function(e) {
     giftImageBase64 = e.target.result;
-    if (preview) { preview.src = giftImageBase64; preview.style.display = 'block'; }
+    if (isVideo) {
+      if (preview) { preview.style.display = 'none'; preview.src = ''; }
+      if (vPrev) { vPrev.src = giftImageBase64; vPrev.style.display = 'block'; }
+    } else {
+      if (vPrev) { vPrev.style.display = 'none'; vPrev.src = ''; }
+      if (preview) { preview.src = giftImageBase64; preview.style.display = 'block'; }
+    }
   };
   reader.readAsDataURL(file);
 }
