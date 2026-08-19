@@ -4009,7 +4009,12 @@ function updateTikTokLiveInfo() {
   const avEl = document.getElementById('tt-host-avatar');
   if (avEl) avEl.innerHTML = (state.user?.avatar && state.user.avatar.startsWith('data:')) ? '<img src="' + state.user.avatar + '">' : (state.user?.avatar || '👤');
   const famEl = document.getElementById('tt-host-family');
-  if (famEl) famEl.textContent = state.family?.name || '';
+  if (famEl) {
+    famEl.textContent = state.family?.name || '';
+    // شارة مستوى/توثيق العائلة بجانب الاسم
+    const fv = state.family?.verif_tier || 'none';
+    if (fv !== 'none') famEl.innerHTML = (state.family?.name || '') + ' ' + verifBadge(fv, 15);
+  }
 }
 
 function updateViewerCount() {

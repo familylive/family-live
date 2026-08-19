@@ -1263,8 +1263,10 @@ app.post('/api/watch/upload', authMiddleware, async (req, res) => {
               const tmpIn = path.join(os.tmpdir(), 'wu-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6) + '.in');
               const tmpOut = path.join(os.tmpdir(), 'wu-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6) + '.mp4');
               fs.writeFileSync(tmpIn, buf);
+              // مهلة قصوى 75 ثانية للتحويل — لا ننتظر أبداً أكثر من ذلك (الملف الأصلي يعمل غالباً)
+              const convert = execFileP(ffmpegPath, ['-y', '-i', tmpIn, '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '28', '-c:a', 'aac', '-b:a', '96k', '-movflags', '+faststart', tmpOut], { timeout: 70000 });
               try {
-                await execFileP(ffmpegPath, ['-y', '-i', tmpIn, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '27', '-c:a', 'aac', '-b:a', '96k', '-movflags', '+faststart', tmpOut], { timeout: 300000 });
+                await convert;
                 const outBuf = fs.readFileSync(tmpOut);
                 if (outBuf.length > 1000) { finalBuf = outBuf; finalType = 'video/mp4'; }
                 console.log(`🎬 تحويل المقطع: ${Math.round(buf.length / 1048576)}MB → ${Math.round(outBuf.length / 1048576)}MB H.264`);
