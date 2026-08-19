@@ -2147,6 +2147,19 @@ app.post('/api/wallet/convert', authMiddleware, async (req, res) => {
 });
 
 // Request withdrawal (بالكونزات — تحسب القيمة بالريال بعد حسم نسبة الموقع 30%)
+// تحويل كونزات الدعم المستلمة إلى رصيد (حسم 25% للموقع) — محمي بالرمز السري
+app.post('/api/wallet/convert-support', authMiddleware, async (req, res) => {
+  if (!walletVerifiedOk(req.user.id)) return res.status(403).json({ error: '🔐 أدخل الرمز السري أولاً (يُرسل لبريدك) من قسم تبديل وتحويل الكونزات' });
+  const { coins } = req.body;
+  if (!coins || parseInt(coins) < 1) return res.status(400).json({ error: 'عدد الكونزات مطلوب' });
+  const result = await db.convertSupportToCoins(req.user.id, parseInt(coins));
+  if (result.error) return res.status(400).json(result);
+  res.json({
+    message: '💱 تم تحويل ' + result.added + ' كونزه إلى رصيدك (حُسم 25% نسبة الموقع = ' + result.fee + ' كونزه)',
+    ...result
+  });
+});
+
 app.post('/api/wallet/withdraw', authMiddleware, async (req, res) => {
   if (!walletVerifiedOk(req.user.id)) return res.status(403).json({ error: '🔐 أدخل الرمز السري أولاً (يُرسل لبريدك) من قسم تبديل وتحويل الكونزات' });
   const { coins, phone } = req.body;

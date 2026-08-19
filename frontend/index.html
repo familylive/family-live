@@ -1202,6 +1202,9 @@
       <div class="card">
         <div class="card-title">🛍️ باقات شراء الكونزات</div>
         <div id="coin-packages-list"><div class="empty-state"><div class="empty-text">لا توجد باقات</div></div></div>
+        <div id="wallet-support-hint" style="display:none;margin-top:8px;background:rgba(255,152,0,.1);border:1px dashed rgba(255,152,0,.5);border-radius:10px;padding:8px 12px;font-size:12px;color:#ffb74d">
+          🎁 لديك <b id="wallet-support-hint-num">0</b> كونزه دعم مستلمة — استخدمها من قسم <b>💱 تبديل وتحويل الكونزات وطلبات السحب</b> (حسم 25%)
+        </div>
       </div>
 
       <div class="card" style="border:1.5px solid rgba(232,184,48,.4)">
@@ -1225,6 +1228,20 @@
         <div style="font-size:11px;color:var(--text-muted);margin-top:4px">محمي برمز سري يُرسل إلى بريدك الإلكتروني 🔐</div>
       </div>
       <div id="wallet-exchange-wrap" style="display:none">
+      <div class="card" style="border:1.5px solid rgba(255,152,0,.5)">
+        <div class="card-title">🎁 كونزات الدعم المستلمة</div>
+        <div style="font-size:28px;font-weight:900;color:#ffb74d" id="wallet-support-coins">0</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">الكونزات التي حصلت عليها من دعم الأعضاء — حوّلها إلى رصيد قابل للاستخدام (يدعم فيها) مع <b style="color:#ff6b6b">حسم 25% لصالح الموقع</b></div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input class="form-input" id="convert-support-input" type="number" placeholder="عدد كونزات الدعم" style="flex:1" oninput="calcSupportConvert()">
+          <button class="btn btn-accent" onclick="convertSupportCoins()">💱 تحويل لرصيد</button>
+        </div>
+        <div id="support-convert-banner" style="display:none;margin-top:10px;background:rgba(255,152,0,.12);border:1px solid rgba(255,152,0,.5);border-radius:10px;padding:10px;font-size:12.5px">
+          <div style="display:flex;justify-content:space-between"><span>🪙 سيتم تحويل</span><b id="sc-coins">0</b></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:#ff6b6b">🏢 حسم نسبة الموقع 25%</span><b style="color:#ff6b6b" id="sc-fee">0</b></div>
+          <div style="display:flex;justify-content:space-between;font-weight:900;color:var(--success)"><span>✅ سيُضاف لرصيدك</span><b id="sc-net">0</b></div>
+        </div>
+      </div>
       <div class="card">
         <div class="card-title">💰 تحويل الكونزات إلى مبلغ</div>
         <div style="display:flex;gap:8px">
@@ -4303,6 +4320,18 @@ async function loadWallet() {
     const data = await api('GET', '/api/wallet');
     walletData = data.wallet;
     document.getElementById('wallet-coins').textContent = data.wallet.coins || 0;
+    // كونزات الدعم المستلمة
+    const sup = parseInt(data.wallet.support || 0);
+    const supEl = document.getElementById('wallet-support-coins');
+    if (supEl) supEl.textContent = sup.toLocaleString('en');
+    const hint = document.getElementById('wallet-support-hint');
+    if (hint) {
+      if (sup > 0) {
+        hint.style.display = 'block';
+        const hn = document.getElementById('wallet-support-hint-num');
+        if (hn) hn.textContent = sup.toLocaleString('en');
+      } else hint.style.display = 'none';
+    }
     // My public ID
     const idEl = document.getElementById('my-public-id');
     if (idEl) idEl.textContent = state.user?.public_id || '------';

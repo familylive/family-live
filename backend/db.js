@@ -116,6 +116,7 @@ async function initDb() {
   try { await run("ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS confirmed_at TEXT"); } catch(e) {}
   try { await run("ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS processed_at TEXT"); } catch(e) {}
   try { await run("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active INTEGER DEFAULT 1"); } catch(e) {}
+  try { await run("ALTER TABLE users ADD COLUMN IF NOT EXISTS support_received BIGINT DEFAULT 0"); } catch(e) {}
   await run(`CREATE TABLE IF NOT EXISTS packages (id TEXT PRIMARY KEY, title TEXT NOT NULL, code_example TEXT, price INTEGER DEFAULT 0, features TEXT DEFAULT '[]', status TEXT DEFAULT 'active', sort_order INTEGER DEFAULT 0, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS capacity_purchases (id TEXT PRIMARY KEY, family_id TEXT NOT NULL, capacity INTEGER NOT NULL, price INTEGER NOT NULL, purchased_at TEXT DEFAULT now())`);
   
@@ -1005,8 +1006,8 @@ async function addLevelPoints(userId, points, type) {
 async function getUserLevel(userId) { return queryOne('SELECT level, level_points, charges_count, broadcasts_count FROM users WHERE id = $1', [userId]); }
 
 async function getWallet(userId) {
-  const u = await queryOne('SELECT coins, wallet, hold_balance FROM users WHERE id = $1', [userId]);
-  return u ? { coins: parseInt(u.coins) || 0, wallet: parseInt(u.wallet) || 0, hold: parseInt(u.hold_balance) || 0 } : { coins: 0, wallet: 0, hold: 0 };
+  const u = await queryOne('SELECT coins, wallet, hold_balance, support_received FROM users WHERE id = $1', [userId]);
+  return u ? { coins: parseInt(u.coins) || 0, wallet: parseInt(u.wallet) || 0, hold: parseInt(u.hold_balance) || 0, support: parseInt(u.support_received) || 0 } : { coins: 0, wallet: 0, hold: 0, support: 0 };
 }
 
 async function getPricing() {
@@ -1206,8 +1207,8 @@ async function updateCoinPackage(id, data) {
 async function deleteCoinPackage(id) { await run('DELETE FROM coin_packages WHERE id = $1', [id]); return true; }
 
 async function getWallet(userId) {
-  const user = await queryOne('SELECT coins, wallet FROM users WHERE id = $1', [userId]);
-  return { coins: user ? user.coins : 0, wallet: user ? user.wallet : 0 };
+  const u = await queryOne('SELECT coins, wallet, hold_balance, support_received FROM users WHERE id = $1', [userId]);
+  return u ? { coins: parseInt(u.coins) || 0, wallet: parseInt(u.wallet) || 0, hold: parseInt(u.hold_balance) || 0, support: parseInt(u.support_received) || 0 } : { coins: 0, wallet: 0, hold: 0, support: 0 };
 }
 async function addCoins(userId, coins) { await run('UPDATE users SET coins = coins + $1 WHERE id = $2', [coins, userId]); return getWallet(userId); }
 async function deductCoins(userId, coins) {
@@ -1219,12 +1220,26 @@ async function deductCoins(userId, coins) {
 async function sendGift(fromId, toId, coins, message) {
   const w = await deductCoins(fromId, coins);
   if (!w) return { error: 'رصيدك لا يكفي' };
-  await run('UPDATE users SET coins = coins + $1 WHERE id = $2', [coins, toId]);
+  // الدعم المستلم يذهب لرصيد دعم منفصل — يتحول للرصيد القابل للاستخدام بحسم 25%
+  await run('UPDATE users SET support_received = support_received + $1 WHERE id = $2', [coins, toId]);
   const id = uuidv4();
   await run('INSERT INTO gifts (id, from_user, to_user, coins, message) VALUES ($1,$2,$3,$4,$5)', [id, fromId, toId, coins, message || '']);
   await run("INSERT INTO coin_transactions (id, user_id, type, coins, detail) VALUES ($1,$2,'gift_out',$3,$4)", [uuidv4(), fromId, coins, 'هدية إلى ' + toId]);
   await run("INSERT INTO coin_transactions (id, user_id, type, coins, detail) VALUES ($1,$2,'gift_in',$3,$4)", [uuidv4(), toId, coins, 'هدية من ' + fromId]);
   return { ok: true, wallet: w };
+}
+// تحويل كونزات الدعم المستلمة إلى رصيد قابل للاستخدام — حسم 25% لصالح الموقع
+async function convertSupportToCoins(userId, coins) {
+  const u = await queryOne('SELECT support_received, coins FROM users WHERE id = $1', [userId]);
+  if (!u) return { error: 'المستخدم غير موجود' };
+  const pool = parseInt(u.support_received) || 0;
+  if (pool < coins) return { error: '⚠️ كونزات الدعم لا تكفي — لديك ' + Number(pool).toLocaleString('en') + ' كونزه دعم والمطلوب ' + Number(coins).toLocaleString('en') };
+  const net = Math.floor(coins * 0.75);               // بعد حسم 25%
+  const fee = coins - net;                            // حصة الموقع
+  await run('UPDATE users SET support_received = support_received - $1, coins = coins + $2 WHERE id = $3', [coins, net, userId]);
+  await run("INSERT INTO coin_transactions (id, user_id, type, coins, amount, detail) VALUES ($1,$2,'support_convert',$3,$4,$5)",
+    [uuidv4(), userId, net, fee, 'تحويل دعم إلى رصيد: ' + coins + ' كونزه (حسم 25% = ' + fee + ')']);
+  return { ok: true, pool: pool - coins, added: net, fee, wallet: await getWallet(userId) };
 }
 async function getWithdrawFee() { return parseFloat(await getSetting('withdraw_fee', '20')); }
 async function setWithdrawFee(fee) { await setSetting('withdraw_fee', fee); return parseFloat(fee); }
@@ -1473,7 +1488,7 @@ module.exports = {
   getDiwaniyaGlobalSettings, setDiwaniyaGlobalSettings, setDiwaniyaMaintenance, clearDiwaniyaMaintenance, getAllDiwaniyaSessions, closeAllDiwaniyas, closeDiwaniyaByAdmin,
   seedViolationTemplates, getViolationTemplates, getAllViolationTemplates, addViolationTemplate, deleteViolationTemplate, addFounderViolation,
   getGiftItems, getAllGiftItems, addGiftItem, updateGiftItem, deleteGiftItem,
-  getWallet, addCoins, deductCoins, addToHold, releaseHold, sendGift, convertCoinsToWallet, getUserByPublicId, transferCoins, getCoinPackages, getAllCoinPackages, addCoinPackage, updateCoinPackage, updateCoinPackageFull, deleteCoinPackage,
+  getWallet, addCoins, deductCoins, addToHold, releaseHold, sendGift, convertSupportToCoins, convertCoinsToWallet, getUserByPublicId, transferCoins, getCoinPackages, getAllCoinPackages, addCoinPackage, updateCoinPackage, updateCoinPackageFull, deleteCoinPackage,
   requestWithdrawal, requestWithdrawalCoins, getMyWithdrawals, getAllWithdrawals, updateWithdrawal, updateWithdrawalFull, getWithdrawalStats,
   getMyTransactions, getAllTransactions, getMyGifts, getGiftsByUser,
   getCurrencyRate, setCurrencyRate, getSecretRoomStatus, enableSecretRoom,

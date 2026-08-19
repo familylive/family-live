@@ -5522,3 +5522,35 @@ async function saveSmtpSettings() {
     if (msg) msg.textContent = 'جرّب الآن من أي عضو: قسم التحويل والسحب ← إرسال الرمز لبريدي';
   } catch (e) { showToast(e.message, 'error'); }
 }
+
+// ==================== 🎁 تحويل كونزات الدعم المستلمة إلى رصيد (حسم 25%) ====================
+function calcSupportConvert() {
+  const coins = parseInt(document.getElementById('convert-support-input').value) || 0;
+  const banner = document.getElementById('support-convert-banner');
+  if (!coins) { banner.style.display = 'none'; return; }
+  const fee = Math.floor(coins * 0.25);
+  const net = coins - fee;
+  document.getElementById('sc-coins').textContent = coins.toLocaleString('en') + ' كونزه';
+  document.getElementById('sc-fee').textContent = fee.toLocaleString('en') + ' كونزه';
+  document.getElementById('sc-net').textContent = net.toLocaleString('en') + ' كونزه';
+  banner.style.display = 'block';
+}
+
+async function convertSupportCoins() {
+  const coins = parseInt(document.getElementById('convert-support-input').value);
+  if (!coins || coins < 1) return showToast('أدخل عدد كونزات الدعم', 'error');
+  const pool = parseInt(document.getElementById('wallet-support-coins').textContent.replace(/,/g, '')) || 0;
+  if (coins > pool) return showToast('⚠️ كونزات الدعم لا تكفي — لديك ' + pool.toLocaleString('en') + ' كونزه', 'error');
+  // لافتة تأكيد بالحسم
+  const fee = Math.floor(coins * 0.25);
+  const net = coins - fee;
+  const ok = confirm('💱 سيتم تحويل ' + coins.toLocaleString('en') + ' كونزه دعم\n🏢 يُحسم منها 25% نسبة الموقع = ' + fee.toLocaleString('en') + ' كونزه\n✅ سيُضاف إلى رصيدك: ' + net.toLocaleString('en') + ' كونزه\n\nمتابعة؟');
+  if (!ok) return;
+  try {
+    const r = await api('POST', '/api/wallet/convert-support', { coins });
+    showToast(r.message, 'success');
+    document.getElementById('convert-support-input').value = '';
+    document.getElementById('support-convert-banner').style.display = 'none';
+    loadWallet();
+  } catch (e) { showToast(e.message, 'error'); }
+}
