@@ -1234,25 +1234,28 @@ app.post('/api/watch/upload', authMiddleware, async (req, res) => {
     const buf = Buffer.from(String(data), 'base64');
     if (!buf.length) return res.status(400).json({ error: 'الملف فارغ' });
     if (buf.length > 180 * 1024 * 1024) return res.status(413).json({ error: 'الملف أكبر من 180 ميجا' });
+    const secret = require('crypto').randomBytes(16).toString('hex');
+    const fileUrl = '/api/watch/file/' + sessionId + '/' + secret;
     globalThis.watchFiles[sessionId] = {
       name: String(name || 'مقطع').slice(0, 120),
       type: String(type || 'video/mp4').slice(0, 80),
       buffer: buf,
+      secret,
       ts: Date.now()
     };
-    // بدء جلسة المشاهدة برابط الملف
+    // بدء جلسة المشاهدة برابط الملف السري
     globalThis.watchSessions[sessionId] = {
-      url: '/api/watch/file/' + sessionId,
+      url: fileUrl,
       playing: true, time: 0,
       byName: meUser?.name || 'المؤسس',
       ts: Date.now()
     };
     io.to(`session_${sessionId}`).emit('watch_started', {
-      url: '/api/watch/file/' + sessionId,
+      url: fileUrl,
       playing: true, time: 0, byName: meUser?.name || 'المؤسس'
     });
     console.log(`🎬 رفع مقطع من الجهاز: ${name} (${Math.round(buf.length / 1048576)}MB) للجلسة ${sessionId.slice(0, 8)}`);
-    res.json({ ok: true, url: '/api/watch/file/' + sessionId });
+    res.json({ ok: true, url: fileUrl });
   } catch (e) {
     console.log('upload err:', e.message);
     res.status(500).json({ error: 'فشل الرفع: ' + e.message });
@@ -1260,9 +1263,9 @@ app.post('/api/watch/upload', authMiddleware, async (req, res) => {
 });
 
 // بث المقطع للمشاهدين مع دعم Range (التنقل داخل الفيديو يعمل)
-app.get('/api/watch/file/:sessionId', authMiddleware, (req, res) => {
+app.get('/api/watch/file/:sessionId/:secret', (req, res) => {
   const f = globalThis.watchFiles[req.params.sessionId];
-  if (!f) return res.status(404).json({ error: 'المقطع غير موجود' });
+  if (!f || !f.secret || f.secret !== req.params.secret) return res.status(404).json({ error: 'المقطع غير موجود' });
   const buf = f.buffer;
   const total = buf.length;
   const range = req.headers.range;
