@@ -1234,12 +1234,37 @@ app.post('/api/watch/upload', authMiddleware, async (req, res) => {
     const buf = Buffer.from(String(data), 'base64');
     if (!buf.length) return res.status(400).json({ error: 'الملف فارغ' });
     if (buf.length > 180 * 1024 * 1024) return res.status(413).json({ error: 'الملف أكبر من 180 ميجا' });
+    // تحويل تلقائي إلى H.264/AAC (المقاطع المحملة من الإنترنت غالباً VP9/HEVC — الآيفون لا يعرضها)
+    let finalBuf = buf;
+    let finalType = String(type || 'video/mp4').slice(0, 80);
+    if (buf.length <= 150 * 1024 * 1024) {
+      try {
+        const ffmpegPath = require('ffmpeg-static');
+        if (ffmpegPath) {
+          const { execFile } = require('child_process');
+          const { promisify } = require('util');
+          const execFileP = promisify(execFile);
+          const os = require('os');
+          const tmpIn = path.join(os.tmpdir(), 'wu-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6) + '.in');
+          const tmpOut = path.join(os.tmpdir(), 'wu-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6) + '.mp4');
+          fs.writeFileSync(tmpIn, buf);
+          try {
+            await execFileP(ffmpegPath, ['-y', '-i', tmpIn, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '27', '-c:a', 'aac', '-b:a', '96k', '-movflags', '+faststart', tmpOut], { timeout: 300000 });
+            const outBuf = fs.readFileSync(tmpOut);
+            if (outBuf.length > 1000) { finalBuf = outBuf; finalType = 'video/mp4'; }
+            console.log(`🎬 تحويل المقطع: ${Math.round(buf.length / 1048576)}MB → ${Math.round(outBuf.length / 1048576)}MB H.264`);
+          } catch (e) { console.log('transcode skip:', String(e.message || e).slice(0, 80)); }
+          try { fs.unlinkSync(tmpIn); } catch (e) {}
+          try { fs.unlinkSync(tmpOut); } catch (e) {}
+        }
+      } catch (e) {}
+    }
     const secret = require('crypto').randomBytes(16).toString('hex');
     const fileUrl = '/api/watch/file/' + sessionId + '/' + secret;
     globalThis.watchFiles[sessionId] = {
       name: String(name || 'مقطع').slice(0, 120),
-      type: String(type || 'video/mp4').slice(0, 80),
-      buffer: buf,
+      type: finalType,
+      buffer: finalBuf,
       secret,
       ts: Date.now()
     };

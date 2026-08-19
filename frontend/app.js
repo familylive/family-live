@@ -2367,7 +2367,7 @@ function ytVideoId(url) {
     const u = new URL(url);
     if (u.hostname.includes('youtu.be')) return u.pathname.slice(1).split('/')[0] || null;
     if (u.hostname.includes('youtube.com')) {
-      if (u.pathname.startsWith('/embed/') || u.pathname.startsWith('/shorts/')) return u.pathname.split('/')[2] || null;
+      if (u.pathname.startsWith('/embed/') || u.pathname.startsWith('/shorts/') || u.pathname.startsWith('/live/')) return u.pathname.split('/')[2] || null;
       return u.searchParams.get('v');
     }
   } catch (e) {}
@@ -2467,7 +2467,7 @@ async function renderWatchPlayer(data) {
     };
     setTimeout(() => {
       try {
-        if (watchYT && watchYT.getPlayerState && watchYT.getPlayerState() !== 1 && !watchTogether.playing) {
+        if (watchYT && watchYT.getPlayerState && watchYT.getPlayerState() !== 1) {
           const h = document.getElementById('watch-tap-hint');
           if (h) h.style.display = 'flex';
         }
@@ -2613,12 +2613,20 @@ function uploadWatchFile(input) {
       });
       const base64 = dataUrl.split(',')[1] || '';
       sendDiag('watch_upload_start', { mb: Math.round(file.size / 1048576), name: file.name.slice(0, 60) });
-      const r = await api('POST', '/api/watch/upload', {
-        sessionId: state.activeSession.id,
-        name: file.name,
-        type: file.type || 'video/mp4',
-        data: base64
+      const controller = new AbortController();
+      const upTimer = setTimeout(() => controller.abort(), 300000); // 5 دقائق (التحويل يأخذ وقتاً)
+      const token = localStorage.getItem('token');
+      const r = await fetch(API_BASE + '/api/watch/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (token || '') },
+        body: JSON.stringify({ sessionId: state.activeSession.id, name: file.name, type: file.type || 'video/mp4', data: base64 }),
+        signal: controller.signal
+      }).then(async (res) => {
+        const d = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(d.error || 'فشل الرفع');
+        return d;
       });
+      clearTimeout(upTimer);
       if (statusEl) statusEl.textContent = '';
       input.value = '';
       document.getElementById('watch-modal').style.display = 'none';
