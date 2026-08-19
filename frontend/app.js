@@ -406,10 +406,10 @@ function updateAllUI() {
     joinMenu.style.display = state.isLoggedIn && !state.family ? 'flex' : 'none';
   }
   
-  // Show/hide admin menu for admin role
+  // Show/hide admin menu for admin role (المشرف المالي يرى القسم المالي)
   const adminMenu = document.getElementById('menu-admin');
   if (adminMenu) {
-    adminMenu.style.display = state.user?.role === 'admin' ? 'flex' : 'none';
+    adminMenu.style.display = (state.user?.role === 'admin' || state.user?.role === 'finance') ? 'flex' : 'none';
   }
 
   // للأدمن: عنصر الرئيسية (داشبورد) يتحول إلى "لوحة التحكم" — والرئيسية الجديدة ترجع للموقع
@@ -5296,7 +5296,7 @@ async function closeDiwaniyaAdmin(sessionId) {
 
 // ==================== 💼 القسم المالي — طلبات السحب (لوحة الإدارة) ====================
 let wdAll = [];
-const WD_STATUS = { pending: ['⏳ قيد المراجعة', '#ff9f43'], processing: ['🔄 جاري التحويل', '#3b82f6'], paid: ['✅ تم التحويل', '#22c55e'], rejected: ['❌ مرفوض', '#ef4444'] };
+const WD_STATUS = { pending: ['📤 تم الرفع', '#ff9f43'], received: ['📤 تم الرفع', '#ff9f43'], confirmed: ['📥 تم استلام الطلب', '#3b82f6'], processing: ['🔄 جاري معالجة الطلب', '#a855f7'], paid: ['✅ تم التحويل', '#22c55e'], rejected: ['❌ مرفوض', '#ef4444'] };
 
 function wdStatusHtml(s) {
   const st = WD_STATUS[s] || [s, '#888'];
@@ -5305,8 +5305,20 @@ function wdStatusHtml(s) {
 
 async function loadAdminFinance() {
   try {
-    const { withdrawals, pendingCount } = await api('GET', '/api/admin/withdrawals');
+    const { withdrawals, pendingCount, overdueCount, overdueList } = await api('GET', '/api/admin/withdrawals');
     wdAll = withdrawals || [];
+    // تنبيه الطلبات المتجاوزة لمهلة المرحلة (5 أيام عمل)
+    const ovEl = document.getElementById('wd-overdue-alert');
+    if (ovEl) {
+      if (overdueList && overdueList.length) {
+        ovEl.style.display = 'block';
+        ovEl.innerHTML = '⏰ <b>إنذار: ' + overdueList.length + ' طلب تجاوز الوقت المعياري (5 أيام عمل)</b><br><small>' +
+          overdueList.map(o => 'طلب #' + String(o.id).slice(0, 8) + ' للعضو ' + (o.user_name || '') + ' — مرحلة: ' + (o.phase || '') + ' — الموعد: ' + new Date(o.deadline).toLocaleString('ar-SA') + (o.net ? ' — المبلغ: ' + o.net + ' ريال' : '')).join('<br>') +
+          '</small>';
+      } else {
+        ovEl.style.display = 'none';
+      }
+    }
     const badge = document.getElementById('wd-pending-badge');
     if (badge) {
       if (pendingCount > 0) badge.innerHTML = '<span style="background:rgba(255,80,80,.2);color:#ff8b8b;border-radius:20px;padding:2px 10px;font-size:12px">🔴 ' + pendingCount + ' جديد</span>';
@@ -5330,9 +5342,10 @@ async function loadAdminFinance() {
           '<span style="color:#22c55e;font-weight:800">✅ صافي: <b>' + Number(w.sar_net || w.amount || 0).toFixed(2) + ' ريال</b></span>' +
         '</div>' +
         '<div style="font-size:11px;color:var(--text-muted);margin-top:4px">📞 ' + (w.phone || '-') + ' · ' + (w.created_at || '') + (w.transfer_days ? ' · ⏱️ ' + w.transfer_days + ' يوم' : '') + (w.transfer_date ? ' · 📅 ' + w.transfer_date : '') + (w.admin_note ? ' · 📝 ' + w.admin_note : '') + '</div>' +
+        (w.sla ? '<div style="font-size:11px;margin-top:4px;color:' + (w.sla.overdue ? '#ef4444' : 'var(--text-muted)') + '">⏱️ مرحلة: <b>' + (w.sla.phaseLabel || '') + '</b> · مهلة المرحلة: ' + w.sla.phaseSlaDays + ' يوم عمل · الموعد: ' + new Date(w.sla.phaseDeadline).toLocaleString('ar-SA') + (w.sla.overdue ? ' · <b style="color:#ef4444">⚠️ تجاوز الوقت المعياري!</b>' : '') + '</div>' : '') +
         '<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">' +
-          '<button class="btn btn-sm btn-success" onclick="openWdActivate(\'' + w.id + '\')">✅ تفعيل</button>' +
-          '<button class="btn btn-sm btn-accent" onclick="openWdEdit(\'' + w.id + '\')">✏️ تعديل</button>' +
+          '<button class="btn btn-sm btn-success" onclick="wdSetStatus(\'' + w.id + '\',\'confirmed\')">📥 استلام الطلب</button>' +
+          '<button class="btn btn-sm btn-accent" onclick="wdSetStatus(\'' + w.id + '\',\'processing\')">⚙️ جاري المعالجة</button>' +
           '<button class="btn btn-sm btn-secondary" onclick="wdSetStatus(\'' + w.id + '\',\'paid\')">💸 تم التحويل</button>' +
           '<button class="btn btn-sm" style="background:rgba(239,68,68,.15);color:#ef4444" onclick="wdSetStatus(\'' + w.id + '\',\'rejected\')">❌ رفض</button>' +
         '</div>' +

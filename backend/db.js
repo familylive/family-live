@@ -112,6 +112,10 @@ async function initDb() {
   try { await run("ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS transfer_days INT"); } catch(e) {}
   try { await run("ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS transfer_date TEXT"); } catch(e) {}
   try { await run("ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS admin_note TEXT"); } catch(e) {}
+  try { await run("ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS received_at TEXT"); } catch(e) {}
+  try { await run("ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS confirmed_at TEXT"); } catch(e) {}
+  try { await run("ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS processed_at TEXT"); } catch(e) {}
+  try { await run("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active INTEGER DEFAULT 1"); } catch(e) {}
   await run(`CREATE TABLE IF NOT EXISTS packages (id TEXT PRIMARY KEY, title TEXT NOT NULL, code_example TEXT, price INTEGER DEFAULT 0, features TEXT DEFAULT '[]', status TEXT DEFAULT 'active', sort_order INTEGER DEFAULT 0, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS capacity_purchases (id TEXT PRIMARY KEY, family_id TEXT NOT NULL, capacity INTEGER NOT NULL, price INTEGER NOT NULL, purchased_at TEXT DEFAULT now())`);
   
@@ -154,7 +158,7 @@ async function createUser(name, email, password, familyId, role = 'member') {
   return queryOne('SELECT id, name, email, family_id, role, points, avatar, created_at FROM users WHERE id = $1', [id]);
 }
 async function getUserByEmail(email) { return queryOne('SELECT * FROM users WHERE lower(email) = lower($1)', [email]); }
-async function getUserById(id) { return queryOne('SELECT id, name, email, phone, whatsapp, country, city, family_id, role, avatar, points, level, total_charged, support_spent, stars, moderator_tier, can_open_diwaniya, last_seen, currency, public_id, coins, wallet, created_at FROM users WHERE id = $1', [id]); }
+async function getUserById(id) { return queryOne('SELECT id, name, email, phone, whatsapp, country, city, family_id, role, avatar, points, level, total_charged, support_spent, stars, moderator_tier, can_open_diwaniya, last_seen, currency, public_id, coins, wallet, is_active, created_at FROM users WHERE id = $1', [id]); }
 async function getFamilyMembers(familyId) { return query("SELECT u.id, u.name, u.email, u.phone, u.whatsapp, u.role, u.avatar, u.points, u.public_id, u.last_seen, u.can_open_diwaniya, f.verif_tier as family_verif FROM users u LEFT JOIN families f ON u.family_id = f.id WHERE u.family_id = $1 ORDER BY u.role DESC, u.points DESC", [familyId]); }
 async function updateProfile(userId, data) {
   const { name, country, city, phone, whatsapp, avatar, currency } = data;
@@ -652,7 +656,7 @@ async function deleteFamily(familyId) {
   await run('DELETE FROM families WHERE id = $1', [familyId]);
   return true;
 }
-async function getAllUsersDetailed() { return query('SELECT u.id, u.name, u.email, u.phone, u.whatsapp, u.country, u.city, u.role, u.points, u.level, u.public_id, u.last_seen, u.can_open_diwaniya, f.name as family_name, f.subscription_code FROM users u LEFT JOIN families f ON u.family_id = f.id ORDER BY u.role, u.name'); }
+async function getAllUsersDetailed() { return query('SELECT u.id, u.name, u.email, u.phone, u.whatsapp, u.country, u.city, u.role, u.points, u.level, u.public_id, u.last_seen, u.can_open_diwaniya, u.is_active, f.name as family_name, f.subscription_code FROM users u LEFT JOIN families f ON u.family_id = f.id ORDER BY u.role, u.name'); }
 async function updateUserByAdmin(userId, data) {
   const { name, email, whatsapp, phone, role } = data;
   if (name !== undefined) await run('UPDATE users SET name = $1 WHERE id = $2', [name, userId]);
@@ -1269,8 +1273,9 @@ async function requestWithdrawalCoins(userId, userName, publicId, coins, rate, f
 }
 // تحديث شامل: الحالة + مدة التحويل + التاريخ + ملاحظة
 async function updateWithdrawalFull(id, status, transferDays, transferDate, adminNote) {
-  await run("UPDATE withdrawals SET status=$1, transfer_days=$2, transfer_date=$3, admin_note=$4, paid_at = CASE WHEN $1='paid' THEN now()::text ELSE paid_at END WHERE id=$5",
-    [status, transferDays || null, transferDate || null, adminNote || '', id]);
+  const now = new Date().toISOString();
+  await run("UPDATE withdrawals SET status=$1, transfer_days=$2, transfer_date=$3, admin_note=$4, paid_at = CASE WHEN $1='paid' THEN now()::text ELSE paid_at END, received_at = CASE WHEN $1 IN ('received','confirmed','processing','paid') AND received_at IS NULL THEN $6 ELSE received_at END, confirmed_at = CASE WHEN $1 IN ('confirmed','processing','paid') AND confirmed_at IS NULL THEN $6 ELSE confirmed_at END, processed_at = CASE WHEN $1 IN ('processing','paid') AND processed_at IS NULL THEN $6 ELSE processed_at END WHERE id=$5",
+    [status, transferDays || null, transferDate || null, adminNote || '', id, now]);
   return queryOne('SELECT * FROM withdrawals WHERE id = $1', [id]);
 }
 // تقارير السحوبات: يومي/أسبوعي/شهري/نصف سنوي/سنوي

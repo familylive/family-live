@@ -1374,6 +1374,7 @@
         <div id="wd-alert" style="display:none;background:rgba(255,80,80,.15);border:1px solid rgba(255,80,80,.5);color:#ff8b8b;border-radius:12px;padding:10px 14px;font-size:13px;font-weight:800;margin-bottom:10px;text-align:center">
           🔔 تنبيه: توجد طلبات سحب جديدة بانتظار المراجعة
         </div>
+        <div id="wd-overdue-alert" style="display:none;background:rgba(255,152,0,.15);border:1px solid rgba(255,152,0,.6);color:#ffb74d;border-radius:12px;padding:10px 14px;font-size:12.5px;font-weight:700;margin-bottom:10px;line-height:1.8"></div>
         <div id="wd-list"><div class="empty-text">جاري التحميل...</div></div>
         <div style="margin-top:14px;border-top:1px dashed var(--border);padding-top:12px">
           <div class="card-title" style="font-size:14px">📊 تقارير السحوبات (بالمجموع الكلي)</div>
@@ -1648,10 +1649,25 @@
       </div>
 
       <div class="card" id="admin-users-card">
-        <div class="card-title">👥 المستخدمون</div>
+        <div class="card-title">👥 المستخدمون <button class="btn btn-sm btn-success" style="float:left" onclick="toggleAddUserForm()">➕ إضافة مستخدم</button></div>
+        <div id="admin-add-user-form" style="display:none;background:var(--bg-hover);border-radius:12px;padding:12px;margin-bottom:12px">
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <input class="form-input" id="add-user-name" placeholder="الاسم" style="flex:1;min-width:120px">
+            <input class="form-input" id="add-user-email" placeholder="البريد" dir="ltr" style="flex:1;min-width:140px">
+            <input class="form-input" id="add-user-pass" placeholder="كلمة المرور" dir="ltr" style="flex:1;min-width:120px">
+            <select class="form-input" id="add-user-role" style="flex:1;min-width:130px">
+              <option value="member">👥 عضو</option>
+              <option value="moderator">🕵️ مشرف</option>
+              <option value="finance">💼 مشرف مالي</option>
+              <option value="founder">👑 مؤسس</option>
+            </select>
+          </div>
+          <button class="btn btn-accent btn-full" style="margin-top:8px" onclick="addUserAdmin()">✅ إضافة</button>
+        </div>
         <div class="agreement-tabs" style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
           <button class="btn btn-sm btn-accent" onclick="showUsersTab('admin')">🛡️ الإدارة</button>
           <button class="btn btn-sm" onclick="showUsersTab('moderator')">🕵️ المشرفون</button>
+          <button class="btn btn-sm" onclick="showUsersTab('finance')">💼 المشرفون الماليون</button>
           <button class="btn btn-sm" onclick="showUsersTab('founder')">👑 المؤسسون</button>
           <button class="btn btn-sm" onclick="showUsersTab('member')">👥 الأعضاء</button>
         </div>
@@ -2182,7 +2198,16 @@ function navigateTo(pageName) {
   if (pageName === 'admin' && state.user?.role === 'admin') loadTierSettings();
   if (pageName === 'codes' && state.isLoggedIn) loadCodesPage();
   if (pageName === 'auctions' && state.isLoggedIn) loadAuctionsPage();
-  if (pageName === 'admin' && state.user?.role === 'admin') { loadAdminPage(); loadAdminAuctions(); loadAdminFinance(); loadWdStats(); }
+  if (pageName === 'admin' && (state.user?.role === 'admin' || state.user?.role === 'finance')) {
+    if (state.user?.role === 'admin') { loadAdminPage(); loadAdminAuctions(); }
+    loadAdminFinance(); loadWdStats();
+    // المشرف المالي: القسم المالي فقط
+    document.querySelectorAll('#page-admin .card').forEach(c => {
+      if (c.id === 'admin-finance-card') c.style.display = '';
+      else if (state.user?.role === 'finance') c.style.display = 'none';
+      else c.style.display = '';
+    });
+  }
 }
 
 function toggleHeaderVisibility(pageName) {
@@ -4330,9 +4355,15 @@ async function loadWalletHistory() {
     const wd = document.getElementById('my-withdrawals');
     if (withdrawals?.length) {
       wd.innerHTML = withdrawals.map(w => {
-        const st = { pending:'⏳ قيد المراجعة', processing:'🔄 جاري التحويل', paid:'✅ تم التحويل', rejected:'❌ مرفوض' }[w.status] || w.status;
+        const st = { pending:'📤 تم الرفع', received:'📤 تم الرفع', confirmed:'📥 تم استلام الطلب', processing:'🔄 جاري معالجة الطلب', paid:'✅ تم التحويل', rejected:'❌ مرفوض' }[w.status] || w.status;
         const extra = w.transfer_date ? ' · 📅 تحويل: ' + w.transfer_date : '';
-        return '<div class="admin-family-item"><div class="admin-family-name">📤 ' + (w.coins ? Number(w.coins).toLocaleString('en') + ' كونزه' : (w.amount ? Math.round(w.amount * (parseInt(state.sarRate) || 50)).toLocaleString('en') + ' كونزه ~' : '')) + ' = ' + (Number(w.sar_net || w.amount || 0).toFixed(2)) + ' ريال <span style="font-size:11px">' + st + '</span></div><div class="admin-family-meta">' + (w.phone||'') + extra + ' · ' + (w.created_at||'') + '</div></div>';
+        const phases = ['received','confirmed','processing','paid'];
+        const curIdx = phases.indexOf(w.status);
+        const prog = curIdx >= 0 ? Math.round((curIdx + 1) / 4 * 100) : 0;
+        const bar = curIdx >= 0 && w.status !== 'rejected'
+          ? '<div style="display:flex;gap:2px;margin-top:6px">' + phases.map((p, i) => '<div style="flex:1;height:5px;border-radius:3px;background:' + (i <= curIdx ? 'linear-gradient(90deg,#22c55e,#4ade80)' : 'var(--border)') + '"></div>').join('') + '</div><div style="font-size:10px;color:var(--text-muted);margin-top:3px">' + prog + '% — ' + ({received:'تم الرفع',confirmed:'تم استلام الطلب',processing:'جاري معالجة الطلب',paid:'تم التحويل'}[w.status] || w.status) + (w.transfer_date ? ' · 📅 ' + w.transfer_date : '') + '</div>'
+          : '';
+        return '<div class="admin-family-item"><div class="admin-family-name">📤 ' + (w.coins ? Number(w.coins).toLocaleString('en') + ' كونزه' : (w.amount ? Math.round(w.amount * (parseInt(state.sarRate) || 50)).toLocaleString('en') + ' كونزه ~' : '')) + ' = ' + (Number(w.sar_net || w.amount || 0).toFixed(2)) + ' ريال <span style="font-size:11px">' + st + '</span></div><div class="admin-family-meta">' + (w.phone||'') + extra + ' · ' + (w.created_at||'') + '</div>' + bar + '</div>';
       }).join('');
     }
   } catch(e) {}
@@ -4497,12 +4528,40 @@ async function rejectPaymentAdmin(id) {
 }
 
 // ==================== USERS MANAGEMENT ====================
-let usersData = { admin: [], moderator: [], founder: [], member: [] };
+let usersData = { admin: [], moderator: [], finance: [], founder: [], member: [] };
+
+function toggleAddUserForm() {
+  const f = document.getElementById('admin-add-user-form');
+  if (f) f.style.display = f.style.display === 'none' ? 'block' : 'none';
+}
+
+async function addUserAdmin() {
+  const name = document.getElementById('add-user-name').value.trim();
+  const email = document.getElementById('add-user-email').value.trim();
+  const password = document.getElementById('add-user-pass').value.trim();
+  const role = document.getElementById('add-user-role').value;
+  if (!name || !email || !password) return showToast('املأ الاسم والبريد وكلمة المرور', 'error');
+  try {
+    const r = await api('POST', '/api/admin/users/create', { name, email, password, role });
+    showToast(r.message, 'success');
+    document.getElementById('admin-add-user-form').style.display = 'none';
+    ['add-user-name','add-user-email','add-user-pass'].forEach(i => { const el = document.getElementById(i); if (el) el.value = ''; });
+    loadAdminUsers();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function toggleUserActive(id) {
+  try {
+    const r = await api('POST', '/api/admin/users/toggle-active', { userId: id });
+    showToast(r.message, 'success');
+    loadAdminUsers();
+  } catch(e) { showToast(e.message, 'error'); }
+}
 
 async function loadAdminUsers() {
   try {
     const { users } = await api('GET', '/api/admin/users-detailed');
-    usersData = { admin: [], moderator: [], founder: [], member: [] };
+    usersData = { admin: [], moderator: [], finance: [], founder: [], member: [] };
     users.forEach(u => { if (usersData[u.role]) usersData[u.role].push(u); });
     showUsersTab('admin');
   } catch(e) { console.error('Users:', e); }
@@ -4511,12 +4570,12 @@ async function loadAdminUsers() {
 function showUsersTab(role) {
   document.querySelectorAll('#admin-users-card .agreement-tabs .btn').forEach(b => b.classList.remove('btn-accent'));
   const buttons = document.querySelectorAll('#admin-users-card .agreement-tabs .btn');
-  const idx = { admin: 0, moderator: 1, founder: 2, member: 3 }[role];
+  const idx = { admin: 0, moderator: 1, finance: 2, founder: 3, member: 4 }[role];
   if (buttons[idx]) buttons[idx].classList.add('btn-accent');
   
   const list = document.getElementById('admin-users-list');
   const data = usersData[role] || [];
-  const labels = { admin: '🛡️ الإدارة', moderator: '🕵️ المشرفون', founder: '👑 المؤسسون', member: '👥 الأعضاء' };
+  const labels = { admin: '🛡️ الإدارة', moderator: '🕵️ المشرفون', finance: '💼 المشرفون الماليون', founder: '👑 المؤسسون', member: '👥 الأعضاء' };
   if (!data.length) {
     list.innerHTML = '<div class="card-title" style="font-size:14px">' + (labels[role]||'') + '</div><div class="empty-state"><div class="empty-text">لا يوجد مستخدمون</div></div>';
     return;
@@ -4531,7 +4590,9 @@ function showUsersTab(role) {
           '<button class="btn btn-sm" onclick="editUser(\'' + u.id + '\')">✏️ تعديل</button>' +
           (u.role === 'member' ? '<button class="btn btn-sm btn-success" onclick="promoteUser(\'' + u.id + '\', \'moderator\')">⬆️ ترقية لمشرف</button>' : '') +
           (u.role === 'moderator' ? '<button class="btn btn-sm btn-secondary" onclick="promoteUser(\'' + u.id + '\', \'member\')">⬇️ عضو</button>' : '') +
-          '<button class="btn btn-sm btn-danger" onclick="banUserAdmin(\'' + u.id + '\', \'' + (u.name||'').replace(/'/g,"") + '\')">⛔ إيقاف</button>' +
+          (u.is_active == 1
+            ? '<button class="btn btn-sm btn-danger" onclick="toggleUserActive(\'' + u.id + '\')">⛔ إيقاف</button>'
+            : '<button class="btn btn-sm btn-success" onclick="toggleUserActive(\'' + u.id + '\')">✅ تنشيط</button>') +
           '<button class="btn btn-sm btn-danger" onclick="deleteUserAdmin(\'' + u.id + '\')">🗑️ حذف</button>' +
         '</div>' +
         '<div id="edit-form-' + u.id + '" style="display:none;margin-top:8px;padding:10px;background:var(--bg-hover);border-radius:var(--radius-sm)">' +

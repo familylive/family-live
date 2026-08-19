@@ -171,6 +171,10 @@ app.post('/api/auth/login', async (req, res) => {
     return res.status(400).json({ error: 'البريد غير مسجل' });
   }
 
+  if (user.is_active == 0) {
+    return res.status(403).json({ error: '⛔ حسابك موقوف — تواصل مع الإدارة' });
+  }
+
   if (!bcrypt.compareSync(password, user.password)) {
     return res.status(400).json({ error: 'كلمة المرور غير صحيحة' });
   }
@@ -939,6 +943,27 @@ app.get('/api/admin/users-detailed', authMiddleware, adminMiddleware, async (req
 });
 
 // Update user (admin) - edit, promote/demote
+app.post('/api/admin/users/create', authMiddleware, adminMiddleware, asyncHandler(async (req, res) => {
+  const { name, email, password, role } = req.body;
+  if (!name || !email || !password) return res.status(400).json({ error: 'الاسم والبريد وكلمة المرور مطلوبة' });
+  const allowedRoles = ['member', 'moderator', 'finance', 'founder'];
+  const newRole = allowedRoles.includes(role) ? role : 'member';
+  const existing = await db.getUserByEmail(email);
+  if (existing) return res.status(400).json({ error: 'البريد مستخدم مسبقاً' });
+  const user = await db.createUserByRole(email, bcrypt.hashSync(password, 10), name, newRole);
+  res.json({ message: '✅ تمت إضافة المستخدم (' + newRole + ')', user });
+}));
+
+// إيقاف/تنشيط مستخدم
+app.post('/api/admin/users/toggle-active', authMiddleware, adminMiddleware, asyncHandler(async (req, res) => {
+  const { userId } = req.body;
+  const u = await db.getUserById(userId);
+  if (!u) return res.status(404).json({ error: 'المستخدم غير موجود' });
+  const newState = u.is_active == 1 ? 0 : 1;
+  await db.runRaw('UPDATE users SET is_active = $1 WHERE id = $2', [newState, userId]);
+  res.json({ message: newState ? '✅ تم تنشيط الحساب' : '⛔ تم إيقاف الحساب', is_active: newState });
+}));
+
 app.post('/api/admin/users/update', authMiddleware, adminMiddleware, async (req, res) => {
   const { userId, name, email, whatsapp, phone, role } = req.body;
   if (!userId) return res.status(400).json({ error: 'معرف المستخدم مطلوب' });
@@ -1218,6 +1243,53 @@ app.get('/api/diwaniya/secret-room', authMiddleware, async (req, res) => {
   if (!req.user.familyId) return res.json({ enabled: false, price: 100 });
   res.json(await db.getSecretRoomStatus(req.user.familyId));
 });
+
+
+// ============ مهلة طلبات السحب: 5 أيام عمل مقسمة على المراحل ============
+const WD_SLA_DAYS = { received: 1, confirmed: 1, processing: 2, paid: 1 }; // الإجمالي 5 أيام عمل
+const WD_PHASES = ['received', 'confirmed', 'processing', 'paid'];
+
+// أيام العمل: نستثني الجمعة والسبت
+function addWorkingDays(from, days) {
+  const d = new Date(from);
+  let added = 0;
+  while (added < days) {
+    d.setDate(d.getDate() + 1);
+    const dow = d.getUTCDay();
+    if (dow !== 5 && dow !== 6) added++; // الجمعة 5، السبت 6
+  }
+  return d;
+}
+function phaseStart(w) {
+  if (w.status === 'received' || !w.status || w.status === 'pending') return new Date(w.created_at);
+  if (w.status === 'confirmed') return new Date(w.received_at || w.created_at);
+  if (w.status === 'processing') return new Date(w.confirmed_at || w.received_at || w.created_at);
+  if (w.status === 'paid') return new Date(w.processed_at || w.confirmed_at || w.received_at || w.created_at);
+  return new Date(w.created_at);
+}
+function phaseLabel(s) {
+  return { pending: 'تم الرفع', received: 'تم الرفع', confirmed: 'تم استلام الطلب', processing: 'جاري معالجة الطلب', paid: 'تم التحويل', rejected: 'مرفوض' }[s] || s;
+}
+// معلومات المهلة لكل طلب
+function wdSlaInfo(w) {
+  const status = w.status === 'pending' ? 'received' : w.status;
+  const slaDays = WD_SLA_DAYS[status] || 1;
+  const start = phaseStart(w);
+  const deadline = addWorkingDays(start, slaDays);
+  const now = new Date();
+  const overdue = status !== 'paid' && status !== 'rejected' && now > deadline;
+  const totalDeadline = addWorkingDays(new Date(w.created_at), 5);
+  return {
+    phase: status,
+    phaseLabel: phaseLabel(w.status),
+    phaseSlaDays: slaDays,
+    phaseDeadline: deadline.toISOString(),
+    totalDeadline: totalDeadline.toISOString(),
+    overdue,
+    totalOverdue: w.status !== 'paid' && w.status !== 'rejected' && now > totalDeadline,
+    remainingMs: Math.max(0, deadline.getTime() - now.getTime())
+  };
+}
 
 // ============ رفع مقطع فيديو من جهاز المؤسس (مشاهدة معاً) ============
 globalThis.watchFiles = {}; // sessionId -> { name, type, buffer, ts }
@@ -2047,21 +2119,32 @@ app.post('/api/admin/coin-packages/delete', authMiddleware, adminMiddleware, asy
   res.json({ message: '🗑️ تم الحذف' });
 });
 
-// Admin: withdrawals management
-app.get('/api/admin/withdrawals', authMiddleware, adminMiddleware, async (req, res) => {
+// Admin/مشرف مالي: withdrawals management
+function isFinanceAdmin(req, u) {
+  return u && (u.role === 'admin' || u.role === 'finance');
+}
+app.get('/api/admin/withdrawals', authMiddleware, async (req, res) => {
+  const u = await db.getUserById(req.user.id);
+  if (!isFinanceAdmin(req, u)) return res.status(403).json({ error: 'غير مصرح' });
   const withdrawals = await db.getAllWithdrawals();
   const pending = withdrawals.filter(w => w.status === 'pending').length;
-  res.json({ withdrawals, pendingCount: pending });
+  const withSla = withdrawals.map(w => ({ ...w, sla: wdSlaInfo(w) }));
+  const overdueList = withSla.filter(w => w.sla && w.sla.overdue);
+  res.json({ withdrawals: withSla, pendingCount: pending, overdueCount: overdueList.length, overdueList: overdueList.map(w => ({ id: w.id, user_name: w.user_name, coins: w.coins, net: w.sar_net || w.amount, phase: w.sla.phaseLabel, deadline: w.sla.phaseDeadline })) });
 });
-app.post('/api/admin/withdrawals/update', authMiddleware, adminMiddleware, async (req, res) => {
+app.post('/api/admin/withdrawals/update', authMiddleware, async (req, res) => {
+  const u = await db.getUserById(req.user.id);
+  if (!isFinanceAdmin(req, u)) return res.status(403).json({ error: 'غير مصرح' });
   const { id, status, transfer_days, transfer_date, admin_note } = req.body;
-  if (!['pending','processing','paid','rejected'].includes(status)) return res.status(400).json({ error: 'حالة غير صحيحة' });
+  if (!['pending','received','confirmed','processing','paid','rejected'].includes(status)) return res.status(400).json({ error: 'حالة غير صحيحة' });
   const withdrawal = await db.updateWithdrawalFull(id, status, transfer_days, transfer_date, admin_note);
   res.json({ message: '✅ تم تحديث طلب السحب', withdrawal });
 });
 
 // Admin: تقارير السحوبات (يومي/أسبوعي/شهري/نصف سنوي/سنوي)
-app.get('/api/admin/withdrawals/stats', authMiddleware, adminMiddleware, async (req, res) => {
+app.get('/api/admin/withdrawals/stats', authMiddleware, async (req, res) => {
+  const u = await db.getUserById(req.user.id);
+  if (!isFinanceAdmin(req, u)) return res.status(403).json({ error: 'غير مصرح' });
   const period = ['daily','weekly','monthly','half','year'].includes(req.query.period) ? req.query.period : 'monthly';
   res.json({ stats: await db.getWithdrawalStats(period) });
 });
