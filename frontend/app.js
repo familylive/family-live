@@ -5324,7 +5324,7 @@ async function loadAdminFinance() {
           wdStatusHtml(w.status) +
         '</div>' +
         '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:6px;font-size:12px">' +
-          '<span>🪙 <b>' + (w.coins ? Number(w.coins).toLocaleString('en') : '-') + '</b></span>' +
+          '<span>🪙 <b>' + (w.coins ? Number(w.coins).toLocaleString('en') : (w.amount ? Math.round(w.amount * (parseInt(state.sarRate) || 50)).toLocaleString('en') + ' ~' : '-')) + '</b></span>' +
           '<span>💵 إجمالي: <b>' + Number(w.sar_gross || w.amount || 0).toFixed(2) + ' ريال</b></span>' +
           '<span style="color:#ff6b6b">🏢 حسم 30%: <b>' + Number(w.commission_sar || 0).toFixed(2) + '</b></span>' +
           '<span style="color:#22c55e;font-weight:800">✅ صافي: <b>' + Number(w.sar_net || w.amount || 0).toFixed(2) + ' ريال</b></span>' +

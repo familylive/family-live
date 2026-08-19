@@ -4332,7 +4332,7 @@ async function loadWalletHistory() {
       wd.innerHTML = withdrawals.map(w => {
         const st = { pending:'⏳ قيد المراجعة', processing:'🔄 جاري التحويل', paid:'✅ تم التحويل', rejected:'❌ مرفوض' }[w.status] || w.status;
         const extra = w.transfer_date ? ' · 📅 تحويل: ' + w.transfer_date : '';
-        return '<div class="admin-family-item"><div class="admin-family-name">📤 ' + (w.coins ? w.coins.toLocaleString('en') + ' كونزه' : '') + ' = ' + (Number(w.sar_net || w.amount || 0).toFixed(2)) + ' ريال <span style="font-size:11px">' + st + '</span></div><div class="admin-family-meta">' + (w.phone||'') + extra + ' · ' + (w.created_at||'') + '</div></div>';
+        return '<div class="admin-family-item"><div class="admin-family-name">📤 ' + (w.coins ? Number(w.coins).toLocaleString('en') + ' كونزه' : (w.amount ? Math.round(w.amount * (parseInt(state.sarRate) || 50)).toLocaleString('en') + ' كونزه ~' : '')) + ' = ' + (Number(w.sar_net || w.amount || 0).toFixed(2)) + ' ريال <span style="font-size:11px">' + st + '</span></div><div class="admin-family-meta">' + (w.phone||'') + extra + ' · ' + (w.created_at||'') + '</div></div>';
       }).join('');
     }
   } catch(e) {}
