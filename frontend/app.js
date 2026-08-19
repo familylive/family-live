@@ -5682,8 +5682,11 @@ async function loadAdminGifts() {
         : notStarted ? '<span style="color:#ffb74d;font-weight:800">🕐 لم تبدأ</span>'
         : '<span style="color:var(--success);font-weight:800">✅ مفعلة</span>';
       const fmt = d => d ? d.toLocaleString('ar-SA-u-nu-latn', { year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' }) : '—';
+      const gIcon = g.gift_image
+        ? '<img src="' + g.gift_image + '" style="width:30px;height:30px;object-fit:contain;vertical-align:middle;border-radius:8px;margin-left:4px">'
+        : (g.emoji || '🎁');
       return '<div class="admin-family-item">' +
-        '<div class="admin-family-name">' + (g.emoji || '🎁') + ' <b>' + escapeHtml(g.name) + '</b> — ' + (parseInt(g.coins)||0).toLocaleString('en') + ' كونزه' + (parseInt(g.price) ? ' · 💰' + g.price + ' ريال' : '') +
+        '<div class="admin-family-name">' + gIcon + ' <b>' + escapeHtml(g.name) + '</b> — ' + (parseInt(g.coins)||0).toLocaleString('en') + ' كونزه' + (parseInt(g.price) ? ' · 💰' + g.price + ' ريال' : '') +
           '<div style="font-size:11px;color:var(--text-muted);margin-top:2px">📅 من ' + fmt(s) + ' إلى ' + fmt(e) + '</div>' +
           '<div style="margin-top:2px">' + stBadge + '</div>' +
         '</div>' +
@@ -5702,9 +5705,19 @@ async function loadAdminGifts() {
   }
 }
 
+function pickGiftEmoji(e) {
+  const el = document.getElementById('gift-emoji');
+  if (el) el.value = e;
+  showToast('تم اختيار الرمز ' + e, 'success');
+}
 function resetGiftForm() {
   giftEditId = null;
-  ['gift-name','gift-emoji','gift-coins','gift-price','gift-start','gift-end'].forEach(id => document.getElementById(id).value = '');
+  giftImageBase64 = '';
+  ['gift-name','gift-emoji','gift-coins','gift-price','gift-start','gift-end'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  const imgFile = document.getElementById('gift-image-file');
+  if (imgFile) imgFile.value = '';
+  const prev = document.getElementById('gift-image-preview');
+  if (prev) { prev.style.display = 'none'; prev.src = ''; }
   const st = document.getElementById('gift-status');
   if (st) st.value = 'active';
   const btn = document.getElementById('gift-save-btn');
@@ -5725,7 +5738,8 @@ async function saveGiftAdmin() {
     price: parseInt(document.getElementById('gift-price').value) || 0,
     start_date: document.getElementById('gift-start').value || null,
     end_date: document.getElementById('gift-end').value || null,
-    status: document.getElementById('gift-status').value
+    status: document.getElementById('gift-status').value,
+    gift_image: giftImageBase64 || undefined
   };
   // تحقق: النهاية بعد البداية
   if (payload.start_date && payload.end_date && payload.end_date < payload.start_date) {
@@ -5753,6 +5767,14 @@ async function editGiftAdmin(id) {
     document.getElementById('gift-price').value = g.price || '';
     document.getElementById('gift-start').value = g.start_date || '';
     document.getElementById('gift-end').value = g.end_date || '';
+    giftImageBase64 = '';
+    const imgFile = document.getElementById('gift-image-file');
+    if (imgFile) imgFile.value = '';
+    const prev = document.getElementById('gift-image-preview');
+    if (prev) {
+      if (g.gift_image) { prev.src = g.gift_image; prev.style.display = 'block'; giftImageBase64 = g.gift_image; }
+      else { prev.style.display = 'none'; prev.src = ''; }
+    }
     const st = document.getElementById('gift-status');
     if (st) st.value = g.status || 'active';
     const btn = document.getElementById('gift-save-btn');
