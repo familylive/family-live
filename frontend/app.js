@@ -4011,9 +4011,15 @@ function updateTikTokLiveInfo() {
   const famEl = document.getElementById('tt-host-family');
   if (famEl) {
     famEl.textContent = state.family?.name || '';
-    // شارة مستوى/توثيق العائلة بجانب الاسم
+    // شارة مستوى/توثيق العائلة بجانب الاسم + مستوى العائلة
     const fv = state.family?.verif_tier || 'none';
-    if (fv !== 'none') famEl.innerHTML = (state.family?.name || '') + ' ' + verifBadge(fv, 15);
+    const flv = parseInt(state.family?.family_level) || 0;
+    let famHtml = escapeHtml(state.family?.name || '');
+    if (fv !== 'none') famHtml += ' ' + verifBadge(fv, 15);
+    if (flv >= 1 && flv <= 100) {
+      famHtml += ' <img src="/assets/levels/level_' + flv + '.' + (flv >= 1 && flv <= 10 ? 'gif' : 'png') + '?v=5" style="width:40px;height:15px;vertical-align:middle"> <span class="tt-host-lv-num">' + flv + '</span>';
+    }
+    famEl.innerHTML = famHtml;
   }
 }
 
@@ -4114,6 +4120,10 @@ function setTikTokMode(on) {
   if (on) {
     setTimeout(syncTikTokChat, 300);
     ensureAudioOverlays();
+    setTimeout(() => { if (!recentCommentsLoaded) loadRecentComments(); }, 800);
+    showChatPanel();
+  } else {
+    recentCommentsLoaded = false;
   }
   if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
 }
@@ -5553,4 +5563,102 @@ async function convertSupportCoins() {
     document.getElementById('support-convert-banner').style.display = 'none';
     loadWallet();
   } catch (e) { showToast(e.message, 'error'); }
+}
+
+// ==================== 💬 سحب الكومنتات (يسار للإخفاء / يمين للإظهار) ====================
+let chatDrag = null;
+function initChatSwipe() {
+  const chat = document.getElementById('tiktok-chat');
+  const tab = document.getElementById('tt-chat-tab');
+  if (!chat) return;
+  for (const el of [chat, tab]) {
+    if (!el) continue;
+    el.addEventListener('pointerdown', (e) => {
+      chatDrag = { startX: e.clientX, startY: e.clientY, dx: 0, dy: 0, active: false, el };
+      try { el.setPointerCapture(e.pointerId); } catch (err) {}
+    });
+    el.addEventListener('pointermove', (e) => {
+      if (!chatDrag) return;
+      chatDrag.dx = e.clientX - chatDrag.startX;
+      chatDrag.dy = e.clientY - chatDrag.startY;
+      if (!chatDrag.active && Math.abs(chatDrag.dx) > 14 && Math.abs(chatDrag.dx) > Math.abs(chatDrag.dy)) {
+        chatDrag.active = true;
+        if (chatDrag.el === tab) { // سحب يمين على التبويب → فتح
+          showChatPanel();
+          chat.classList.add('dragging');
+        } else {
+          chat.classList.add('dragging');
+        }
+      }
+      if (chatDrag.active && chatDrag.el === chat) {
+        chat.style.transform = 'translateX(' + Math.min(chatDrag.dx, 0) + 'px)';
+      }
+    });
+    const endDrag = () => {
+      if (!chatDrag) return;
+      const dx = chatDrag.dx, el2 = chatDrag.el;
+      chatDrag = null;
+      chat.classList.remove('dragging');
+      if (el2 === chat) {
+        if (dx < -chat.offsetWidth * 0.35) hideChatPanel();
+        else { chat.style.transform = ''; }
+      } else if (el2 === tab) {
+        // بعد أي سحب/نقر على التبويب: نضمن ظهور الكومنت واختفاء التبويب
+        showChatPanel();
+      }
+    };
+    el.addEventListener('pointerup', endDrag);
+    el.addEventListener('pointercancel', endDrag);
+  }
+}
+function hideChatPanel() {
+  const chat = document.getElementById('tiktok-chat');
+  const tab = document.getElementById('tt-chat-tab');
+  if (!chat) return;
+  chat.classList.add('chat-hidden');
+  chat.style.transform = '';
+  if (tab) tab.style.display = 'flex';
+}
+function showChatPanel() {
+  const chat = document.getElementById('tiktok-chat');
+  const tab = document.getElementById('tt-chat-tab');
+  if (!chat) return;
+  chat.classList.remove('chat-hidden');
+  chat.style.transform = '';
+  if (tab) tab.style.display = 'none';
+}
+window.addEventListener('load', () => { setTimeout(initChatSwipe, 500); });
+
+// ==================== ⏫ ترجيع آخر 20 كومنت ====================
+let recentCommentsLoaded = false;
+async function loadRecentComments() {
+  if (!state.activeSession) return showToast('ادخل البث أولاً', 'error');
+  try {
+    const r = await api('GET', '/api/diwaniya/messages/' + encodeURIComponent(state.activeSession.id) + '?limit=20');
+    const msgs = r.messages || [];
+    const list = document.getElementById('tiktok-chat-list');
+    if (!list) return;
+    const oldBlock = document.getElementById('tt-recent-block');
+    if (oldBlock) oldBlock.remove();
+    if (!msgs.length) return showToast('لا توجد كومنتات سابقة', 'info');
+    const block = document.createElement('div');
+    block.id = 'tt-recent-block';
+    const divider = document.createElement('div');
+    divider.className = 'tt-chat-divider';
+    divider.textContent = '⏫ كومنتات سابقة (' + msgs.length + ')';
+    block.appendChild(divider);
+    for (const m of msgs) block.appendChild(buildHistoryMsg(m));
+    list.insertBefore(block, list.firstChild);
+    recentCommentsLoaded = true;
+    const btn = document.getElementById('tt-chat-history-btn');
+    if (btn) btn.style.display = 'none';
+  } catch (e) { showToast(e.message, 'error'); }
+}
+function buildHistoryMsg(m) {
+  const msg = document.createElement('div');
+  msg.className = 'tiktok-chat-msg' + (m.user_id === state.user?.id ? ' mine' : '');
+  const lv = parseInt(m.user_level) || 0;
+  const lvImg = (lv >= 1 && lv <= 100) ? '<img src="/assets/levels/level_' + lv + '.' + (lv >= 1 && lv <= 10 ? 'gif' : 'png') + '?v=5" style="width:32px;height:12px;vertical-align:middle">' : '';
+  msg.innerHTML = '<span class="tiktok-chat-name">' + escapeHtml(m.user_name || '') + '</span> ' + lvImg + verifBadge(m.family_verif || 'none', 16) + escapeHtml(m.message || '');
+  return msg;
 }

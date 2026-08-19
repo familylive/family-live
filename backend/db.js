@@ -184,7 +184,9 @@ async function createFamily(name, subscriptionCode) {
   await run('UPDATE subscription_codes SET used = 1, family_id = $1 WHERE code = $2', [id, subscriptionCode]);
   return queryOne('SELECT * FROM families WHERE id = $1', [id]);
 }
-async function getFamily(id) { return queryOne('SELECT * FROM families WHERE id = $1', [id]); }
+async function getFamily(id) {
+  return queryOne("SELECT f.*, LEAST(COALESCE((SELECT SUM(level) FROM users WHERE family_id = f.id), 0), 100) AS family_level FROM families f WHERE f.id = $1", [id]);
+}
 async function validateSubscriptionCode(code) { return queryOne("SELECT * FROM subscription_codes WHERE code = $1 AND (used = 0 OR used IS NULL) AND (available_after IS NULL OR available_after::timestamptz <= now())", [code]); }
 async function updateFamilyFounder(familyId, userId) { await run('UPDATE families SET founder_id = $1 WHERE id = $2', [userId, familyId]); }
 async function leaveFamily(userId) {
@@ -368,6 +370,7 @@ async function addDiwaniyaMessage(sessionId, userId, message) {
   return queryOne('SELECT dm.*, u.name as user_name, u.avatar, u.level as user_level, u.role as user_role, f.verif_tier as family_verif FROM diwaniya_messages dm JOIN users u ON dm.user_id = u.id LEFT JOIN families f ON u.family_id = f.id WHERE dm.id = $1', [id]);
 }
 async function getDiwaniyaMessages(sessionId) { return query('SELECT dm.*, u.name as user_name, u.avatar, u.level as user_level, u.role as user_role, f.verif_tier as family_verif FROM diwaniya_messages dm JOIN users u ON dm.user_id = u.id LEFT JOIN families f ON u.family_id = f.id WHERE dm.session_id = $1 ORDER BY dm.created_at ASC', [sessionId]); }
+async function getRecentDiwaniyaMessages(sessionId, limit) { return query('SELECT * FROM (SELECT dm.*, u.name as user_name, u.avatar, u.level as user_level, u.role as user_role, f.verif_tier as family_verif FROM diwaniya_messages dm JOIN users u ON dm.user_id = u.id LEFT JOIN families f ON u.family_id = f.id WHERE dm.session_id = $1 ORDER BY dm.created_at DESC LIMIT $2) sub ORDER BY created_at ASC', [sessionId, limit]); }
 
 // =============== CHALLENGES ===============
 async function createChallenge(familyId, gameType, challengerId, opponentId, points = 10) {
@@ -1462,7 +1465,7 @@ module.exports = {
   createFamily, getFamily, validateSubscriptionCode, updateFamilyFounder, leaveFamily,
   generateSubscriptionCodes, generatePremiumCode, generateSpecialCodes, addCustomCode, getAvailablePremiumCodes, purchaseCode, getUserCodes, pinPremiumCode, getFirstAvailablePremiumCode, updatePrice, getFamilyWhatsappNumbers, getPublicMemberProfile,
   createInvitation, createInvitationByPhone, getInvitationsByFamily, getInvitationByToken, acceptInvitation,
-  openDiwaniya, closeDiwaniya, getActiveDiwaniya, getDiwaniyaSessionById, verifyDiwaniyaCode, getDiwaniyaHistory, addDiwaniyaMessage, getDiwaniyaMessages,
+  openDiwaniya, closeDiwaniya, getActiveDiwaniya, getDiwaniyaSessionById, verifyDiwaniyaCode, getDiwaniyaHistory, addDiwaniyaMessage, getDiwaniyaMessages, getRecentDiwaniyaMessages,
   createChallenge, respondToChallenge, completeChallenge, getFamilyChallenges, getPendingChallenges, getFamilyLeaderboard,
   createAuction, getActiveAuctions, getPinnedAuction, setAuctionPinned, getAllAuctions, getAuctionById, joinAuction, placeBid, endAuction, confirmAuctionPayment, cancelAuction, getAuctionBids, isAuctionParticipant, getAvailableAuctionCodes, getAuctionParticipants, getLastBidder, releaseAuctionCode,
   getAllFamilies, updateFamilyData, setFamilyStatus, deleteFamily, getAllUsersDetailed, updateUserByAdmin, deleteUserByAdmin, createAdminUser, createUserByRole, getAdminStats,

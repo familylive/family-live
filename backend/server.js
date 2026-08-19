@@ -2635,7 +2635,8 @@ app.get('/api/diwaniya/history', authMiddleware, async (req, res) => {
 
 // Get diwaniya messages
 app.get('/api/diwaniya/messages/:sessionId', authMiddleware, async (req, res) => {
-  const messages = await db.getDiwaniyaMessages(req.params.sessionId);
+  const limit = parseInt(req.query.limit);
+  const messages = limit ? await db.getRecentDiwaniyaMessages(req.params.sessionId, Math.min(limit, 50)) : await db.getDiwaniyaMessages(req.params.sessionId);
   res.json({ messages });
 });
 

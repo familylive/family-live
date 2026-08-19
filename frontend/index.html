@@ -786,8 +786,11 @@
               <div class="tt-like-count" id="tt-like-count">0</div>
             </div>
             <div id="tt-hearts-layer" class="tt-hearts-layer"></div>
+            <div class="tt-chat-tab" id="tt-chat-tab" onclick="showChatPanel()" style="display:none" title="إظهار الكومنتات">💬</div>
             <!-- TikTok chat overlay: comments over the black screen -->
             <div id="tiktok-chat" class="tiktok-chat">
+              <div class="tt-chat-grip" id="tt-chat-grip"><span>☰</span> اسحب يساراً للإخفاء — يميناً للإظهار</div>
+              <button class="tt-chat-history-btn" id="tt-chat-history-btn" onclick="loadRecentComments()">⏫ عرض آخر 20 كومنت</button>
               <div id="tiktok-chat-list" class="tiktok-chat-list"></div>
               <div class="tiktok-chat-row">
                 <input id="tiktok-chat-input" class="form-input" placeholder="اكتب رسالة..." onkeydown="if(event.key==='Enter')sendTikTokChat()">
