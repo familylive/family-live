@@ -1260,7 +1260,7 @@ async function requestWithdrawalCoins(userId, userName, publicId, coins, rate, f
   const w = await getWallet(userId);
   if (!w) return { error: 'لا يوجد رصيد' };
   if (w.coins < coins) {
-    return { error: '⚠️ لم يكتمل المبلغ لسحب الرصيد — رصيدك ' + Number(w.coins).toLocaleString('en') + ' كونزه والمطلوب ' + Number(coins).toLocaleString('en') + ' كونزه' };
+    return { error: '⚠️ الحساب لا يغطي هذا السحب — لا يوجد رصيد كافٍ (رصيدك ' + Number(w.coins).toLocaleString('en') + ' كونزه والمطلوب ' + Number(coins).toLocaleString('en') + ' كونزه)' };
   }
   const gross = Math.round(coins * rate * 100) / 100;              // القيمة بالريال قبل الحسم
   const commission = Math.round(gross * feePct) / 100;             // حصة الموقع (feePct = 30%) — تُحسم من العميل
