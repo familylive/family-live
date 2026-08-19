@@ -1258,11 +1258,14 @@ async function updateWithdrawal(id, status) {
 // سحب بالكونزات: حساب الإجمالي وحسم نسبة الموقع (30%) والصافي
 async function requestWithdrawalCoins(userId, userName, publicId, coins, rate, feePct, phone) {
   const w = await getWallet(userId);
-  if (!w || w.coins < coins) return { error: 'رصيد الكوينزات لا يكفي' };
+  if (!w) return { error: 'لا يوجد رصيد' };
+  if (w.coins < coins) {
+    return { error: '⚠️ لم يكتمل المبلغ لسحب الرصيد — رصيدك ' + Number(w.coins).toLocaleString('en') + ' كونزه والمطلوب ' + Number(coins).toLocaleString('en') + ' كونزه' };
+  }
   const gross = Math.round(coins * rate * 100) / 100;              // القيمة بالريال قبل الحسم
-  const commission = Math.round(gross * feePct) / 100;             // حصة الموقع (feePct = 30%)
-  const net = Math.round((gross - commission) * 100) / 100;        // الصافي للمستخدم
-  if (net < 10) return { error: 'الحد الأدنى للسحب 10 ريال صافي' };
+  const commission = Math.round(gross * feePct) / 100;             // حصة الموقع (feePct = 30%) — تُحسم من العميل
+  const net = Math.round((gross - commission) * 100) / 100;        // الصافي للمستخدم بعد حسم رسوم الموقع الإدارية
+  if (net < 50) return { error: 'الحد الأدنى للسحب 50 ريال صافي (بعد حسم 30%)' };
   await run('UPDATE users SET coins = coins - $1 WHERE id = $2', [coins, userId]);
   const id = uuidv4();
   await run("INSERT INTO withdrawals (id, user_id, user_name, amount, coins, sar_gross, commission_pct, commission_sar, sar_net, public_id, phone, status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'pending')",

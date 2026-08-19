@@ -1220,8 +1220,9 @@
         <div id="withdraw-calc" style="display:none;background:var(--bg-hover);border-radius:10px;padding:10px;font-size:12.5px;margin-bottom:8px">
           <div style="display:flex;justify-content:space-between"><span>🪙 الكونزات المحولة</span><b id="wc-coins">0</b></div>
           <div style="display:flex;justify-content:space-between"><span>💵 القيمة بالريال</span><b id="wc-gross">0 ريال</b></div>
-          <div style="display:flex;justify-content:space-between"><span>🏢 حسم الموقع 30%</span><b style="color:#ff6b6b" id="wc-commission">0 ريال</b></div>
+          <div style="display:flex;justify-content:space-between"><span>🏢 رسوم الموقع الإدارية 30% (تُحسم منك)</span><b style="color:#ff6b6b" id="wc-commission">0 ريال</b></div>
           <div style="display:flex;justify-content:space-between;font-weight:900;color:var(--success)"><span>✅ الصافي لك</span><b id="wc-net">0 ريال</b></div>
+          <div id="wc-min-note" style="display:none;margin-top:6px;background:rgba(255,80,80,.12);color:#ff8b8b;border-radius:8px;padding:6px 10px;font-size:11px;font-weight:800;text-align:center">⚠️ الحد الأدنى للسحب 50 ريال صافي</div>
         </div>
         <button class="btn btn-primary btn-full" onclick="requestWithdraw()">📤 تقديم طلب السحب</button>
         <div id="my-withdrawals" style="margin-top:10px"></div>
@@ -4398,6 +4399,8 @@ function calcWithdrawPreview() {
   document.getElementById('wc-gross').textContent = gross.toFixed(2) + ' ريال';
   document.getElementById('wc-commission').textContent = commission.toFixed(2) + ' ريال';
   document.getElementById('wc-net').textContent = net.toFixed(2) + ' ريال';
+  const minNote = document.getElementById('wc-min-note');
+  if (minNote) minNote.style.display = net < 50 ? 'block' : 'none';
   box.style.display = 'block';
 }
 
