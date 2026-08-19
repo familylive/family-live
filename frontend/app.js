@@ -5662,3 +5662,122 @@ function buildHistoryMsg(m) {
   msg.innerHTML = '<span class="tiktok-chat-name">' + escapeHtml(m.user_name || '') + '</span> ' + lvImg + verifBadge(m.family_verif || 'none', 16) + escapeHtml(m.message || '');
   return msg;
 }
+
+// ==================== 🎁 إدارة الهدايا (لوحة التحكم) ====================
+let giftEditId = null;
+async function loadAdminGifts() {
+  try {
+    const { gifts } = await api('GET', '/api/admin/gift-items');
+    const list = document.getElementById('admin-gifts-list');
+    if (!list) return;
+    if (!gifts?.length) { list.innerHTML = '<div class="empty-text">لا توجد هدايا — أضف أول هدية من الأعلى</div>'; return; }
+    const now = Date.now();
+    list.innerHTML = gifts.map(g => {
+      const s = g.start_date ? new Date(g.start_date) : null;
+      const e = g.end_date ? new Date(g.end_date) : null;
+      const notStarted = s && s.getTime() > now;
+      const expired = e && e.getTime() < now;
+      const stBadge = g.status !== 'active' ? '<span style="color:#ff6b6b;font-weight:800">⛔ موقوفة</span>'
+        : expired ? '<span style="color:#ff6b6b;font-weight:800">⏰ منتهية</span>'
+        : notStarted ? '<span style="color:#ffb74d;font-weight:800">🕐 لم تبدأ</span>'
+        : '<span style="color:var(--success);font-weight:800">✅ مفعلة</span>';
+      const fmt = d => d ? d.toLocaleString('ar-SA-u-nu-latn', { year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' }) : '—';
+      return '<div class="admin-family-item">' +
+        '<div class="admin-family-name">' + (g.emoji || '🎁') + ' <b>' + escapeHtml(g.name) + '</b> — ' + (parseInt(g.coins)||0).toLocaleString('en') + ' كونزه' + (parseInt(g.price) ? ' · 💰' + g.price + ' ريال' : '') +
+          '<div style="font-size:11px;color:var(--text-muted);margin-top:2px">📅 من ' + fmt(s) + ' إلى ' + fmt(e) + '</div>' +
+          '<div style="margin-top:2px">' + stBadge + '</div>' +
+        '</div>' +
+        '<div class="admin-family-actions">' +
+          '<button class="btn btn-sm" onclick="editGiftAdmin(\'' + g.id + '\')">✏️ تعديل</button>' +
+          (g.status === 'active'
+            ? '<button class="btn btn-sm" onclick="toggleGiftAdmin(\'' + g.id + '\',\'inactive\')">⛔ إيقاف</button>'
+            : '<button class="btn btn-sm" style="color:var(--success)" onclick="toggleGiftAdmin(\'' + g.id + '\',\'active\')">✅ تفعيل</button>') +
+          '<button class="btn btn-sm btn-danger" onclick="deleteGiftAdmin(\'' + g.id + '\')">🗑️ حذف</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  } catch (e) {
+    const list = document.getElementById('admin-gifts-list');
+    if (list) list.innerHTML = '<div class="empty-text">تعذر التحميل: ' + escapeHtml(e.message) + '</div>';
+  }
+}
+
+function resetGiftForm() {
+  giftEditId = null;
+  ['gift-name','gift-emoji','gift-coins','gift-price','gift-start','gift-end'].forEach(id => document.getElementById(id).value = '');
+  const st = document.getElementById('gift-status');
+  if (st) st.value = 'active';
+  const btn = document.getElementById('gift-save-btn');
+  if (btn) btn.textContent = '➕ إضافة هدية';
+  const cb = document.getElementById('gift-cancel-btn');
+  if (cb) cb.style.display = 'none';
+}
+
+async function saveGiftAdmin() {
+  const name = document.getElementById('gift-name').value.trim();
+  const coins = document.getElementById('gift-coins').value;
+  if (!name) return showToast('اسم الهدية مطلوب', 'error');
+  if (!coins || parseInt(coins) < 1) return showToast('عدد الكونزات مطلوب', 'error');
+  const payload = {
+    name,
+    emoji: document.getElementById('gift-emoji').value.trim() || '🎁',
+    coins: parseInt(coins),
+    price: parseInt(document.getElementById('gift-price').value) || 0,
+    start_date: document.getElementById('gift-start').value || null,
+    end_date: document.getElementById('gift-end').value || null,
+    status: document.getElementById('gift-status').value
+  };
+  // تحقق: النهاية بعد البداية
+  if (payload.start_date && payload.end_date && payload.end_date < payload.start_date) {
+    return showToast('⚠️ تاريخ الانتهاء قبل تاريخ البداية — راجع التواريخ', 'error');
+  }
+  try {
+    const r = giftEditId
+      ? await api('POST', '/api/admin/gift-items/update', { ...payload, id: giftEditId })
+      : await api('POST', '/api/admin/gift-items/add', payload);
+    showToast(r.message, 'success');
+    resetGiftForm();
+    loadAdminGifts();
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+async function editGiftAdmin(id) {
+  try {
+    const { gifts } = await api('GET', '/api/admin/gift-items');
+    const g = gifts.find(x => x.id === id);
+    if (!g) return showToast('الهدية غير موجودة', 'error');
+    giftEditId = id;
+    document.getElementById('gift-name').value = g.name || '';
+    document.getElementById('gift-emoji').value = g.emoji || '';
+    document.getElementById('gift-coins').value = g.coins || '';
+    document.getElementById('gift-price').value = g.price || '';
+    document.getElementById('gift-start').value = g.start_date || '';
+    document.getElementById('gift-end').value = g.end_date || '';
+    const st = document.getElementById('gift-status');
+    if (st) st.value = g.status || 'active';
+    const btn = document.getElementById('gift-save-btn');
+    if (btn) btn.textContent = '💾 حفظ التعديل';
+    const cb = document.getElementById('gift-cancel-btn');
+    if (cb) cb.style.display = '';
+    document.getElementById('gift-name').scrollIntoView({ block: 'center', behavior: 'smooth' });
+    showToast('✏️ عدّل البيانات ثم اضغط حفظ', 'success');
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+async function toggleGiftAdmin(id, status) {
+  try {
+    const r = await api('POST', '/api/admin/gift-items/update', { id, status });
+    showToast(status === 'active' ? '✅ تم تفعيل الهدية' : '⛔ تم إيقاف الهدية', 'success');
+    loadAdminGifts();
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+async function deleteGiftAdmin(id) {
+  if (!confirm('🗑️ حذف هذه الهدية نهائياً؟')) return;
+  try {
+    const r = await api('POST', '/api/admin/gift-items/delete', { id });
+    showToast(r.message, 'success');
+    if (giftEditId === id) resetGiftForm();
+    loadAdminGifts();
+  } catch (e) { showToast(e.message, 'error'); }
+}

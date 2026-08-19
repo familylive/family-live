@@ -1620,6 +1620,32 @@
         <div id="admin-packages-list" style="margin-top:12px"></div>
       </div>
 
+      <div class="card" id="admin-gifts-card" style="border:1.5px solid rgba(232,48,100,.45)">
+        <div class="card-title">🎁 إدارة الهدايا</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">أضف الهدايا وحدد عدد الكونزات وتواريخ البدء والانتهاء — الهدية تختفي تلقائياً خارج الفترة (المفعلة فقط تظهر للأعضاء)</div>
+        <div id="gift-form-box" style="background:rgba(232,48,100,.06);border:1px dashed rgba(232,48,100,.35);border-radius:10px;padding:10px;margin-bottom:10px">
+          <div style="display:flex;gap:8px">
+            <div class="form-group" style="flex:1"><label>اسم الهدية</label><input class="form-input" id="gift-name" type="text" placeholder="مثال: وردة"></div>
+            <div class="form-group" style="flex:0 0 70px"><label>الرمز</label><input class="form-input" id="gift-emoji" type="text" placeholder="🌹"></div>
+            <div class="form-group" style="flex:1"><label>عدد الكونزات</label><input class="form-input" id="gift-coins" type="number" placeholder="100"></div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <div class="form-group" style="flex:1"><label>السعر (ريال، اختياري)</label><input class="form-input" id="gift-price" type="number" placeholder="0"></div>
+            <div class="form-group" style="flex:1"><label>🟢 تبدأ من (اختياري)</label><input class="form-input" id="gift-start" type="datetime-local"></div>
+            <div class="form-group" style="flex:1"><label>🔴 تنتهي في (اختياري)</label><input class="form-input" id="gift-end" type="datetime-local"></div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:flex-end">
+            <div class="form-group" style="flex:1"><label>الحالة</label><select class="form-input" id="gift-status">
+              <option value="active">✅ مفعلة</option>
+              <option value="inactive">⛔ موقوفة</option>
+            </select></div>
+            <button class="btn btn-accent" id="gift-save-btn" onclick="saveGiftAdmin()">➕ إضافة هدية</button>
+            <button class="btn btn-sm" id="gift-cancel-btn" style="display:none" onclick="resetGiftForm()">إلغاء</button>
+          </div>
+        </div>
+        <div id="admin-gifts-list"><div class="empty-text">جاري التحميل...</div></div>
+      </div>
+
       <div class="card" id="admin-coins-card">
         <div class="card-title">💰 إدارة الكونزات</div>
         <div class="form-group"><label>سعر التحويل (1 <img src="/assets/coin.png" class="coin-ico" alt=""> = ? ريال)</label>
@@ -2260,7 +2286,7 @@ function navigateTo(pageName) {
   if (pageName === 'codes' && state.isLoggedIn) loadCodesPage();
   if (pageName === 'auctions' && state.isLoggedIn) loadAuctionsPage();
   if (pageName === 'admin' && (state.user?.role === 'admin' || state.user?.role === 'finance')) {
-    if (state.user?.role === 'admin') { loadAdminPage(); loadAdminAuctions(); loadSmtpSettings(); }
+    if (state.user?.role === 'admin') { loadAdminPage(); loadAdminAuctions(); loadSmtpSettings(); loadAdminGifts(); }
     loadAdminFinance(); loadWdStats();
     // المشرف المالي: القسم المالي فقط
     document.querySelectorAll('#page-admin .card').forEach(c => {

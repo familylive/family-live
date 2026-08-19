@@ -145,6 +145,8 @@ async function initDb() {
   try { await run("ALTER TABLE diwaniya_sessions ADD COLUMN IF NOT EXISTS video_limit INTEGER DEFAULT 6"); } catch(e) {}
   try { await run("ALTER TABLE gift_items ADD COLUMN IF NOT EXISTS gift_image TEXT"); } catch(e) {}
   try { await run("ALTER TABLE gift_items ADD COLUMN IF NOT EXISTS price INTEGER DEFAULT 0"); } catch(e) {}
+  try { await run("ALTER TABLE gift_items ADD COLUMN IF NOT EXISTS start_date TEXT"); } catch(e) {}
+  try { await run("ALTER TABLE gift_items ADD COLUMN IF NOT EXISTS end_date TEXT"); } catch(e) {}
   try { await run("ALTER TABLE ads ADD COLUMN IF NOT EXISTS start_time TEXT"); } catch(e) {}
   try { await run("ALTER TABLE ads ADD COLUMN IF NOT EXISTS end_time TEXT"); } catch(e) {}
   try { await run("ALTER TABLE ads ADD COLUMN IF NOT EXISTS views INTEGER DEFAULT 0"); } catch(e) {}
@@ -1164,21 +1166,33 @@ async function getDiwaniyaRestrictions(sessionId) {
   return query('SELECT r.*, u.name as user_name FROM diwaniya_restrictions r JOIN users u ON r.user_id = u.id WHERE r.session_id = $1', [sessionId]);
 }
 
-async function getGiftItems() { return query("SELECT * FROM gift_items WHERE status = 'active' ORDER BY coins"); }
+async function getGiftItems() {
+  const now = Date.now();
+  const rows = await query("SELECT * FROM gift_items WHERE status = 'active' ORDER BY coins");
+  return rows.filter(g => {
+    const s = g.start_date ? Date.parse(g.start_date) : null;
+    const e = g.end_date ? Date.parse(g.end_date) : null;
+    if (s !== null && !isNaN(s) && s > now) return false;   // لم تبدأ بعد
+    if (e !== null && !isNaN(e) && e < now) return false;   // انتهت
+    return true;
+  });
+}
 async function getAllGiftItems() { return query('SELECT * FROM gift_items ORDER BY coins'); }
-async function addGiftItem(name, emoji, coins, giftImage, price) {
+async function addGiftItem(name, emoji, coins, giftImage, price, startDate, endDate) {
   const id = uuidv4();
-  await run('INSERT INTO gift_items (id, name, emoji, coins, price, gift_image) VALUES ($1,$2,$3,$4,$5,$6)', [id, name, emoji || '🎁', parseInt(coins) || 10, parseInt(price) || 0, giftImage || null]);
+  await run('INSERT INTO gift_items (id, name, emoji, coins, price, gift_image, start_date, end_date) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)', [id, name, emoji || '🎁', parseInt(coins) || 10, parseInt(price) || 0, giftImage || null, startDate || null, endDate || null]);
   return queryOne('SELECT * FROM gift_items WHERE id = $1', [id]);
 }
 async function updateGiftItem(id, data) {
-  const { name, emoji, coins, price, status, gift_image } = data;
+  const { name, emoji, coins, price, status, gift_image, start_date, end_date } = data;
   if (name !== undefined) await run('UPDATE gift_items SET name = $1 WHERE id = $2', [name, id]);
   if (emoji !== undefined) await run('UPDATE gift_items SET emoji = $1 WHERE id = $2', [emoji, id]);
   if (coins !== undefined) await run('UPDATE gift_items SET coins = $1 WHERE id = $2', [coins, id]);
   if (price !== undefined) await run('UPDATE gift_items SET price = $1 WHERE id = $2', [price, id]);
   if (status !== undefined) await run('UPDATE gift_items SET status = $1 WHERE id = $2', [status, id]);
   if (gift_image !== undefined) await run('UPDATE gift_items SET gift_image = $1 WHERE id = $2', [gift_image, id]);
+  if (start_date !== undefined) await run('UPDATE gift_items SET start_date = $1 WHERE id = $2', [start_date, id]);
+  if (end_date !== undefined) await run('UPDATE gift_items SET end_date = $1 WHERE id = $2', [end_date, id]);
   return queryOne('SELECT * FROM gift_items WHERE id = $1', [id]);
 }
 async function deleteGiftItem(id) { await run('DELETE FROM gift_items WHERE id = $1', [id]); return true; }
