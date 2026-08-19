@@ -2808,6 +2808,42 @@ body {
   font-weight: 400;
   line-height: 1.7;
 }
+.watch-big-play {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, .92);
+  color: #1a1a2e;
+  font-size: 30px;
+  cursor: pointer;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, .5);
+  animation: ebPulse 1.8s ease-in-out infinite;
+}
+.watch-big-play:active { transform: translate(-50%, -50%) scale(.9); }
+.watch-big-play-label {
+  position: absolute;
+  top: calc(50% + 52px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, .65);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 6px 16px;
+  border-radius: 20px;
+  z-index: 5;
+  pointer-events: none;
+  white-space: nowrap;
+}
 .watch-controls {
   display: flex;
   align-items: center;

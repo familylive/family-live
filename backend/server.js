@@ -1268,16 +1268,16 @@ app.post('/api/watch/upload', authMiddleware, async (req, res) => {
       secret,
       ts: Date.now()
     };
-    // بدء جلسة المشاهدة برابط الملف السري
+    // بدء جلسة المشاهدة برابط الملف السري — يبدأ متوقفاً (زر تشغيل واضح بدل التشغيل التلقائي المحجوب على iOS)
     globalThis.watchSessions[sessionId] = {
       url: fileUrl,
-      playing: true, time: 0,
+      playing: false, time: 0,
       byName: meUser?.name || 'المؤسس',
       ts: Date.now()
     };
     io.to(`session_${sessionId}`).emit('watch_started', {
       url: fileUrl,
-      playing: true, time: 0, byName: meUser?.name || 'المؤسس'
+      playing: false, time: 0, byName: meUser?.name || 'المؤسس'
     });
     console.log(`🎬 رفع مقطع من الجهاز: ${name} (${Math.round(buf.length / 1048576)}MB) للجلسة ${sessionId.slice(0, 8)}`);
     res.json({ ok: true, url: fileUrl });

@@ -2400,6 +2400,12 @@ async function renderWatchPlayer(data) {
   const stage = document.getElementById('watch-stage');
   if (!ov || !stage) return;
   ov.style.display = 'block';
+  // المقطع المرفوع يبدأ متوقفاً → زر تشغيل كبير واضح
+  const bigPlay = document.getElementById('watch-big-play');
+  const bigPlayLabel = document.getElementById('watch-big-play-label');
+  if (bigPlay) bigPlay.style.display = data.playing ? 'none' : 'flex';
+  if (bigPlayLabel) bigPlayLabel.style.display = data.playing ? 'none' : 'block';
+  if (!data.playing && hint) hint.style.display = 'none';
   const hostEl = document.getElementById('watch-host');
   if (hostEl) hostEl.textContent = watchIsHost ? 'أنت تتحكم — العائلة تشاهد معك' : ('مع ' + (data.byName || 'المؤسس'));
   const ctrls = document.getElementById('watch-controls');
@@ -2473,6 +2479,12 @@ async function renderWatchPlayer(data) {
         },
         onError: () => showErr('youtube-error'),
         onStateChange: (ev) => {
+          if (ev.data === YT.PlayerState.PLAYING) {
+            const bp = document.getElementById('watch-big-play');
+            const bpl = document.getElementById('watch-big-play-label');
+            if (bp) bp.style.display = 'none';
+            if (bpl) bpl.style.display = 'none';
+          }
           if (ev.data === YT.PlayerState.ENDED && watchIsHost) emitWatchControl('pause', watchYT.getDuration());
           if (!watchIsHost) return;
           if (ev.data === YT.PlayerState.PLAYING) emitWatchControl('play', watchYT.getCurrentTime());
@@ -2504,7 +2516,14 @@ async function renderWatchPlayer(data) {
     stage.appendChild(v);
     watchVideo = v;
     const playIt = () => { v.play().catch(() => { const h = document.getElementById('watch-tap-hint'); if (h) h.style.display = 'flex'; }); };
-    v.addEventListener('playing', () => { loadBox.style.display = 'none'; errBox.style.display = 'none'; });
+    v.addEventListener('playing', () => {
+      loadBox.style.display = 'none';
+      errBox.style.display = 'none';
+      const bp = document.getElementById('watch-big-play');
+      const bpl = document.getElementById('watch-big-play-label');
+      if (bp) bp.style.display = 'none';
+      if (bpl) bpl.style.display = 'none';
+    });
     if (/\.m3u8(\?|$)/i.test(data.url) && !v.canPlayType('application/vnd.apple.mpegurl')) {
       if (!window.Hls) {
         await new Promise((res) => {
@@ -2518,16 +2537,17 @@ async function renderWatchPlayer(data) {
         const hls = new Hls();
         hls.loadSource(data.url);
         hls.attachMedia(v);
-        hls.on(Hls.Events.MANIFEST_PARSED, () => { loadBox.style.display = 'none'; try { v.currentTime = watchTogether.time; } catch (e) {} playIt(); });
+        hls.on(Hls.Events.MANIFEST_PARSED, () => { loadBox.style.display = 'none'; try { v.currentTime = watchTogether.time; } catch (e) {} if (watchTogether.playing) playIt(); });
         hls.on(Hls.Events.ERROR, (ev, hd) => { if (hd && hd.fatal) showErr('hls-' + (hd.type || '?')); });
       } else { v.src = data.url; playIt(); }
     } else {
       v.src = data.url;
       v.addEventListener('loadedmetadata', () => {
+        loadBox.style.display = 'none';
         try { v.currentTime = watchTogether.time; } catch (e) {}
         if (watchTogether.playing) playIt(); else v.pause();
       });
-      playIt();
+      if (watchTogether.playing) playIt();
     }
     v.addEventListener('play', () => { if (watchIsHost) emitWatchControl('play', v.currentTime); });
     v.addEventListener('pause', () => { if (watchIsHost) emitWatchControl('pause', v.currentTime); });
@@ -2579,6 +2599,21 @@ function watchStartPosLoop() {
 function emitWatchControl(action, time) {
   if (!watchTogether || !state.activeSession?.id || !socket?.connected) return;
   socket.emit('watch_control', { sessionId: state.activeSession.id, action, time: typeof time === 'number' ? time : watchTogether.time });
+}
+
+// زر التشغيل الكبير للمقطع المرفوع (المضيف يبث للجميع، العضو يشغّل محلياً)
+function watchBigPlay() {
+  if (watchIsHost) {
+    watchTogglePlay();
+  } else if (watchVideo) {
+    watchVideo.play().catch(() => {});
+  } else if (watchYT) {
+    try { watchYT.playVideo(); } catch (e) {}
+  }
+  const bp = document.getElementById('watch-big-play');
+  const bpl = document.getElementById('watch-big-play-label');
+  if (bp) bp.style.display = 'none';
+  if (bpl) bpl.style.display = 'none';
 }
 
 function watchTogglePlay() {
@@ -2635,9 +2670,15 @@ function uploadWatchFile(input) {
     return;
   }
   const statusEl = document.getElementById('watch-upload-status');
+  const progWrap = document.getElementById('watch-progress-wrap');
+  const progBar = document.getElementById('watch-progress-bar');
+  const progPct = document.getElementById('watch-progress-pct');
   const doUpload = async () => {
     try {
-      if (statusEl) statusEl.textContent = '⏳ جاري رفع المقطع (' + Math.round(file.size / 1048576) + 'MB)... لا تغلق الصفحة';
+      if (statusEl) statusEl.textContent = '⏳ جاري تجهيز المقطع (' + Math.round(file.size / 1048576) + 'MB)...';
+      if (progWrap) progWrap.style.display = 'block';
+      if (progBar) progBar.style.width = '2%';
+      if (progPct) progPct.textContent = '0%';
       const reader = new FileReader();
       const dataUrl = await new Promise((res, rej) => {
         reader.onload = () => res(String(reader.result));
@@ -2646,26 +2687,43 @@ function uploadWatchFile(input) {
       });
       const base64 = dataUrl.split(',')[1] || '';
       sendDiag('watch_upload_start', { mb: Math.round(file.size / 1048576), name: file.name.slice(0, 60) });
-      const controller = new AbortController();
-      const upTimer = setTimeout(() => controller.abort(), 300000); // 5 دقائق (التحويل يأخذ وقتاً)
+      // رفع بتقدم حقيقي (XHR) — شريط أزرق بنسبة مئوية
       const token = localStorage.getItem('token');
-      const r = await fetch(API_BASE + '/api/watch/upload', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (token || '') },
-        body: JSON.stringify({ sessionId: state.activeSession.id, name: file.name, type: file.type || 'video/mp4', data: base64 }),
-        signal: controller.signal
-      }).then(async (res) => {
-        const d = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(d.error || 'فشل الرفع');
-        return d;
+      const uploaded = await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', API_BASE + '/api/watch/upload');
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        if (token) xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+        xhr.timeout = 300000;
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable && progBar && progPct) {
+            const pct = Math.min(100, Math.round(e.loaded / e.total * 100));
+            progBar.style.width = pct + '%';
+            progPct.textContent = pct + '%';
+            if (statusEl) statusEl.textContent = pct >= 100 ? '⏳ جاري التحويل للصيغة المتوافقة...' : '📤 جاري رفع المقطع: ' + pct + '%';
+          }
+        };
+        xhr.onload = () => {
+          try {
+            const d = JSON.parse(xhr.responseText || '{}');
+            if (xhr.status >= 200 && xhr.status < 300) resolve(d);
+            else reject(new Error(d.error || 'فشل الرفع (' + xhr.status + ')'));
+          } catch (e2) { reject(new Error('استجابة غير مفهومة')); }
+        };
+        xhr.onerror = () => reject(new Error('تعذر الاتصال'));
+        xhr.ontimeout = () => reject(new Error('انتهت مهلة الرفع'));
+        xhr.send(JSON.stringify({ sessionId: state.activeSession.id, name: file.name, type: file.type || 'video/mp4', data: base64 }));
       });
-      clearTimeout(upTimer);
-      if (statusEl) statusEl.textContent = '';
+      if (progBar) progBar.style.width = '100%';
+      if (progPct) progPct.textContent = '100%';
+      if (statusEl) statusEl.textContent = '✅ تم الرفع — اضغط تشغيل للمشاهدة';
+      setTimeout(() => { if (progWrap) progWrap.style.display = 'none'; }, 1500);
       input.value = '';
       document.getElementById('watch-modal').style.display = 'none';
-      showToast('📤 تم رفع المقطع — المشاهدة بدأت!', 'success');
+      showToast('📤 تم رفع المقطع — اضغط ▶️ تشغيل', 'success');
     } catch (e) {
       if (statusEl) statusEl.textContent = '';
+      if (progWrap) progWrap.style.display = 'none';
       input.value = '';
       sendDiag('watch_upload_fail', { err: String(e.message || e).slice(0, 120) });
       showToast('فشل رفع المقطع: ' + (e.message || ''), 'error');
