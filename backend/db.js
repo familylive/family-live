@@ -1256,9 +1256,9 @@ async function requestWithdrawalCoins(userId, userName, publicId, coins, rate, f
   const w = await getWallet(userId);
   if (!w || w.coins < coins) return { error: 'رصيد الكوينزات لا يكفي' };
   const gross = Math.round(coins * rate * 100) / 100;              // القيمة بالريال قبل الحسم
-  const commission = Math.round(gross * feePct * 100) / 100;       // حصة الموقع
+  const commission = Math.round(gross * feePct) / 100;             // حصة الموقع (feePct = 30%)
   const net = Math.round((gross - commission) * 100) / 100;        // الصافي للمستخدم
-  if (net < 10) return { error: 'الحد الأدنى للسحب 10 ريال صافي (حوالي 715 كونزه)' };
+  if (net < 10) return { error: 'الحد الأدنى للسحب 10 ريال صافي' };
   await run('UPDATE users SET coins = coins - $1 WHERE id = $2', [coins, userId]);
   const id = uuidv4();
   await run("INSERT INTO withdrawals (id, user_id, user_name, amount, coins, sar_gross, commission_pct, commission_sar, sar_net, public_id, phone, status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'pending')",
@@ -1269,7 +1269,7 @@ async function requestWithdrawalCoins(userId, userName, publicId, coins, rate, f
 }
 // تحديث شامل: الحالة + مدة التحويل + التاريخ + ملاحظة
 async function updateWithdrawalFull(id, status, transferDays, transferDate, adminNote) {
-  await run("UPDATE withdrawals SET status=$1, transfer_days=$2, transfer_date=$3, admin_note=$4, paid_at = CASE WHEN $1='paid' THEN now() ELSE paid_at END WHERE id=$5",
+  await run("UPDATE withdrawals SET status=$1, transfer_days=$2, transfer_date=$3, admin_note=$4, paid_at = CASE WHEN $1='paid' THEN now()::text ELSE paid_at END WHERE id=$5",
     [status, transferDays || null, transferDate || null, adminNote || '', id]);
   return queryOne('SELECT * FROM withdrawals WHERE id = $1', [id]);
 }
@@ -1282,7 +1282,7 @@ async function getWithdrawalStats(period) {
     COALESCE(SUM(sar_gross),0)::numeric AS gross,
     COALESCE(SUM(commission_sar),0)::numeric AS commission,
     COALESCE(SUM(sar_net),0)::numeric AS net
-    FROM withdrawals WHERE created_at >= now() - make_interval(days => $1)`, [days]);
+    FROM withdrawals WHERE created_at::timestamptz >= now() - make_interval(days => $1)`, [days]);
   const pend = await query("SELECT COUNT(*)::int AS cnt FROM withdrawals WHERE status = 'pending'");
   return {
     count: rows[0] ? parseInt(rows[0].cnt, 10) : 0,

@@ -4361,7 +4361,7 @@ function calcWithdrawPreview() {
   if (!coins) { box.style.display = 'none'; return; }
   const rate = 1 / (parseInt(state.sarRate) || 50);   // 1 ريال = 50 كونزه
   const gross = Math.round(coins * rate * 100) / 100;
-  const commission = Math.round(gross * 30 * 100) / 100;
+  const commission = Math.round(gross * 30) / 100;
   const net = Math.round((gross - commission) * 100) / 100;
   document.getElementById('wc-coins').textContent = coins.toLocaleString('en');
   document.getElementById('wc-gross').textContent = gross.toFixed(2) + ' ريال';
