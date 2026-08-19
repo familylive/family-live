@@ -20,7 +20,7 @@ const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors());
-app.use(express.json({ limit: '5mb' }));
+app.use(express.json({ limit: '250mb' }));
 
 // Async route wrapper (Express 4 doesn't catch async errors)
 const asyncHandler = (fn) => (req, res, next) => {
@@ -1219,6 +1219,74 @@ app.get('/api/diwaniya/secret-room', authMiddleware, async (req, res) => {
   res.json(await db.getSecretRoomStatus(req.user.familyId));
 });
 
+// ============ رفع مقطع فيديو من جهاز المؤسس (مشاهدة معاً) ============
+globalThis.watchFiles = {}; // sessionId -> { name, type, buffer, ts }
+app.post('/api/watch/upload', authMiddleware, async (req, res) => {
+  try {
+    const { sessionId, name, data, type } = req.body || {};
+    if (!sessionId || !data) return res.status(400).json({ error: 'بيانات ناقصة' });
+    // فحص صلاحية المضيف
+    const sessRow = await db.getDiwaniyaSessionById(sessionId);
+    if (!sessRow) return res.status(404).json({ error: 'الجلسة غير موجودة' });
+    const meUser = await db.getUserById(req.user.id);
+    const isHost = sessRow.opened_by === req.user.id || (meUser && meUser.role === 'admin');
+    if (!isHost) return res.status(403).json({ error: 'فقط المؤسس يمكنه رفع مقطع' });
+    const buf = Buffer.from(String(data), 'base64');
+    if (!buf.length) return res.status(400).json({ error: 'الملف فارغ' });
+    if (buf.length > 180 * 1024 * 1024) return res.status(413).json({ error: 'الملف أكبر من 180 ميجا' });
+    globalThis.watchFiles[sessionId] = {
+      name: String(name || 'مقطع').slice(0, 120),
+      type: String(type || 'video/mp4').slice(0, 80),
+      buffer: buf,
+      ts: Date.now()
+    };
+    // بدء جلسة المشاهدة برابط الملف
+    globalThis.watchSessions[sessionId] = {
+      url: '/api/watch/file/' + sessionId,
+      playing: true, time: 0,
+      byName: meUser?.name || 'المؤسس',
+      ts: Date.now()
+    };
+    io.to(`session_${sessionId}`).emit('watch_started', {
+      url: '/api/watch/file/' + sessionId,
+      playing: true, time: 0, byName: meUser?.name || 'المؤسس'
+    });
+    console.log(`🎬 رفع مقطع من الجهاز: ${name} (${Math.round(buf.length / 1048576)}MB) للجلسة ${sessionId.slice(0, 8)}`);
+    res.json({ ok: true, url: '/api/watch/file/' + sessionId });
+  } catch (e) {
+    console.log('upload err:', e.message);
+    res.status(500).json({ error: 'فشل الرفع: ' + e.message });
+  }
+});
+
+// بث المقطع للمشاهدين مع دعم Range (التنقل داخل الفيديو يعمل)
+app.get('/api/watch/file/:sessionId', authMiddleware, (req, res) => {
+  const f = globalThis.watchFiles[req.params.sessionId];
+  if (!f) return res.status(404).json({ error: 'المقطع غير موجود' });
+  const buf = f.buffer;
+  const total = buf.length;
+  const range = req.headers.range;
+  res.setHeader('Content-Type', f.type || 'video/mp4');
+  res.setHeader('Accept-Ranges', 'bytes');
+  res.setHeader('Cache-Control', 'no-store');
+  if (range) {
+    const m = /bytes=(\d*)-(\d*)/.exec(range);
+    if (m) {
+      let start = m[1] ? parseInt(m[1], 10) : 0;
+      let end = m[2] ? parseInt(m[2], 10) : total - 1;
+      if (isNaN(start) || start < 0) start = 0;
+      if (isNaN(end) || end >= total) end = total - 1;
+      if (start > end) { res.status(416).setHeader('Content-Range', 'bytes */' + total).end(); return; }
+      res.status(206);
+      res.setHeader('Content-Range', 'bytes ' + start + '-' + end + '/' + total);
+      res.setHeader('Content-Length', end - start + 1);
+      return res.end(buf.subarray(start, end + 1));
+    }
+  }
+  res.setHeader('Content-Length', total);
+  res.end(buf);
+});
+
 // ============ تشخيص الأجهزة (مشاكل الفيديو/مشاركة الشاشة) ============
 globalThis.diagReports = [];
 globalThis.watchSessions = {}; // sessionId -> { url, playing, time, byName, ts } — مشاهدة معاً
@@ -2181,6 +2249,7 @@ app.post('/api/diwaniya/close/:sessionId', authMiddleware, async (req, res) => {
   if (audioRooms[req.params.sessionId]) delete audioRooms[req.params.sessionId];
   // إيقاف جلسة مشاهدة معاً عند إغلاق البث
   if (globalThis.watchSessions[req.params.sessionId]) delete globalThis.watchSessions[req.params.sessionId];
+  if (globalThis.watchFiles[req.params.sessionId]) delete globalThis.watchFiles[req.params.sessionId];
   // Stop the bot gifting loop immediately when the broadcast closes
   if (botGiftTimer) { clearInterval(botGiftTimer); botGiftTimer = null; }
   const userFull = await db.getUserById(req.user.id);
@@ -3091,6 +3160,7 @@ io.on('connection', (socket) => {
       const isHost = sessRow.opened_by === meUser.id || meUser.role === 'admin';
       if (!isHost) return;
       delete globalThis.watchSessions[sessionId];
+      if (globalThis.watchFiles[sessionId]) delete globalThis.watchFiles[sessionId];
       io.to(`session_${sessionId}`).emit('watch_stopped', {});
       console.log(`🎬 إيقاف مشاهدة معاً (${sessionId.slice(0, 8)})`);
     } catch(e) {}

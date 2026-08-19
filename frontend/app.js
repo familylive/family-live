@@ -2435,6 +2435,10 @@ async function renderWatchPlayer(data) {
     stage.appendChild(iframe);
     loadBox.style.display = 'none';
     await loadYTIframeApi();
+    if (!window.YT || typeof window.YT.Player !== 'function') {
+      showErr('youtube-api');
+      return;
+    }
     watchYT = new YT.Player(iframe.id, {
       events: {
         onReady: () => {
@@ -2461,11 +2465,14 @@ async function renderWatchPlayer(data) {
         try { if (watchYT.getPlayerState() !== 1) watchYT.playVideo(); } catch (e) {}
       }
     };
-    if (!watchIsHost) {
-      setTimeout(() => {
-        try { if (watchYT && watchYT.getPlayerState && watchYT.getPlayerState() !== 1) { const h = document.getElementById('watch-tap-hint'); if (h) h.style.display = 'flex'; } } catch (e) {}
-      }, 3000);
-    }
+    setTimeout(() => {
+      try {
+        if (watchYT && watchYT.getPlayerState && watchYT.getPlayerState() !== 1 && !watchTogether.playing) {
+          const h = document.getElementById('watch-tap-hint');
+          if (h) h.style.display = 'flex';
+        }
+      } catch (e) {}
+    }, 3500);
   } else {
     const v = document.createElement('video');
     v.id = 'watch-video';
@@ -2581,6 +2588,53 @@ async function startWatchTogether() {
   if (!state.activeSession?.id) return showToast('افتح البث أولاً', 'error');
   socket.emit('watch_start', { sessionId: state.activeSession.id, url });
   document.getElementById('watch-modal').style.display = 'none';
+}
+
+// 📤 رفع مقطع فيديو من جهاز المؤسس (مشاهدة معاً)
+function uploadWatchFile(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  if (!state.activeSession?.id) return showToast('افتح البث أولاً', 'error');
+  const maxMB = 180;
+  if (file.size > maxMB * 1024 * 1024) {
+    showToast('⚠️ المقطع أكبر من ' + maxMB + ' ميجا — اختر مقطعاً أصغر', 'error');
+    input.value = '';
+    return;
+  }
+  const statusEl = document.getElementById('watch-upload-status');
+  const doUpload = async () => {
+    try {
+      if (statusEl) statusEl.textContent = '⏳ جاري رفع المقطع (' + Math.round(file.size / 1048576) + 'MB)... لا تغلق الصفحة';
+      const reader = new FileReader();
+      const dataUrl = await new Promise((res, rej) => {
+        reader.onload = () => res(String(reader.result));
+        reader.onerror = () => rej(new Error('تعذر قراءة الملف'));
+        reader.readAsDataURL(file);
+      });
+      const base64 = dataUrl.split(',')[1] || '';
+      sendDiag('watch_upload_start', { mb: Math.round(file.size / 1048576), name: file.name.slice(0, 60) });
+      const r = await api('POST', '/api/watch/upload', {
+        sessionId: state.activeSession.id,
+        name: file.name,
+        type: file.type || 'video/mp4',
+        data: base64
+      });
+      if (statusEl) statusEl.textContent = '';
+      input.value = '';
+      document.getElementById('watch-modal').style.display = 'none';
+      showToast('📤 تم رفع المقطع — المشاهدة بدأت!', 'success');
+    } catch (e) {
+      if (statusEl) statusEl.textContent = '';
+      input.value = '';
+      showToast('فشل رفع المقطع: ' + (e.message || ''), 'error');
+    }
+  };
+  // تأكيد للملفات الكبيرة
+  if (file.size > 50 * 1024 * 1024) {
+    const yes = confirm('المقطع حجمه ' + Math.round(file.size / 1048576) + 'MB — الرفع قد يأخذ دقيقة أو أكثر. متابعة؟');
+    if (!yes) { input.value = ''; return; }
+  }
+  doUpload();
 }
 
 function stopWatchTogether() {
