@@ -2539,6 +2539,16 @@ async function renderWatchPlayer(data) {
       if (watchVideo === v && v.readyState < 2 && !v.error && loadBox.style.display !== 'none') showErr('timeout');
     }, 15000);
     stage.onclick = () => { v.muted = false; v.play().catch(() => {}); const h = document.getElementById('watch-tap-hint'); if (h) h.style.display = 'none'; };
+    // تشخيص: حالة عنصر الفيديو بعد 4 ثوانٍ (يكشف سبب الشاشة السوداء)
+    setTimeout(() => {
+      try {
+        sendDiag('watch_video_state', {
+          rs: v.readyState, ns: v.networkState, err: v.error ? v.error.code : 0,
+          vw: v.videoWidth, vh: v.videoHeight, stageW: stage.clientWidth, stageH: stage.clientHeight,
+          paused: v.paused, src: (v.currentSrc || '').slice(-40)
+        });
+      } catch (e) {}
+    }, 4000);
     watchStartPosLoop();
   }
   const wm = document.getElementById('watch-modal');
@@ -5150,3 +5160,38 @@ async function closeDiwaniyaAdmin(sessionId) {
   } catch(e) { showToast(e.message || 'فشل الإغلاق', 'error'); }
 }
 
+
+// ============ كاشف النسخ الجديدة (ينهي مشكلة الصفحات القديمة) ============
+(function versionWatcher() {
+  const getVer = () => {
+    try {
+      const src = document.querySelector('script[src*="app.js"]');
+      if (!src) return null;
+      const m = src.getAttribute('src').match(/v=(\d+)/);
+      return m ? m[1] : null;
+    } catch (e) { return null; }
+  };
+  let curVer = getVer();
+  if (!curVer) return;
+  window._curAppVer = curVer;
+  const check = () => {
+    fetch('/?nv=' + Date.now(), { cache: 'no-store' })
+      .then(r => r.text())
+      .then(html => {
+        const m = html.match(/app\.js\?v=(\d+)/);
+        if (m && m[1] !== curVer) {
+          curVer = m[1];
+          if (!document.getElementById('ver-update-banner')) {
+            const b = document.createElement('div');
+            b.id = 'ver-update-banner';
+            b.style.cssText = 'position:fixed;bottom:70px;left:50%;transform:translateX(-50%);z-index:99998;background:linear-gradient(135deg,#e8b830,#c8930c);color:#1a1a2e;font-weight:800;font-size:13px;padding:10px 18px;border-radius:30px;box-shadow:0 6px 24px rgba(0,0,0,.45);cursor:pointer;font-family:sans-serif;direction:rtl;';
+            b.textContent = '🔄 نسخة جديدة متاحة — اضغط هنا للتحديث';
+            b.onclick = () => location.reload();
+            document.body.appendChild(b);
+          }
+        }
+      }).catch(() => {});
+  };
+  setTimeout(check, 8000);
+  setInterval(check, 45000);
+})();
