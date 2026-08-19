@@ -736,7 +736,18 @@ function connectSocket() {
   });
   // 🎬 مشاهدة معاً
   socket.on('watch_started', (data) => {
-    if (data?.url) renderWatchPlayer(data);
+    if (data?.url) {
+      if (window._watchUploadPending) {
+        window._watchUploadPending = false;
+        const wm = document.getElementById('watch-modal');
+        if (wm) wm.style.display = 'none';
+        const pw = document.getElementById('watch-progress-wrap');
+        if (pw) pw.style.display = 'none';
+        const su = document.getElementById('watch-upload-status');
+        if (su) su.textContent = '';
+      }
+      renderWatchPlayer(data);
+    }
   });
   socket.on('watch_control', (data) => {
     if (!watchTogether || watchIsHost || !data) return; // المضيف يتحكم بنفسه
@@ -2705,22 +2716,46 @@ function uploadWatchFile(input) {
         };
         xhr.onload = () => {
           try {
-            const d = JSON.parse(xhr.responseText || '{}');
+            const txt = xhr.responseText || '';
+            const d = JSON.parse(txt || '{}');
             if (xhr.status >= 200 && xhr.status < 300) resolve(d);
             else reject(new Error(d.error || 'فشل الرفع (' + xhr.status + ')'));
-          } catch (e2) { reject(new Error('استجابة غير مفهومة')); }
+          } catch (e2) {
+            // الاستضافة كانت نائمة وردّت صفحة HTML — نعيد المحاولة بعد ثانية
+            sendDiag('watch_upload_badresp', { status: xhr.status, len: (xhr.responseText || '').length, head: (xhr.responseText || '').slice(0, 60) });
+            setTimeout(() => {
+              const retry = new XMLHttpRequest();
+              retry.open('POST', API_BASE + '/api/watch/upload');
+              retry.setRequestHeader('Content-Type', 'application/json');
+              if (token) retry.setRequestHeader('Authorization', 'Bearer ' + token);
+              retry.timeout = 300000;
+              retry.onload = () => {
+                try {
+                  const d2 = JSON.parse(retry.responseText || '{}');
+                  if (retry.status >= 200 && retry.status < 300) resolve(d2);
+                  else reject(new Error(d2.error || 'فشل الرفع (' + retry.status + ')'));
+                } catch (e3) { reject(new Error('الاستضافة لم تستجب — أعد المحاولة بعد قليل')); }
+              };
+              retry.onerror = () => reject(new Error('تعذر الاتصال — أعد المحاولة'));
+              retry.ontimeout = () => reject(new Error('انتهت مهلة الرفع'));
+              retry.send(xhr.body);
+            }, 1500);
+          }
         };
-        xhr.onerror = () => reject(new Error('تعذر الاتصال'));
+        xhr.onerror = () => reject(new Error('تعذر الاتصال — تأكد أن الموقع مستيقظ وأعد المحاولة'));
         xhr.ontimeout = () => reject(new Error('انتهت مهلة الرفع'));
         xhr.send(JSON.stringify({ sessionId: state.activeSession.id, name: file.name, type: file.type || 'video/mp4', data: base64 }));
       });
       if (progBar) progBar.style.width = '100%';
       if (progPct) progPct.textContent = '100%';
-      if (statusEl) statusEl.textContent = '✅ تم الرفع — اضغط تشغيل للمشاهدة';
-      setTimeout(() => { if (progWrap) progWrap.style.display = 'none'; }, 1500);
-      input.value = '';
-      document.getElementById('watch-modal').style.display = 'none';
-      showToast('📤 تم رفع المقطع — اضغط ▶️ تشغيل', 'success');
+      if (statusEl) statusEl.textContent = '✅ تم الرفع — جاري التحويل والتجهيز...';
+      window._watchUploadPending = true;
+      // المشغل يفتح عندما يصل watch_started من السيرفر (بعد التحويل)
+      setTimeout(() => {
+        if (window._watchUploadPending) {
+          if (statusEl) statusEl.textContent = '⏳ التحويل يستغرق وقتاً للمقاطع الطويلة — انتظر قليلاً...';
+        }
+      }, 20000);
     } catch (e) {
       if (statusEl) statusEl.textContent = '';
       if (progWrap) progWrap.style.display = 'none';
