@@ -2001,14 +2001,20 @@ app.post('/api/wallet/convert', authMiddleware, async (req, res) => {
   });
 });
 
-// Request withdrawal
+// Request withdrawal (بالكونزات — تحسب القيمة بالريال بعد حسم نسبة الموقع 30%)
 app.post('/api/wallet/withdraw', authMiddleware, async (req, res) => {
-  const { amount, phone } = req.body;
-  if (!amount || amount < 10) return res.status(400).json({ error: 'الحد الأدنى للسحب 10 ريال' });
+  const { coins, phone } = req.body;
+  if (!coins || parseInt(coins) < 1) return res.status(400).json({ error: 'عدد الكونزات مطلوب' });
   const user = await db.getUserById(req.user.id);
-  const result = await db.requestWithdrawal(req.user.id, user.name, parseInt(amount), phone);
+  const sarToCoins = parseFloat(await db.getSetting('sar_to_coins', '50')) || 50;
+  const rate = 1 / sarToCoins;                     // كونزات -> ريال
+  const fee = 30;                                  // نسبة الموقع 30%
+  const result = await db.requestWithdrawalCoins(req.user.id, user.name, user.public_id, parseInt(coins), rate, fee, phone);
   if (result.error) return res.status(400).json(result);
-  res.json({ message: '📤 تم تقديم طلب السحب — التحويل خلال 3 أيام', withdrawal: result });
+  res.json({
+    message: '📤 تم تقديم طلب السحب: ' + result.coins + ' كونزه = ' + result.sar_net + ' ريال (بعد حسم ' + fee + '%) — بانتظار التفعيل',
+    withdrawal: result
+  });
 });
 
 // My wallet history
@@ -2043,13 +2049,21 @@ app.post('/api/admin/coin-packages/delete', authMiddleware, adminMiddleware, asy
 
 // Admin: withdrawals management
 app.get('/api/admin/withdrawals', authMiddleware, adminMiddleware, async (req, res) => {
-  res.json({ withdrawals: await db.getAllWithdrawals() });
+  const withdrawals = await db.getAllWithdrawals();
+  const pending = withdrawals.filter(w => w.status === 'pending').length;
+  res.json({ withdrawals, pendingCount: pending });
 });
 app.post('/api/admin/withdrawals/update', authMiddleware, adminMiddleware, async (req, res) => {
-  const { id, status } = req.body;
+  const { id, status, transfer_days, transfer_date, admin_note } = req.body;
   if (!['pending','processing','paid','rejected'].includes(status)) return res.status(400).json({ error: 'حالة غير صحيحة' });
-  const withdrawal = await db.updateWithdrawal(id, status);
-  res.json({ message: '✅ تم تحديث حالة السحب', withdrawal });
+  const withdrawal = await db.updateWithdrawalFull(id, status, transfer_days, transfer_date, admin_note);
+  res.json({ message: '✅ تم تحديث طلب السحب', withdrawal });
+});
+
+// Admin: تقارير السحوبات (يومي/أسبوعي/شهري/نصف سنوي/سنوي)
+app.get('/api/admin/withdrawals/stats', authMiddleware, adminMiddleware, async (req, res) => {
+  const period = ['daily','weekly','monthly','half','year'].includes(req.query.period) ? req.query.period : 'monthly';
+  res.json({ stats: await db.getWithdrawalStats(period) });
 });
 
 // Admin: set coin conversion rate

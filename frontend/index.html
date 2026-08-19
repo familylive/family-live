@@ -1210,12 +1210,18 @@
         </div>
       </div>
 
-      <div class="card">
-        <div class="card-title">📤 طلب سحب</div>
-        <p style="font-size:12px;color:var(--text-muted);margin-bottom:8px">التحويل خلال 3 أيام عبر STC Pay</p>
+      <div class="card" style="border:1.5px solid rgba(34,197,94,.4)">
+        <div class="card-title">📤 طلب سحب (كونزات ← ريال)</div>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:8px">حوّل كونزاتك إلى ريال يُحول عبر STC Pay بعد تفعيل الإدارة — <b style="color:#ff6b6b">حسم الموقع 30%</b></p>
         <div style="display:flex;gap:8px;margin-bottom:8px">
-          <input class="form-input" id="withdraw-amount" type="number" placeholder="المبلغ (ريال)" style="flex:1">
-          <input class="form-input" id="withdraw-phone" type="text" placeholder="رقم STC" dir="ltr" style="flex:1">
+          <input class="form-input" id="withdraw-coins" type="number" placeholder="عدد الكونزات" style="flex:1" oninput="calcWithdrawPreview()">
+          <input class="form-input" id="withdraw-phone" type="text" placeholder="رقم STC Pay" dir="ltr" style="flex:1">
+        </div>
+        <div id="withdraw-calc" style="display:none;background:var(--bg-hover);border-radius:10px;padding:10px;font-size:12.5px;margin-bottom:8px">
+          <div style="display:flex;justify-content:space-between"><span>🪙 الكونزات المحولة</span><b id="wc-coins">0</b></div>
+          <div style="display:flex;justify-content:space-between"><span>💵 القيمة بالريال</span><b id="wc-gross">0 ريال</b></div>
+          <div style="display:flex;justify-content:space-between"><span>🏢 حسم الموقع 30%</span><b style="color:#ff6b6b" id="wc-commission">0 ريال</b></div>
+          <div style="display:flex;justify-content:space-between;font-weight:900;color:var(--success)"><span>✅ الصافي لك</span><b id="wc-net">0 ريال</b></div>
         </div>
         <button class="btn btn-primary btn-full" onclick="requestWithdraw()">📤 تقديم طلب السحب</button>
         <div id="my-withdrawals" style="margin-top:10px"></div>
@@ -1363,6 +1369,28 @@
     <!-- Admin Page - لوحة الإدارة -->
     <div id="page-admin" class="page-content">
       <div class="page-title">⚙️ لوحة الإدارة <button class="btn btn-sm btn-accent" style="float:left" onclick="navigateTo('reports')">📊 التقارير</button></div>
+      <div class="card" id="admin-finance-card" style="border:1.5px solid rgba(34,197,94,.5)">
+        <div class="card-title">💼 القسم المالي — طلبات السحب <span id="wd-pending-badge"></span></div>
+        <div id="wd-alert" style="display:none;background:rgba(255,80,80,.15);border:1px solid rgba(255,80,80,.5);color:#ff8b8b;border-radius:12px;padding:10px 14px;font-size:13px;font-weight:800;margin-bottom:10px;text-align:center">
+          🔔 تنبيه: توجد طلبات سحب جديدة بانتظار المراجعة
+        </div>
+        <div id="wd-list"><div class="empty-text">جاري التحميل...</div></div>
+        <div style="margin-top:14px;border-top:1px dashed var(--border);padding-top:12px">
+          <div class="card-title" style="font-size:14px">📊 تقارير السحوبات (بالمجموع الكلي)</div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <select class="form-input" id="wd-period" style="flex:1;min-width:140px">
+              <option value="daily">📅 يومي</option>
+              <option value="weekly">🗓️ أسبوعي</option>
+              <option value="monthly" selected>📆 شهري</option>
+              <option value="half">📊 نصف سنوي</option>
+              <option value="year">🌐 سنوي</option>
+            </select>
+            <button class="btn btn-accent" onclick="loadWdStats()">عرض</button>
+            <button class="btn btn-secondary" onclick="printWdReport()">🖨️ طباعة</button>
+          </div>
+          <div id="wd-stats" style="margin-top:10px"></div>
+        </div>
+      </div>
       <div class="card" style="border:1.5px solid rgba(232,184,48,.4)">
         <div class="card-title">💾 النسخ الاحتياطي</div>
         <div style="display:flex;gap:8px">
@@ -2154,7 +2182,7 @@ function navigateTo(pageName) {
   if (pageName === 'admin' && state.user?.role === 'admin') loadTierSettings();
   if (pageName === 'codes' && state.isLoggedIn) loadCodesPage();
   if (pageName === 'auctions' && state.isLoggedIn) loadAuctionsPage();
-  if (pageName === 'admin' && state.user?.role === 'admin') { loadAdminPage(); loadAdminAuctions(); }
+  if (pageName === 'admin' && state.user?.role === 'admin') { loadAdminPage(); loadAdminAuctions(); loadAdminFinance(); loadWdStats(); }
 }
 
 function toggleHeaderVisibility(pageName) {
@@ -4303,7 +4331,8 @@ async function loadWalletHistory() {
     if (withdrawals?.length) {
       wd.innerHTML = withdrawals.map(w => {
         const st = { pending:'⏳ قيد المراجعة', processing:'🔄 جاري التحويل', paid:'✅ تم التحويل', rejected:'❌ مرفوض' }[w.status] || w.status;
-        return '<div class="admin-family-item"><div class="admin-family-name">📤 ' + w.amount + ' ريال <span style="font-size:11px">' + st + '</span></div><div class="admin-family-meta">' + (w.phone||'') + ' · ' + (w.created_at||'') + '</div></div>';
+        const extra = w.transfer_date ? ' · 📅 تحويل: ' + w.transfer_date : '';
+        return '<div class="admin-family-item"><div class="admin-family-name">📤 ' + (w.coins ? w.coins.toLocaleString('en') + ' كونزه' : '') + ' = ' + w.sar_net + ' ريال <span style="font-size:11px">' + st + '</span></div><div class="admin-family-meta">' + (w.phone||'') + extra + ' · ' + (w.created_at||'') + '</div></div>';
       }).join('');
     }
   } catch(e) {}
@@ -4326,13 +4355,28 @@ async function convertCoins() {
   } catch(e) { showToast(e.message, 'error'); }
 }
 
+function calcWithdrawPreview() {
+  const coins = parseInt(document.getElementById('withdraw-coins').value) || 0;
+  const box = document.getElementById('withdraw-calc');
+  if (!coins) { box.style.display = 'none'; return; }
+  const rate = 1 / (parseInt(state.sarRate) || 50);   // 1 ريال = 50 كونزه
+  const gross = Math.round(coins * rate * 100) / 100;
+  const commission = Math.round(gross * 30 * 100) / 100;
+  const net = Math.round((gross - commission) * 100) / 100;
+  document.getElementById('wc-coins').textContent = coins.toLocaleString('en');
+  document.getElementById('wc-gross').textContent = gross.toFixed(2) + ' ريال';
+  document.getElementById('wc-commission').textContent = commission.toFixed(2) + ' ريال';
+  document.getElementById('wc-net').textContent = net.toFixed(2) + ' ريال';
+  box.style.display = 'block';
+}
+
 async function requestWithdraw() {
-  const amount = parseInt(document.getElementById('withdraw-amount').value);
+  const coins = parseInt(document.getElementById('withdraw-coins').value);
   const phone = document.getElementById('withdraw-phone').value.trim();
-  if (!amount) return showToast('أدخل المبلغ', 'error');
+  if (!coins || coins < 1) return showToast('أدخل عدد الكونزات', 'error');
   if (!phone) return showToast('أدخل رقم STC Pay', 'error');
   try {
-    const result = await api('POST', '/api/wallet/withdraw', { amount, phone });
+    const result = await api('POST', '/api/wallet/withdraw', { coins, phone });
     showToast(result.message, 'success');
     loadWallet();
   } catch(e) { showToast(e.message, 'error'); }

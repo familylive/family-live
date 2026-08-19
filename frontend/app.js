@@ -5293,3 +5293,136 @@ async function closeDiwaniyaAdmin(sessionId) {
   setTimeout(check, 8000);
   setInterval(check, 45000);
 })();
+
+// ==================== 💼 القسم المالي — طلبات السحب (لوحة الإدارة) ====================
+let wdAll = [];
+const WD_STATUS = { pending: ['⏳ قيد المراجعة', '#ff9f43'], processing: ['🔄 جاري التحويل', '#3b82f6'], paid: ['✅ تم التحويل', '#22c55e'], rejected: ['❌ مرفوض', '#ef4444'] };
+
+function wdStatusHtml(s) {
+  const st = WD_STATUS[s] || [s, '#888'];
+  return '<span style="color:' + st[1] + ';font-weight:800;font-size:12px">' + st[0] + '</span>';
+}
+
+async function loadAdminFinance() {
+  try {
+    const { withdrawals, pendingCount } = await api('GET', '/api/admin/withdrawals');
+    wdAll = withdrawals || [];
+    const badge = document.getElementById('wd-pending-badge');
+    if (badge) {
+      if (pendingCount > 0) badge.innerHTML = '<span style="background:rgba(255,80,80,.2);color:#ff8b8b;border-radius:20px;padding:2px 10px;font-size:12px">🔴 ' + pendingCount + ' جديد</span>';
+      else badge.innerHTML = '<span style="background:rgba(34,197,94,.15);color:#22c55e;border-radius:20px;padding:2px 10px;font-size:12px">✅ لا طلبات معلقة</span>';
+    }
+    const alert = document.getElementById('wd-alert');
+    if (alert) alert.style.display = pendingCount > 0 ? 'block' : 'none';
+    const list = document.getElementById('wd-list');
+    if (!list) return;
+    if (!wdAll.length) { list.innerHTML = '<div class="empty-text">لا توجد طلبات سحب بعد</div>'; return; }
+    list.innerHTML = wdAll.map(w => {
+      return '<div style="background:var(--bg-hover);border-radius:12px;padding:10px 12px;margin-bottom:8px;border-right:4px solid ' + (WD_STATUS[w.status] ? WD_STATUS[w.status][1] : '#888') + '">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap">' +
+          '<div><b style="font-size:14px">👤 ' + (w.user_name || '') + '</b> <span style="font-size:11px;color:var(--text-muted)">🆔 ' + (w.public_id || '-') + '</span></div>' +
+          wdStatusHtml(w.status) +
+        '</div>' +
+        '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:6px;font-size:12px">' +
+          '<span>🪙 <b>' + (w.coins ? Number(w.coins).toLocaleString('en') : '-') + '</b></span>' +
+          '<span>💵 إجمالي: <b>' + Number(w.sar_gross || 0).toFixed(2) + ' ريال</b></span>' +
+          '<span style="color:#ff6b6b">🏢 حسم 30%: <b>' + Number(w.commission_sar || 0).toFixed(2) + '</b></span>' +
+          '<span style="color:#22c55e;font-weight:800">✅ صافي: <b>' + Number(w.sar_net || 0).toFixed(2) + ' ريال</b></span>' +
+        '</div>' +
+        '<div style="font-size:11px;color:var(--text-muted);margin-top:4px">📞 ' + (w.phone || '-') + ' · ' + (w.created_at || '') + (w.transfer_days ? ' · ⏱️ ' + w.transfer_days + ' يوم' : '') + (w.transfer_date ? ' · 📅 ' + w.transfer_date : '') + (w.admin_note ? ' · 📝 ' + w.admin_note : '') + '</div>' +
+        '<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">' +
+          '<button class="btn btn-sm btn-success" onclick="openWdActivate(\'' + w.id + '\')">✅ تفعيل</button>' +
+          '<button class="btn btn-sm btn-accent" onclick="openWdEdit(\'' + w.id + '\')">✏️ تعديل</button>' +
+          '<button class="btn btn-sm btn-secondary" onclick="wdSetStatus(\'' + w.id + '\',\'paid\')">💸 تم التحويل</button>' +
+          '<button class="btn btn-sm" style="background:rgba(239,68,68,.15);color:#ef4444" onclick="wdSetStatus(\'' + w.id + '\',\'rejected\')">❌ رفض</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  } catch (e) { console.log('finance err', e.message); }
+}
+
+function openWdActivate(id) {
+  openWdEdit(id, true);
+}
+function openWdEdit(id, activating) {
+  const w = wdAll.find(x => x.id === id);
+  if (!w) return;
+  const days = prompt((activating ? '✅ تفعيل السحب — ' : '✏️ تعديل — ') + 'مدة التحويل (بالأيام):', w.transfer_days || '3');
+  if (days === null) return;
+  const dateStr = prompt('📅 تاريخ التحويل (YYYY-MM-DD):', w.transfer_date || '');
+  if (dateStr === null) return;
+  const note = prompt('📝 ملاحظة (اختياري):', w.admin_note || '');
+  if (note === null) return;
+  const status = activating ? 'processing' : w.status;
+  wdSetStatusFull(id, status, parseInt(days) || null, dateStr, note || '');
+}
+async function wdSetStatus(id, status) {
+  if (status === 'rejected') {
+    const ok = confirm('❌ رفض طلب السحب هذا؟ (لا يمكن التراجع)');
+    if (!ok) return;
+  }
+  wdSetStatusFull(id, status, null, null, null);
+}
+async function wdSetStatusFull(id, status, days, date, note) {
+  try {
+    const r = await api('POST', '/api/admin/withdrawals/update', { id, status, transfer_days: days, transfer_date: date, admin_note: note });
+    showToast(r.message, 'success');
+    loadAdminFinance();
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+async function loadWdStats() {
+  const period = document.getElementById('wd-period').value;
+  try {
+    const { stats } = await api('GET', '/api/admin/withdrawals/stats?period=' + period);
+    const el = document.getElementById('wd-stats');
+    if (!el) return;
+    const labels = { daily: 'اليومي', weekly: 'الأسبوعي', monthly: 'الشهري', half: 'نصف السنوي', year: 'السنوي' };
+    el.innerHTML =
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-top:8px">' +
+        statBox('🪙 الكونزات المسحوبة', Number(stats.coins || 0).toLocaleString('en'), 'var(--gold)') +
+        statBox('💵 الإجمالي (قبل الحسم)', Number(stats.gross || 0).toFixed(2) + ' ريال', '#3b82f6') +
+        statBox('🏢 حصة الموقع 30%', Number(stats.commission || 0).toFixed(2) + ' ريال', '#ff6b6b') +
+        statBox('✅ صافي المسحوب', Number(stats.net || 0).toFixed(2) + ' ريال', '#22c55e') +
+        statBox('📄 عدد العمليات', stats.count + ' عملية', '#a78bfa') +
+      '</div>' +
+      '<div style="font-size:11px;color:var(--text-muted);margin-top:6px">التقرير ' + (labels[period] || period) + ' — حتى الآن · المعلقة: ' + (stats.pending || 0) + '</div>';
+    window._wdStats = stats; window._wdPeriod = labels[period] || period;
+  } catch (e) { showToast(e.message, 'error'); }
+}
+function statBox(label, value, color) {
+  return '<div style="background:var(--bg-hover);border-radius:12px;padding:10px;text-align:center;border:1px solid var(--border)">' +
+    '<div style="font-size:11px;color:var(--text-muted)">' + label + '</div>' +
+    '<div style="font-size:17px;font-weight:900;color:' + color + ';margin-top:4px">' + value + '</div></div>';
+}
+
+function printWdReport() {
+  const s = window._wdStats;
+  if (!s) return showToast('اعرض التقرير أولاً', 'error');
+  const rows = wdAll.filter(w => w.status !== 'rejected').map(w =>
+    '<tr><td>' + (w.user_name || '') + '</td><td>' + (w.public_id || '-') + '</td><td>' + (w.coins ? Number(w.coins).toLocaleString('en') : '-') + '</td><td>' + Number(w.sar_gross || 0).toFixed(2) + '</td><td>' + Number(w.commission_sar || 0).toFixed(2) + '</td><td>' + Number(w.sar_net || 0).toFixed(2) + '</td><td>' + (w.status || '') + '</td><td>' + (w.created_at || '') + '</td></tr>'
+  ).join('');
+  const win = window.open('', '_blank', 'width=900,height=600');
+  if (!win) return showToast('السماح بالنوافذ المنبثقة للطباعة', 'error');
+  win.document.write(
+    '<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>تقرير السحوبات</title>' +
+    '<style>body{font-family:Tahoma,Arial;padding:24px;color:#111} h1{font-size:20px;margin:0 0 4px} .meta{color:#666;font-size:12px;margin-bottom:16px} ' +
+    '.totals{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px} .tbox{border:1px solid #ccc;border-radius:10px;padding:10px 16px;text-align:center} .tbox b{display:block;font-size:16px} .tbox span{font-size:11px;color:#666} ' +
+    'table{width:100%;border-collapse:collapse;font-size:12px} th,td{border:1px solid #bbb;padding:6px 8px;text-align:center} th{background:#f0f0f0} ' +
+    '@media print{ .noprint{display:none} }</style></head><body>' +
+    '<h1>💼 تقرير السحوبات — ' + (window._wdPeriod || '') + '</h1>' +
+    '<div class="meta">Family Live · تاريخ التقرير: ' + new Date().toLocaleString('ar-SA') + '</div>' +
+    '<div class="totals">' +
+      '<div class="tbox"><b>' + Number(s.coins || 0).toLocaleString('en') + '</b><span>🪙 الكونزات المسحوبة</span></div>' +
+      '<div class="tbox"><b>' + Number(s.gross || 0).toFixed(2) + ' ر.س</b><span>💵 الإجمالي</span></div>' +
+      '<div class="tbox"><b>' + Number(s.commission || 0).toFixed(2) + ' ر.س</b><span>🏢 حصة الموقع 30%</span></div>' +
+      '<div class="tbox"><b>' + Number(s.net || 0).toFixed(2) + ' ر.س</b><span>✅ صافي المسحوب</span></div>' +
+      '<div class="tbox"><b>' + s.count + '</b><span>📄 عدد العمليات</span></div>' +
+    '</div>' +
+    '<table><thead><tr><th>المستخدم</th><th>الايدي</th><th>الكونزات</th><th>الإجمالي</th><th>حصة الموقع</th><th>الصافي</th><th>الحالة</th><th>التاريخ</th></tr></thead>' +
+    '<tbody>' + (rows || '<tr><td colspan="8">لا توجد عمليات</td></tr>') + '</tbody></table>' +
+    '<div class="noprint" style="margin-top:16px"><button onclick="window.print()" style="padding:10px 24px;font-size:14px;cursor:pointer">🖨️ طباعة</button></div>' +
+    '</body></html>'
+  );
+  win.document.close();
+}

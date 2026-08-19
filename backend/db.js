@@ -103,6 +103,15 @@ async function initDb() {
   await run(`CREATE TABLE IF NOT EXISTS gifts (id TEXT PRIMARY KEY, from_user TEXT NOT NULL, to_user TEXT NOT NULL, coins INTEGER NOT NULL, message TEXT, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS coin_transactions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, type TEXT NOT NULL, coins INTEGER DEFAULT 0, amount INTEGER DEFAULT 0, detail TEXT, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS withdrawals (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, user_name TEXT, amount INTEGER NOT NULL, method TEXT DEFAULT 'stcpay', phone TEXT, status TEXT DEFAULT 'pending', created_at TEXT DEFAULT now(), paid_at TEXT)`);
+  try { await run("ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS coins BIGINT DEFAULT 0"); } catch(e) {}
+  try { await run("ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS sar_gross NUMERIC DEFAULT 0"); } catch(e) {}
+  try { await run("ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS commission_pct NUMERIC DEFAULT 30"); } catch(e) {}
+  try { await run("ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS commission_sar NUMERIC DEFAULT 0"); } catch(e) {}
+  try { await run("ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS sar_net NUMERIC DEFAULT 0"); } catch(e) {}
+  try { await run("ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS public_id TEXT DEFAULT ''"); } catch(e) {}
+  try { await run("ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS transfer_days INT"); } catch(e) {}
+  try { await run("ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS transfer_date TEXT"); } catch(e) {}
+  try { await run("ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS admin_note TEXT"); } catch(e) {}
   await run(`CREATE TABLE IF NOT EXISTS packages (id TEXT PRIMARY KEY, title TEXT NOT NULL, code_example TEXT, price INTEGER DEFAULT 0, features TEXT DEFAULT '[]', status TEXT DEFAULT 'active', sort_order INTEGER DEFAULT 0, created_at TEXT DEFAULT now())`);
   await run(`CREATE TABLE IF NOT EXISTS capacity_purchases (id TEXT PRIMARY KEY, family_id TEXT NOT NULL, capacity INTEGER NOT NULL, price INTEGER NOT NULL, purchased_at TEXT DEFAULT now())`);
   
@@ -1236,11 +1245,53 @@ async function requestWithdrawal(userId, userName, amount, phone) {
   await run("INSERT INTO coin_transactions (id, user_id, type, amount, detail) VALUES ($1,$2,'withdraw',$3,$4)", [uuidv4(), userId, amount, 'طلب سحب']);
   return queryOne('SELECT * FROM withdrawals WHERE id = $1', [id]);
 }
-async function getAllWithdrawals() { return query("SELECT * FROM withdrawals ORDER BY created_at DESC LIMIT 100"); }
+async function getAllWithdrawals() { return query("SELECT * FROM withdrawals ORDER BY created_at DESC LIMIT 300"); }
 async function getMyWithdrawals(userId) { return query('SELECT * FROM withdrawals WHERE user_id = $1 ORDER BY created_at DESC', [userId]); }
 async function updateWithdrawal(id, status) {
   await run("UPDATE withdrawals SET status = $1, paid_at = CASE WHEN $1 = 'paid' THEN now() ELSE paid_at END WHERE id = $2", [status, id]);
   return queryOne('SELECT * FROM withdrawals WHERE id = $1', [id]);
+}
+// سحب بالكونزات: حساب الإجمالي وحسم نسبة الموقع (30%) والصافي
+async function requestWithdrawalCoins(userId, userName, publicId, coins, rate, feePct, phone) {
+  const w = await getWallet(userId);
+  if (!w || w.coins < coins) return { error: 'رصيد الكوينزات لا يكفي' };
+  const gross = Math.round(coins * rate * 100) / 100;              // القيمة بالريال قبل الحسم
+  const commission = Math.round(gross * feePct * 100) / 100;       // حصة الموقع
+  const net = Math.round((gross - commission) * 100) / 100;        // الصافي للمستخدم
+  if (net < 10) return { error: 'الحد الأدنى للسحب 10 ريال صافي (حوالي 715 كونزه)' };
+  await run('UPDATE users SET coins = coins - $1 WHERE id = $2', [coins, userId]);
+  const id = uuidv4();
+  await run("INSERT INTO withdrawals (id, user_id, user_name, amount, coins, sar_gross, commission_pct, commission_sar, sar_net, public_id, phone, status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'pending')",
+    [id, userId, userName, net, coins, gross, feePct, commission, net, publicId || '', phone || '']);
+  await run("INSERT INTO coin_transactions (id, user_id, type, coins, amount, detail) VALUES ($1,$2,'withdraw',$3,$4,$5)",
+    [uuidv4(), userId, coins, net, 'طلب سحب ' + coins + ' كونزه (حسم ' + feePct + '%)']);
+  return queryOne('SELECT * FROM withdrawals WHERE id = $1', [id]);
+}
+// تحديث شامل: الحالة + مدة التحويل + التاريخ + ملاحظة
+async function updateWithdrawalFull(id, status, transferDays, transferDate, adminNote) {
+  await run("UPDATE withdrawals SET status=$1, transfer_days=$2, transfer_date=$3, admin_note=$4, paid_at = CASE WHEN $1='paid' THEN now() ELSE paid_at END WHERE id=$5",
+    [status, transferDays || null, transferDate || null, adminNote || '', id]);
+  return queryOne('SELECT * FROM withdrawals WHERE id = $1', [id]);
+}
+// تقارير السحوبات: يومي/أسبوعي/شهري/نصف سنوي/سنوي
+async function getWithdrawalStats(period) {
+  const map = { daily: 1, weekly: 7, monthly: 30, half: 182, year: 365 };
+  const days = map[period] || 30;
+  const rows = await query(`SELECT COUNT(*)::int AS cnt,
+    COALESCE(SUM(coins),0)::bigint AS coins,
+    COALESCE(SUM(sar_gross),0)::numeric AS gross,
+    COALESCE(SUM(commission_sar),0)::numeric AS commission,
+    COALESCE(SUM(sar_net),0)::numeric AS net
+    FROM withdrawals WHERE created_at >= now() - make_interval(days => $1)`, [days]);
+  const pend = await query("SELECT COUNT(*)::int AS cnt FROM withdrawals WHERE status = 'pending'");
+  return {
+    count: rows[0] ? parseInt(rows[0].cnt, 10) : 0,
+    coins: rows[0] ? Number(rows[0].coins || 0) : 0,
+    gross: rows[0] ? Number(rows[0].gross || 0) : 0,
+    commission: rows[0] ? Number(rows[0].commission || 0) : 0,
+    net: rows[0] ? Number(rows[0].net || 0) : 0,
+    pending: pend[0] ? parseInt(pend[0].cnt, 10) : 0
+  };
 }
 async function getUserByPublicId(publicId) {
   return queryOne('SELECT * FROM users WHERE UPPER(public_id) = UPPER($1)', [publicId]);
@@ -1415,7 +1466,7 @@ module.exports = {
   seedViolationTemplates, getViolationTemplates, getAllViolationTemplates, addViolationTemplate, deleteViolationTemplate, addFounderViolation,
   getGiftItems, getAllGiftItems, addGiftItem, updateGiftItem, deleteGiftItem,
   getWallet, addCoins, deductCoins, addToHold, releaseHold, sendGift, convertCoinsToWallet, getUserByPublicId, transferCoins, getCoinPackages, getAllCoinPackages, addCoinPackage, updateCoinPackage, updateCoinPackageFull, deleteCoinPackage,
-  requestWithdrawal, getMyWithdrawals, getAllWithdrawals, updateWithdrawal,
+  requestWithdrawal, requestWithdrawalCoins, getMyWithdrawals, getAllWithdrawals, updateWithdrawal, updateWithdrawalFull, getWithdrawalStats,
   getMyTransactions, getAllTransactions, getMyGifts, getGiftsByUser,
   getCurrencyRate, setCurrencyRate, getSecretRoomStatus, enableSecretRoom,
   recordRecordingAttempt, setVideoLimit,
