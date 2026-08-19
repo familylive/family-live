@@ -2413,6 +2413,7 @@ async function renderWatchPlayer(data) {
   errBox.className = 'watch-err';
   errBox.style.display = 'none';
   errBox.innerHTML = '⚠️ تعذر تشغيل هذا الرابط<br><small>تأكد أنه: رابط يوتيوب، أو رابط فيديو مباشر (ينتهي بـ .mp4)، أو رابط بث (m3u8)<br>المواقع العادية (صفحات المباريات) لا تدعم التضمين</small>';
+  errBox.setAttribute('data-why', '');
   stage.appendChild(errBox);
   // مؤشر تحميل
   const loadBox = document.createElement('div');
@@ -2421,6 +2422,9 @@ async function renderWatchPlayer(data) {
   stage.appendChild(loadBox);
   const showErr = (why) => {
     loadBox.style.display = 'none';
+    if (why === 'youtube-timeout') {
+      errBox.innerHTML = '⚠️ يوتيوب لم يستجب<br><small>افتح الرابط في تطبيق يوتيوب للتأكد أنه يعمل، ثم حاول مجدداً<br>أو حمّل المقطع وارفعه من الجهاز</small>';
+    }
     errBox.style.display = 'flex';
     if (why) sendDiag('watch_video_error', { url: (watchTogether && watchTogether.url || '').slice(0, 200), why });
   };
@@ -2447,6 +2451,25 @@ async function renderWatchPlayer(data) {
             if (watchTogether.playing) watchYT.playVideo(); else watchYT.pauseVideo();
           } catch (e) {}
           watchStartPosLoop();
+          // محاولات تشغيل تلقائية (iOS يمنع التشغيل الأول بالصوت — نعيد المحاولة + نظهر التلميح)
+          let tries = 0;
+          const retryPlay = setInterval(() => {
+            tries++;
+            try {
+              const st = watchYT.getPlayerState();
+              if (st === 1) { clearInterval(retryPlay); return; }
+              if (st === 5) watchYT.playVideo(); // 5 = CUED — نحاول البدء
+              if (tries === 2 || tries === 5) {
+                const h = document.getElementById('watch-tap-hint');
+                if (h) h.style.display = 'flex';
+              }
+            } catch (e) {}
+            if (tries >= 8) clearInterval(retryPlay);
+          }, 1500);
+          // لو ما جاهز خلال 12 ثانية → رسالة واضحة
+          setTimeout(() => {
+            try { if (watchYT.getPlayerState && watchYT.getPlayerState() === -1) showErr('youtube-timeout'); } catch (e) {}
+          }, 12000);
         },
         onError: () => showErr('youtube-error'),
         onStateChange: (ev) => {
@@ -2634,6 +2657,7 @@ function uploadWatchFile(input) {
     } catch (e) {
       if (statusEl) statusEl.textContent = '';
       input.value = '';
+      sendDiag('watch_upload_fail', { err: String(e.message || e).slice(0, 120) });
       showToast('فشل رفع المقطع: ' + (e.message || ''), 'error');
     }
   };
