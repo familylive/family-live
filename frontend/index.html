@@ -2186,8 +2186,21 @@
         <div class="gift-recipient-chips" id="gift-recipient-chips"></div>
         <div id="gift-items-list" class="gift-items-horizontal"></div>
         <div id="gift-send-area" class="gift-bar-send" style="display:none">
-          <span id="gift-selected-label" class="gift-bar-label">لا شيء محدد</span>
-          <button class="btn btn-accent gift-bar-send-btn" onclick="sendSelectedGift()">📤 إرسال</button>
+          <div id="gift-selected-label" class="gift-bar-label"></div>
+          <div class="gift-count-row">
+            <span class="gift-count-hint">كم مرة؟</span>
+          <button type="button" class="gift-count-btn" onclick="sendGiftCount(0)">0</button>
+          <button type="button" class="gift-count-btn" onclick="sendGiftCount(1)">1</button>
+          <button type="button" class="gift-count-btn" onclick="sendGiftCount(2)">2</button>
+          <button type="button" class="gift-count-btn" onclick="sendGiftCount(3)">3</button>
+          <button type="button" class="gift-count-btn" onclick="sendGiftCount(4)">4</button>
+          <button type="button" class="gift-count-btn" onclick="sendGiftCount(5)">5</button>
+          <button type="button" class="gift-count-btn" onclick="sendGiftCount(6)">6</button>
+          <button type="button" class="gift-count-btn" onclick="sendGiftCount(7)">7</button>
+          <button type="button" class="gift-count-btn" onclick="sendGiftCount(8)">8</button>
+          <button type="button" class="gift-count-btn" onclick="sendGiftCount(9)">9</button>
+          <button type="button" class="gift-count-btn" onclick="sendGiftCount(10)">10</button>
+          </div>
         </div>
       </div>
     </div>
@@ -4061,7 +4074,7 @@ async function openGiftBox() {
   } else {
     const mems = (state.members || []);
     const participants = Object.keys(peerConnections);
-    const chipsHtml = ['self'].concat(participants).map(pid => {
+    let chipsHtml = ['self'].concat(participants).map(pid => {
       const isSelf = pid === 'self';
       const id = isSelf ? state.user.id : pid;
       const name = isSelf ? 'أنت (دعم ذاتي)' : (state.callMembers?.[pid] || 'عضو');
@@ -4069,40 +4082,40 @@ async function openGiftBox() {
       const av = m?.avatar || (isSelf ? state.user.avatar : peerAvatars[pid]) || '👤';
       return '<div class="gift-recipient-chip" data-id="' + id + '" onclick="selectGiftRecipientChip(this,\'' + id + '\')"><span class="chip-av">' + ava(av) + '</span>' + name + '</div>';
     }).join('');
+    // دعم ذاتي فوري بدون هدية (يعمل حتى لو القائمة فارغة) — للمؤسس وأي عضو
+    chipsHtml += '<div class="gift-recipient-chip quick-self" onclick="quickSelfCoins(100)" title="يرفع نقاط عائلتك في الترتيب المميز">🙋 دعم نفسي +100</div>';
     chips.innerHTML = chipsHtml;
     // إضافة الخيارات للـ select القديم (توافق مع sendGiftItem)
-    chips.querySelectorAll('.gift-recipient-chip').forEach(ch => {
+    chips.querySelectorAll('.gift-recipient-chip[data-id]').forEach(ch => {
       sel.innerHTML += '<option value="' + ch.dataset.id + '">' + ch.textContent.trim() + '</option>';
     });
     // افتراضي: صاحب البث — أو نفسي إن كنت المؤسس
     const hostId = state.activeSession?.opened_by;
     let defaultChip = null;
     if (hostId === state.user?.id) defaultChip = chips.querySelector('[data-id="' + state.user.id + '"]');
-    else defaultChip = chips.querySelector('[data-id="' + hostId + '"]') || chips.querySelector('.gift-recipient-chip');
+    else defaultChip = chips.querySelector('[data-id="' + hostId + '"]') || chips.querySelector('.gift-recipient-chip[data-id]');
     if (defaultChip) selectGiftRecipientChip(defaultChip, defaultChip.dataset.id);
   }
-  // Load gift items grid
+  // Load gift items grid — الهدية تُختار باللمس ثم تُحدد عدد المرات (0 = إلغاء)
   const grid = document.getElementById('gift-items-list');
+  const pickerArea = document.getElementById('gift-send-area');
+  const pickerLabel = document.getElementById('gift-selected-label');
   window._lastGiftId = null;
-  window._selectGift = (id, el) => {
-    // إرسال فوري بلمسة واحدة (نمط تيك توك) — مع إشارة سريعة
+  window._selectGift = (id) => {
     const g = giftItems.find(x => x.id === id);
+    if (!g) return;
     window._lastGiftId = id;
     document.querySelectorAll('.gift-item').forEach(el2 => el2.classList.remove('selected'));
     const clicked = document.getElementById('gift-item-' + id);
     if (clicked) clicked.classList.add('selected');
-    setTimeout(() => { if (clicked) clicked.classList.remove('selected'); }, 400);
-    // تحديث شريط الإرسال
-    const area = document.getElementById('gift-send-area');
-    const label = document.getElementById('gift-selected-label');
-    if (area) area.style.display = 'flex';
-    if (label && g) label.innerHTML = 'الهدية: ' + (g.gift_image ? '' : g.emoji + ' ') + g.name + ' · <img src="/assets/coin.png" class="coin-ico" alt="🪙"> ' + g.coins;
-    sendGiftItem(id);
+    if (pickerArea) pickerArea.style.display = 'flex';
+    if (pickerLabel) pickerLabel.innerHTML = 'الهدية: ' + (g.gift_image ? '' : g.emoji + ' ') + g.name + ' · <img src="/assets/coin.png" class="coin-ico" alt="كونزه"> ' + g.coins + '<span style="opacity:.65"> — اختر عدد المرات</span>';
   };
   window._sendSelectedGift = () => {
-    if (window._lastGiftId) { sendGiftItem(window._lastGiftId); return; }
+    if (window._lastGiftId) { sendGiftItem(window._lastGiftId, 1); return; }
     showToast('اختر الهدية أولاً', 'error');
   };
+  if (pickerArea) pickerArea.style.display = 'none';
   if (giftItems.length) {
     grid.innerHTML = giftItems.map(g => {
       const media = g.gift_image
@@ -4117,14 +4130,8 @@ async function openGiftBox() {
       '</div>';
     }).join('');
   } else {
-    grid.innerHTML = '<div class="empty-text" style="grid-column:span 2">لا توجد هدايا</div>';
-  }
-  // شريط الإرسال ظاهر دائماً (زر إرسال واضح)
-  const sendArea = document.getElementById('gift-send-area');
-  if (sendArea) {
-    sendArea.style.display = 'flex';
-    const lbl = document.getElementById('gift-selected-label');
-    if (lbl) lbl.innerHTML = '<span style="opacity:.7">لمس أي هدية للإرسال الفوري، أو اختر ثم اضغط إرسال</span>';
+    grid.innerHTML = '<div class="empty-text" style="grid-column:span 2">لا توجد هدايا حالياً</div>' +
+      '<button class="btn btn-secondary" style="grid-column:span 2;font-size:13px" onclick="reloadGiftBox()">🔄 إعادة تحميل الهدايا</button>';
   }
   document.getElementById('gift-box-modal').style.display = 'flex';
 }
@@ -4177,8 +4184,53 @@ async function updateGiftBarBalance() {
   if (bal) bal.innerHTML = '<span style="opacity:.8;font-size:11px">الرصيد:</span> <img src="/assets/coin.png" class="coin-ico" alt="كونزه"> <b>' + (state.coins || 0) + '</b>';
 }
 
-async function sendGiftItem(giftId) {
+// اختيار عدد المرات (0 = إلغاء التحديد)
+async function sendGiftCount(count) {
+  count = parseInt(count);
+  if (isNaN(count) || count <= 0) {
+    document.querySelectorAll('.gift-item').forEach(el2 => el2.classList.remove('selected'));
+    const area = document.getElementById('gift-send-area');
+    if (area) area.style.display = 'none';
+    window._lastGiftId = null;
+    return;
+  }
+  const id = window._lastGiftId;
+  if (!id) return showToast('اختر الهدية أولاً', 'error');
+  await sendGiftItem(id, Math.min(count, 10));
+}
+
+// دعم ذاتي فوري بدون هدية: يرفع نقاط عائلتك في الترتيب المميز
+async function quickSelfCoins(coins) {
+  try {
+    const r = await api('POST', '/api/support/self', { coins: parseInt(coins) || 100 });
+    showToast(r.message || '🙋 دعمت نفسك', 'success');
+    refreshWalletHeader();
+    updateGiftBarBalance();
+  } catch(e) { showToast(e.message || 'فشل الدعم الذاتي', 'error'); }
+}
+
+// إعادة تحميل قائمة الهدايا إذا فشل التحميل
+async function reloadGiftBox() {
+  try {
+    const { gifts } = await api('GET', '/api/gifts/items');
+    giftItems = gifts || [];
+    const grid = document.getElementById('gift-items-list');
+    if (!grid) return;
+    if (!giftItems.length) { grid.innerHTML = '<div class="empty-text" style="grid-column:span 2">لا توجد هدايا حالياً</div>'; return; }
+    grid.innerHTML = giftItems.map(g => {
+      const media = g.gift_image
+        ? (isGiftVideo(g.gift_image)
+            ? '<video src="' + g.gift_image + '" style="width:56px;height:56px;object-fit:contain;margin:0 auto;border-radius:8px" muted autoplay loop playsinline preload="metadata"></video>'
+            : '<img src="' + g.gift_image + '" style="width:56px;height:56px;object-fit:contain;margin:0 auto">')
+        : '<div style="font-size:34px">' + g.emoji + '</div>';
+      return '<div class="gift-item" id="gift-item-' + g.id + '" onclick="window._selectGift(\'' + g.id + '\')">' + media + '<div style="font-size:11px;font-weight:700">' + g.name + '</div><div style="font-size:11px;color:var(--gold)"><img src="/assets/coin.png" class="coin-ico" alt="كونزه"> ' + g.coins + '</div></div>';
+    }).join('');
+  } catch(e) { showToast('تعذر تحميل الهدايا', 'error'); }
+}
+
+async function sendGiftItem(giftId, count = 1) {
   const g = giftItems.find(x => x.id === giftId);
+  count = Math.min(Math.max(parseInt(count) || 1, 1), 10);
   const sel = document.getElementById('gift-recipient');
   const toId = sel ? sel.value : '';
   if (!toId) return showToast('⚠️ اختر العضو المرسل إليه من الشرائح أولاً', 'error');
@@ -4190,11 +4242,12 @@ async function sendGiftItem(giftId) {
     const side = toId === currentBattle.player_a_id ? 'a' : 'b';
     if (!g) return showToast('الهدية غير موجودة', 'error');
     try {
-      const r = await api('POST', '/api/battles/support', { battleId: currentBattle.id, side, coins: g.coins });
-      showToast(r.message || '🎁 دعمت الفريق!', 'success');
+      const total = g.coins * count;
+      const r = await api('POST', '/api/battles/support', { battleId: currentBattle.id, side, coins: total });
+      showToast((count > 1 ? '🎁 أرسلت ' + g.emoji + ' ' + g.name + ' ×' + count + ' — ' : '') + (r.message || '🎁 دعمت الفريق!'), 'success');
       updateGiftBarBalance();
       document.getElementById('gift-box-modal').style.display = 'none';
-      showGiftOnCamera({ giftName: g.name, giftEmoji: g.emoji, giftCoins: g.coins, giftImage: g.gift_image || null, fromName: state.user?.name, toName: side === 'a' ? currentBattle.player_a_name : currentBattle.player_b_name, familyName: '', toId: toId, fromId: state.user?.id });
+      showGiftOnCamera({ giftName: (count > 1 ? g.name + ' ×' + count : g.name), giftEmoji: g.emoji, giftCoins: total, giftImage: g.gift_image || null, fromName: state.user?.name, toName: side === 'a' ? currentBattle.player_a_name : currentBattle.player_b_name, familyName: '', toId: toId, fromId: state.user?.id });
       return;
     } catch(e) { return showToast(e.message || 'فشل الإرسال', 'error'); }
   }
@@ -4207,8 +4260,8 @@ async function sendGiftItem(giftId) {
     if (!state.activeSession?.id) return showToast('⚠️ الديوانية غير متاحة الآن - تأكد أنها مفتوحة وأنك في البث', 'error');
   }
   try {
-    const result = await api('POST', '/api/gifts/send', { giftId, toId, sessionId: state.activeSession.id });
-    showToast(result.message, 'success');
+    const result = await api('POST', '/api/gifts/send', { giftId, toId, sessionId: state.activeSession.id, count });
+    showToast(result.message || ((count > 1 ? 'أرسلت ' + g.emoji + ' ' + g.name + ' ×' + count + ' بنجاح' : '🎁 أرسلت الهدية')), 'success');
     updateGiftBarBalance();
     // يغلق صندوق الهدايا بعد الإرسال ليشاهد المستخدم الهدية على الشاشة
     document.getElementById('gift-box-modal').style.display = 'none';

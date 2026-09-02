@@ -1934,20 +1934,22 @@ app.get('/api/gifts/items', async (req, res) => {
 // Send gift to member on camera (via socket)
 app.post('/api/gifts/send', authMiddleware, asyncHandler(async (req, res) => {
   const { giftId, toId, sessionId } = req.body;
+  const count = Math.min(Math.max(parseInt(req.body.count) || 1, 1), 10);
   const gift = await db.execQuery("SELECT * FROM gift_items WHERE id = $1 AND status = 'active'", [giftId]);
   if (!gift.length) return res.status(400).json({ error: 'الهدية غير متاحة' });
   const fromUser = await db.getUserById(req.user.id);
+  const totalCoins = gift[0].coins * count;
   // Self-support: founder sends a gift to himself -> raises family featured ranking
   if (toId === req.user.id) {
-    const w = await db.deductCoins(req.user.id, gift[0].coins);
+    const w = await db.deductCoins(req.user.id, totalCoins);
     if (!w) return res.status(400).json({ error: 'رصيدك لا يكفي' });
-    if (fromUser?.family_id) await db.addFamilySupportPoints(fromUser.family_id, gift[0].coins);
-    await db.runRaw("INSERT INTO coin_transactions (id, user_id, type, coins, detail) VALUES ($1,$2,'self_support',$3,$4)", [require('crypto').randomUUID(), req.user.id, gift[0].coins, 'دعم ذاتي: ' + gift[0].emoji + ' ' + gift[0].name]);
+    if (fromUser?.family_id) await db.addFamilySupportPoints(fromUser.family_id, totalCoins);
+    await db.runRaw("INSERT INTO coin_transactions (id, user_id, type, coins, detail) VALUES ($1,$2,'self_support',$3,$4)", [require('crypto').randomUUID(), req.user.id, totalCoins, (count > 1 ? 'دعم ذاتي ×' + count + ': ' : 'دعم ذاتي: ') + gift[0].emoji + ' ' + gift[0].name]);
     // بث الأنيميشن أيضاً (كان يُحسم بدون ظهور على الشاشة)
     io.to(`session_${sessionId}`).emit('gift_on_camera', {
-      giftName: gift[0].name,
+      giftName: count > 1 ? gift[0].name + ' ×' + count : gift[0].name,
       giftEmoji: gift[0].emoji,
-      giftCoins: gift[0].coins,
+      giftCoins: totalCoins,
       giftImage: gift[0].gift_image || null,
       fromName: fromUser.name,
       toName: fromUser.name,
@@ -1955,13 +1957,13 @@ app.post('/api/gifts/send', authMiddleware, asyncHandler(async (req, res) => {
       toId: toId,
       fromId: req.user.id
     });
-    return res.json({ message: '🙋 دعمت نفسك بـ ' + gift[0].coins + ' كوينز - ارتفعت نقاط عائلتك!', wallet: w });
+    return res.json({ message: '🙋 دعمت نفسك بـ ' + gift[0].coins + (count > 1 ? ' ×' + count + ' = ' + totalCoins : '') + ' كوينز - ارتفعت نقاط عائلتك!', wallet: w });
   }
-  const result = await db.sendGift(req.user.id, toId, gift[0].coins, 'هدية: ' + gift[0].emoji + ' ' + gift[0].name);
+  const result = await db.sendGift(req.user.id, toId, totalCoins, 'هدية: ' + gift[0].emoji + ' ' + gift[0].name + (count > 1 ? ' ×' + count : ''));
   if (result.error) return res.status(400).json(result);
   // Level up: support spent (gifts)
   try {
-    const info = await db.addUserSupport(req.user.id, gift[0].coins);
+    const info = await db.addUserSupport(req.user.id, totalCoins);
     if (info && info.level > 0) io.to(`user_${req.user.id}`).emit('level_up', { level: info.level, remaining: info.next ? Math.max(0, info.next.coins_needed - info.spent) : 0 });
   } catch(e) {}
   // Broadcast gift animation to the session (with sender/recipient/family info)
@@ -1969,9 +1971,9 @@ app.post('/api/gifts/send', authMiddleware, asyncHandler(async (req, res) => {
   const sess = await db.getActiveDiwaniya(sessionId);
   const fam = sess ? await db.getFamily(sess.family_id) : null;
   io.to(`session_${sessionId}`).emit('gift_on_camera', {
-    giftName: gift[0].name,
+    giftName: count > 1 ? gift[0].name + ' ×' + count : gift[0].name,
     giftEmoji: gift[0].emoji,
-    giftCoins: gift[0].coins,
+    giftCoins: totalCoins,
     giftImage: gift[0].gift_image || null,
     fromName: fromUser.name,
     toName: toUser?.name || 'عضو',
@@ -1980,8 +1982,21 @@ app.post('/api/gifts/send', authMiddleware, asyncHandler(async (req, res) => {
     fromId: req.user.id
   });
   // Notify recipient
-  io.to(`user_${toId}`).emit('gift_received', { fromName: fromUser.name, coins: gift[0].coins, message: gift[0].emoji + ' ' + gift[0].name });
-  res.json({ message: '🎁 أرسلت ' + gift[0].emoji + ' ' + gift[0].name + ' إلى العضو', wallet: result.wallet });
+  io.to(`user_${toId}`).emit('gift_received', { fromName: fromUser.name, coins: totalCoins, message: gift[0].emoji + ' ' + gift[0].name + (count > 1 ? ' ×' + count : '') });
+  res.json({ message: '🎁 أرسلت ' + gift[0].emoji + ' ' + gift[0].name + (count > 1 ? ' ×' + count : '') + ' إلى العضو', wallet: result.wallet });
+}));
+
+// Quick self-support (بدون هدية): يرفع نقاط عائلة المرسل في الترتيب المميز
+app.post('/api/support/self', authMiddleware, asyncHandler(async (req, res) => {
+  let amount = parseInt(req.body?.coins);
+  if (!amount || amount <= 0) amount = 100;
+  amount = Math.min(amount, 100000);
+  const me = await db.getUserById(req.user.id);
+  const w = await db.deductCoins(req.user.id, amount);
+  if (!w) return res.status(400).json({ error: 'رصيدك لا يكفي' });
+  if (me?.family_id) await db.addFamilySupportPoints(me.family_id, amount);
+  await db.runRaw("INSERT INTO coin_transactions (id, user_id, type, coins, detail) VALUES ($1,$2,'self_support',$3,$4)", [require('crypto').randomUUID(), req.user.id, amount, 'دعم ذاتي سريع']);
+  res.json({ message: '🙋 دعمت نفسك بـ ' + amount + ' كوينز - ارتفعت نقاط عائلتك!', wallet: w });
 }));
 
 // Admin: gift items management

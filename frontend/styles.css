@@ -4422,3 +4422,12 @@ body{
 
 /* ===== تنبيهات داكنة متناسقة على الثيم الفاتح ===== */
 .toast{background:rgba(24,30,54,.94);color:#fff;border-color:rgba(255,255,255,.08)}
+
+/* ===== صندوق الهدايا: عدّاد المرات 0-10 (بدل زر إرسال) ===== */
+.gift-bar-send{flex-direction:column;align-items:stretch;gap:8px}
+.gift-count-row{display:flex;flex-wrap:wrap;gap:5px;align-items:center;justify-content:center;direction:ltr}
+.gift-count-hint{font-size:11px;color:var(--text-muted);white-space:nowrap;direction:rtl;margin-inline-end:2px}
+.gift-count-btn{min-width:31px;height:30px;padding:0 5px;border-radius:15px;border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.07);color:#fff;font-weight:800;font-size:14px;cursor:pointer;transition:all .15s}
+.gift-count-btn:hover{background:var(--gold);color:#14235a;border-color:var(--gold);transform:scale(1.08)}
+.gift-recipient-chip.quick-self{border-color:var(--gold);background:rgba(232,184,48,.16);color:#ffd75e;font-weight:700}
+.gift-recipient-chip.quick-self:active{transform:scale(.96)}
