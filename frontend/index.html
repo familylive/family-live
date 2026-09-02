@@ -4037,16 +4037,83 @@ async function updateWithdrawalAdmin(id, status) {
 
 // ==================== GIFTS BOX ====================
 let giftItems = [];
+let giftLoadState = 'idle';
 
-async function openGiftBox() {
-  if (!inLiveCall) return showToast('ادخل البث أولاً لإرسال الهدايا', 'error');
-  // Load gift items
+function giftItemHtml(g) {
+  const media = g.gift_image
+    ? (isGiftVideo(g.gift_image)
+        ? '<video src="' + g.gift_image + '" style="width:56px;height:56px;object-fit:contain;margin:0 auto;border-radius:8px" muted autoplay loop playsinline preload="metadata"></video>'
+        : '<img src="' + g.gift_image + '" style="width:56px;height:56px;object-fit:contain;margin:0 auto">')
+    : '<div style="font-size:34px">' + g.emoji + '</div>';
+  return '<div class="gift-item" id="gift-item-' + g.id + '" onclick="window._selectGift(\'' + g.id + '\')">' +
+    media +
+    '<div style="font-size:11px;font-weight:700">' + g.name + '</div>' +
+    '<div style="font-size:11px;color:var(--gold)"><img src="/assets/coin.png" class="coin-ico" alt="كونزه"> ' + g.coins + '</div>' +
+  '</div>';
+}
+function saveGiftCache(items) {
+  try {
+    // نسخة خفيفة فقط (بدون صور/فيديوهات كبيرة) — الصور الكبيرة تفجّر سعة التخزين
+    const slim = (items || []).slice(0, 60).map(g => {
+      const c = Object.assign({}, g);
+      if (typeof c.gift_image === 'string' && c.gift_image.length > 20000) c.gift_image = '';
+      return c;
+    });
+    localStorage.setItem('gift_cache_v1', JSON.stringify({ t: Date.now(), items: slim }));
+  } catch(e) {
+    try {
+      localStorage.setItem('gift_cache_v1', JSON.stringify({ t: Date.now(), items: (items || []).slice(0, 60).map(g => ({ id: g.id, name: g.name, emoji: g.emoji, coins: g.coins, gift_image: '' })) }));
+    } catch(e2) {}
+  }
+}
+function loadGiftCache() {
+  try { const c = JSON.parse(localStorage.getItem('gift_cache_v1') || 'null'); return (c && Array.isArray(c.items) && c.items.length) ? c.items : null; } catch(e) { return null; }
+}
+function renderGiftGrid() {
+  const grid = document.getElementById('gift-items-list');
+  if (!grid) return;
+  if (giftLoadState === 'loading') {
+    grid.innerHTML = '<div class="empty-text" style="grid-column:span 2">⏳ يتم تحميل الهدايا...</div>';
+    return;
+  }
+  if (!giftItems.length) {
+    grid.innerHTML = '<div class="empty-text" style="grid-column:span 2">تعذر تحميل الهدايا - تحقق من اتصالك</div>' +
+      '<button class="btn btn-secondary" style="grid-column:span 2;font-size:13px" onclick="reloadGiftBox()">🔄 إعادة المحاولة</button>';
+    return;
+  }
+  grid.innerHTML = giftItems.map(giftItemHtml).join('');
+}
+async function refreshGiftItems(showLoading) {
+  if (showLoading && !giftItems.length) { giftLoadState = 'loading'; renderGiftGrid(); }
   try {
     const { gifts } = await api('GET', '/api/gifts/items');
     giftItems = gifts || [];
-  } catch(e) { giftItems = []; }
-  // الرصيد الحالي (محدث من الخادم)
-  await refreshWalletHeader().catch(() => {});
+    giftLoadState = 'ok';
+    if (giftItems.length) saveGiftCache(giftItems);
+  } catch(e) {
+    if (giftItems.length) { giftLoadState = 'ok'; }
+    else {
+      const cached = loadGiftCache();
+      if (cached) { giftItems = cached; giftLoadState = 'ok'; }
+      else giftLoadState = 'error';
+    }
+  }
+  renderGiftGrid();
+}
+
+
+async function openGiftBox() {
+  if (!inLiveCall) return showToast('ادخل البث أولاً لإرسال الهدايا', 'error');
+  // فتح الصندوق فوراً مع رسالة تحميل واضحة
+  const boxModal = document.getElementById('gift-box-modal');
+  if (boxModal) boxModal.style.display = 'flex';
+  // نسخة محفوظة سريعة إن وُجدت (تعمل حتى لو الخادم بطيء) ثم تحميل بالخلفية
+  const cachedList = loadGiftCache();
+  if (cachedList && !giftItems.length) { giftItems = cachedList; giftLoadState = 'ok'; }
+  renderGiftGrid();
+  refreshGiftItems(true);
+  // الرصيد الحالي (بدون إيقاف الصندوق)
+  refreshWalletHeader().catch(() => {});
   const bal = document.getElementById('gift-bar-balance');
   if (bal) bal.innerHTML = '<span style="opacity:.8;font-size:11px">الرصيد:</span> <img src="/assets/coin.png" class="coin-ico" alt="كونزه"> <b>' + (state.coins || 0) + '</b>';
   // المستلمون: في PK → الفريقان؛ خارج PK → المشاركون (الافتراضي: صاحب البث)
@@ -4064,7 +4131,6 @@ async function openGiftBox() {
     let chipsHtml =
       '<div class="gift-recipient-chip pk-chip-a" data-pk="a" onclick="selectGiftRecipientChip(this,\'pk:a\')"><span class="chip-av">' + ava(avA) + '</span>⭐ ' + (currentBattle.player_a_name || 'أ') + '</div>' +
       '<div class="gift-recipient-chip pk-chip-b" data-pk="b" onclick="selectGiftRecipientChip(this,\'pk:b\')"><span class="chip-av">' + ava(avB) + '</span>⭐ ' + (currentBattle.player_b_name || 'ب') + '</div>';
-    // دعم نفسي فوري (بدون نافذة): للمؤسس/اللاعب — يرفع نقاط فريقه
     const isPlayer = currentBattle.player_a_id === state.user?.id || currentBattle.player_b_id === state.user?.id;
     if (isPlayer) {
       const mySide = currentBattle.player_a_id === state.user?.id ? 'a' : 'b';
@@ -4082,21 +4148,19 @@ async function openGiftBox() {
       const av = m?.avatar || (isSelf ? state.user.avatar : peerAvatars[pid]) || '👤';
       return '<div class="gift-recipient-chip" data-id="' + id + '" onclick="selectGiftRecipientChip(this,\'' + id + '\')"><span class="chip-av">' + ava(av) + '</span>' + name + '</div>';
     }).join('');
-    // دعم ذاتي فوري بدون هدية (يعمل حتى لو القائمة فارغة) — للمؤسس وأي عضو
+    // دعم ذاتي فوري بدون هدية (يعمل حتى لو القائمة فاضية أو النت بطيء)
     chipsHtml += '<div class="gift-recipient-chip quick-self" onclick="quickSelfCoins(100)" title="يرفع نقاط عائلتك في الترتيب المميز">🙋 دعم نفسي +100</div>';
     chips.innerHTML = chipsHtml;
-    // إضافة الخيارات للـ select القديم (توافق مع sendGiftItem)
     chips.querySelectorAll('.gift-recipient-chip[data-id]').forEach(ch => {
       sel.innerHTML += '<option value="' + ch.dataset.id + '">' + ch.textContent.trim() + '</option>';
     });
-    // افتراضي: صاحب البث — أو نفسي إن كنت المؤسس
     const hostId = state.activeSession?.opened_by;
     let defaultChip = null;
     if (hostId === state.user?.id) defaultChip = chips.querySelector('[data-id="' + state.user.id + '"]');
     else defaultChip = chips.querySelector('[data-id="' + hostId + '"]') || chips.querySelector('.gift-recipient-chip[data-id]');
     if (defaultChip) selectGiftRecipientChip(defaultChip, defaultChip.dataset.id);
   }
-  // Load gift items grid — الهدية تُختار باللمس ثم تُحدد عدد المرات (0 = إلغاء)
+  // اختيار الهدية باللمس ثم تحديد عدد المرات (0 = إلغاء)
   const grid = document.getElementById('gift-items-list');
   const pickerArea = document.getElementById('gift-send-area');
   const pickerLabel = document.getElementById('gift-selected-label');
@@ -4116,25 +4180,9 @@ async function openGiftBox() {
     showToast('اختر الهدية أولاً', 'error');
   };
   if (pickerArea) pickerArea.style.display = 'none';
-  if (giftItems.length) {
-    grid.innerHTML = giftItems.map(g => {
-      const media = g.gift_image
-        ? (isGiftVideo(g.gift_image)
-            ? '<video src="' + g.gift_image + '" style="width:56px;height:56px;object-fit:contain;margin:0 auto;border-radius:8px" muted autoplay loop playsinline preload="metadata"></video>'
-            : '<img src="' + g.gift_image + '" style="width:56px;height:56px;object-fit:contain;margin:0 auto">')
-        : '<div style="font-size:34px">' + g.emoji + '</div>';
-      return '<div class="gift-item" id="gift-item-' + g.id + '" onclick="window._selectGift(\'' + g.id + '\',this)">' +
-        media +
-        '<div style="font-size:11px;font-weight:700">' + g.name + '</div>' +
-        '<div style="font-size:11px;color:var(--gold)"><img src="/assets/coin.png" class="coin-ico" alt="كونزه"> ' + g.coins + '</div>' +
-      '</div>';
-    }).join('');
-  } else {
-    grid.innerHTML = '<div class="empty-text" style="grid-column:span 2">لا توجد هدايا حالياً</div>' +
-      '<button class="btn btn-secondary" style="grid-column:span 2;font-size:13px" onclick="reloadGiftBox()">🔄 إعادة تحميل الهدايا</button>';
-  }
-  document.getElementById('gift-box-modal').style.display = 'flex';
+  renderGiftGrid();
 }
+
 
 // اختيار مستلم من الشرائح
 function selectGiftRecipientChip(el, val) {
@@ -4209,23 +4257,11 @@ async function quickSelfCoins(coins) {
   } catch(e) { showToast(e.message || 'فشل الدعم الذاتي', 'error'); }
 }
 
-// إعادة تحميل قائمة الهدايا إذا فشل التحميل
+// إعادة محاولة تحميل قائمة الهدايا
 async function reloadGiftBox() {
-  try {
-    const { gifts } = await api('GET', '/api/gifts/items');
-    giftItems = gifts || [];
-    const grid = document.getElementById('gift-items-list');
-    if (!grid) return;
-    if (!giftItems.length) { grid.innerHTML = '<div class="empty-text" style="grid-column:span 2">لا توجد هدايا حالياً</div>'; return; }
-    grid.innerHTML = giftItems.map(g => {
-      const media = g.gift_image
-        ? (isGiftVideo(g.gift_image)
-            ? '<video src="' + g.gift_image + '" style="width:56px;height:56px;object-fit:contain;margin:0 auto;border-radius:8px" muted autoplay loop playsinline preload="metadata"></video>'
-            : '<img src="' + g.gift_image + '" style="width:56px;height:56px;object-fit:contain;margin:0 auto">')
-        : '<div style="font-size:34px">' + g.emoji + '</div>';
-      return '<div class="gift-item" id="gift-item-' + g.id + '" onclick="window._selectGift(\'' + g.id + '\')">' + media + '<div style="font-size:11px;font-weight:700">' + g.name + '</div><div style="font-size:11px;color:var(--gold)"><img src="/assets/coin.png" class="coin-ico" alt="كونزه"> ' + g.coins + '</div></div>';
-    }).join('');
-  } catch(e) { showToast('تعذر تحميل الهدايا', 'error'); }
+  giftItems = [];
+  giftLoadState = 'idle';
+  await refreshGiftItems(true);
 }
 
 async function sendGiftItem(giftId, count = 1) {
