@@ -13,7 +13,14 @@ function getPool() {
     pool = new Pool({
       connectionString: process.env.DATABASE_URL || 'postgres://postgres:postgres@localhost:5432/family',
       ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false,
+      max: 10,
+      connectionTimeoutMillis: 8000,
+      idleTimeoutMillis: 30000,
+      query_timeout: 12000,
+      statement_timeout: 12000,
     });
+    // منع انهيار الخادم عند فشل قاعدة البيانات (حصة Neon المنتهية مثلاً)
+    pool.on('error', (e) => { console.error('pg pool error:', e.message); });
   }
   return pool;
 }

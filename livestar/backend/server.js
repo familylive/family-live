@@ -38,8 +38,8 @@ let pool = null;
 if (dbUrl) {
   try {
     pool = new Pool({ connectionString: dbUrl, ssl: { rejectUnauthorized: false } });
-// نبض كل 60 ثانية لإبقاء قاعدة Neon يقظة
-setInterval(() => { if (useDb) pool.query('SELECT 1').catch(() => {}); }, 60000);
+// ملاحظة: أُزيل النبض كل 60 ثانية — كان يبقي قاعدة Neon يعملة 24 ساعة ويحرق حصة الحوسبة المجانية
+// (Neon تصحو تلقائياً عند أول استعلام — لا حاجة لنبض داخلي)
     useDb = true;
   } catch(e) { useDb = false; }
 }

@@ -159,7 +159,7 @@ app.post('/api/auth/register-invited', async (req, res) => {
 });
 
 // Login
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login', asyncHandler(async (req, res) => {
   const { email, password } = req.body;
   
   if (!email || !password) {
@@ -209,15 +209,15 @@ app.post('/api/auth/login', async (req, res) => {
     },
     family: user.family_id ? await db.getFamily(user.family_id) : null
   });
-});
+}));
 
 // Verify token
-app.get('/api/auth/verify', authMiddleware, async (req, res) => {
+app.get('/api/auth/verify', authMiddleware, asyncHandler(async (req, res) => {
   const user = await db.getUserById(req.user.id);
   if (!user) return res.status(404).json({ error: 'المستخدم غير موجود' });
   await db.updateLastSeen(req.user.id);
   res.json({ user, family: user.family_id ? await db.getFamily(user.family_id) : null });
-});
+}));
 
 // =============== CODES ROUTES ===============
 
@@ -3512,6 +3512,11 @@ process.on('uncaughtException', (err) => {
 // =============== GLOBAL ERROR HANDLER ===============
 app.use((err, req, res, next) => {
   console.log('❌ Route error:', err.message, err.code || '');
+  const msg = String(err.message || '');
+  const dbDown = /quota|timeout|ECONNREFUSED|ENOTFOUND|ETIMEDOUT|terminat|connection|connect/i.test(msg);
+  if (dbDown) {
+    return res.status(503).json({ error: '⚠️ خدمة قاعدة البيانات غير متاحة حالياً — حاول بعد قليل' });
+  }
   res.status(500).json({ error: err.message || 'خطأ داخلي', code: err.code || '' });
 });
 

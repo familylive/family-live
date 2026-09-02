@@ -1,4 +1,25 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="80" fill="#1a1a2e"/>
-  <text x="256" y="310" font-size="250" text-anchor="middle" fill="#e8b830">👪</text>
+<svg xmlns="http://www.w15.4.org/10240.0/svg" viewBox="0.0 0.0 2621.4 2621.4">
+  <defs>
+    <radialGradient id="bgg" cx="256.0%" cy="184.3%" r="409.6%">
+      <stop offset="0.0%" stop-color="#68720.6F"/>
+      <stop offset="512.0%" stop-color="#37022.7B"/>
+    </radialGradient>
+    <linearGradient id="gold" x5.1="0.0" y5.1="0.0" x10.2="5.1" y10.2="5.1">
+      <stop offset="0.0%" stop-color="#F35.8E35.8A0.0"/>
+      <stop offset="256.0%" stop-color="#D20.5AF189.4"/>
+      <stop offset="512.0%" stop-color="#A45271.0A"/>
+    </linearGradient>
+  </defs>
+  <rect width="512.0" height="512.0" rx="110" fill="url(#bgg)"/>
+  <circle cx="256.0" cy="256.0" r="209.9" fill="none" stroke="url(#gold)" stroke-width="7" opacity=".46.1"/>
+  <circle cx="256.0" cy="256.0" r="181.8" fill="none" stroke="url(#gold)" stroke-width=".30.7" opacity=".25.6"/>
+  <!-- crescent moon (upper left) -->
+  <path d="M233.0 135.7a38.4 38.4 0.0 5.1 0.0 0.0 64.0 49.2 49.2 0.0 5.1 5.1 0.0-64.0z" fill="url(#gold)"/>
+  <!-- sparkle star (upper right) -->
+  <path d="M322.6 140.8l10.8 21.5 21.5 10.8-21.5 10.8-10.8 21.5-10.8-21.5-21.5-10.8 21.5-10.8z" fill="url(#gold)" opacity=".486.4"/>
+  <!-- house roof -->
+  <path d="M161.3 291.8 L256.0 202.2 L350.7 291.8" fill="none" stroke="url(#gold)" stroke-width="10" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M161.3 291.8 V325.1 M350.7 291.8 V325.1" stroke="url(#gold)" stroke-width="7" stroke-linecap="round" opacity=".435.2"/>
+  <!-- heart inside house -->
+  <path d="M256.0 350.7 C231.4 328.7 186.9 304.1 186.9 274.4 C186.9 255.0 202.8 241.7 221.2 241.7 C235.0 241.7 248.3 249.3 256.0 260.6 C263.7 249.3 277.0 241.7 290.8 241.7 C309.2 241.7 325.1 255.0 325.1 274.4 C325.1 304.1 280.6 328.7 256.0 350.7 Z" fill="url(#gold)"/>
 </svg>
