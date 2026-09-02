@@ -1,26 +1,44 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+<g transform="scale(0.0977)">
+
   <defs>
     <radialGradient id="bgg" cx="50%" cy="30%" r="95%">
       <stop offset="0%" stop-color="#2E4A9E"/>
-      <stop offset="60%" stop-color="#1A2F6E"/>
+      <stop offset="55%" stop-color="#1A2F6E"/>
       <stop offset="100%" stop-color="#0E1B46"/>
+    </radialGradient>
+    <radialGradient id="halo" cx="50%" cy="42%" r="55%">
+      <stop offset="0%" stop-color="#FFD97E" stop-opacity=".22"/>
+      <stop offset="60%" stop-color="#FFD97E" stop-opacity=".06"/>
+      <stop offset="100%" stop-color="#FFD97E" stop-opacity="0"/>
     </radialGradient>
     <linearGradient id="gold" x1="0" y1="0" x2="0.35" y2="1">
       <stop offset="0%" stop-color="#F9E7A8"/>
       <stop offset="48%" stop-color="#E7B93C"/>
       <stop offset="100%" stop-color="#A87F16"/>
     </linearGradient>
+    <linearGradient id="mapg" x1="0" y1="0" x2="0.3" y2="1">
+      <stop offset="0%" stop-color="#FDF3C8"/>
+      <stop offset="55%" stop-color="#F1D27C"/>
+      <stop offset="100%" stop-color="#D9AB3F"/>
+    </linearGradient>
   </defs>
-  <rect width="100" height="100" rx="22" fill="url(#bgg)"/>
-  <circle cx="50" cy="50" r="39.3" fill="none" stroke="url(#gold)" stroke-width="1.3" opacity=".55"/>
-  <circle cx="50" cy="50" r="34" fill="none" stroke="url(#gold)" stroke-width=".6" opacity=".28"/>
-  <!-- crescent moon (upper left) -->
-  <path d="M45.5 26.5a7.5 7.5 0 1 0 0 12.5 9.6 9.6 0 1 1 0-12.5z" fill="url(#gold)"/>
-  <!-- sparkle star (upper right) -->
-  <path d="M63 27.5l2.1 4.2 4.2 2.1-4.2 2.1-2.1 4.2-2.1-4.2-4.2-2.1 4.2-2.1z" fill="url(#gold)" opacity=".92"/>
+  <rect width="1024" height="1024" rx="225" fill="url(#bgg)"/>
+  <rect width="1024" height="1024" fill="url(#halo)"/>
+  <!-- fine frame hairline -->
+  <rect x="36" y="36" width="952" height="952" rx="96" fill="none" stroke="#F7E3A0" stroke-opacity=".30" stroke-width="5"/>
+  <!-- emblem rings -->
+  <circle cx="512" cy="512" r="402" fill="none" stroke="url(#gold)" stroke-width="13" opacity=".55"/>
+  <circle cx="512" cy="512" r="348" fill="none" stroke="url(#gold)" stroke-width="6" opacity=".28"/>
   <!-- house roof -->
-  <path d="M31.5 57 L50 39.5 L68.5 57" fill="none" stroke="url(#gold)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M31.5 57 V63.5 M68.5 57 V63.5" stroke="url(#gold)" stroke-width="1.4" stroke-linecap="round" opacity=".85"/>
-  <!-- heart inside house -->
-  <path d="M50 68.5 C45.2 64.2 36.5 59.4 36.5 53.6 C36.5 49.8 39.6 47.2 43.2 47.2 C45.9 47.2 48.5 48.7 50 50.9 C51.5 48.7 54.1 47.2 56.8 47.2 C60.4 47.2 63.5 49.8 63.5 53.6 C63.5 59.4 54.8 64.2 50 68.5 Z" fill="url(#gold)"/>
+  <path d="M322.6 583.7 L512 404.5 L701.4 583.7" fill="none" stroke="url(#gold)" stroke-width="20" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M322.6 583.7 V650.2 M701.4 583.7 V650.2" stroke="url(#gold)" stroke-width="14" stroke-linecap="round" opacity=".85"/>
+  <!-- heart outline (سكن العائلة) -->
+  <path d="M512 701.4 C462.8 657.5 373.8 607.8 373.8 548.7 C373.8 510.0 405.6 483.4 442.4 483.4 C468.0 483.4 496.6 498.6 512 520.1 C527.4 498.6 556.0 483.4 581.6 483.4 C618.4 483.4 650.2 510.0 650.2 548.7 C650.2 607.8 561.2 657.5 512 701.4 Z" fill="none" stroke="url(#gold)" stroke-width="16" stroke-linejoin="round"/>
+  <!-- خريطة الجزيرة العربية داخل القلب -->
+  <g transform="translate(428.8 524.8) scale(1.027)">
+    <path d="M 3.14 14.43 L 19.45 13.18 L 32.0 7.53 L 43.92 3.14 L 55.22 5.02 L 65.88 8.16 L 77.8 14.43 L 84.08 15.69 L 87.22 18.2 L 92.24 22.59 L 96.63 28.86 L 99.14 33.88 L 101.02 37.02 L 102.9 38.59 L 104.47 36.71 L 105.29 35.14 L 106.16 36.71 L 106.67 39.22 L 106.04 41.73 L 108.55 42.35 L 112.94 44.86 L 119.84 45.8 L 126.12 45.49 L 131.14 42.67 L 135.22 37.96 L 137.41 35.77 L 138.04 38.28 L 143.69 44.55 L 149.33 49.57 L 153.73 53.33 L 157.49 56.47 L 158.93 58.35 L 158.12 65.26 L 154.98 72.79 L 151.22 76.55 L 143.06 82.82 L 134.9 87.22 L 128.63 90.35 L 122.35 92.86 L 115.45 95.37 L 109.18 101.65 L 101.65 106.04 L 93.49 108.55 L 85.96 109.81 L 78.43 111.69 L 72.16 115.45 L 67.14 117.96 L 61.49 119.22 L 55.53 120.16 L 54.59 112.32 L 53.33 103.53 L 51.45 93.49 L 47.06 84.71 L 42.04 76.55 L 36.39 69.02 L 31.37 64.0 L 26.35 56.47 L 22.59 48.94 L 19.45 41.41 L 17.57 34.51 L 13.8 28.24 L 9.41 22.59 L 5.02 18.2 Z" fill="url(#mapg)" stroke="#A87F16" stroke-width="3" stroke-linejoin="round" opacity=".98"/>
+  </g>
+
+</g>
 </svg>
