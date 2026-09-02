@@ -1931,11 +1931,18 @@ app.get('/api/gifts/items', async (req, res) => {
   res.json({ gifts: await db.getGiftItems() });
 });
 
+// وسائط هدية واحدة عند الطلب فقط (لتجنب سحب المرفقات الضخمة مع القائمة)
+app.get('/api/gifts/media/:id', async (req, res) => {
+  const rows = await db.execQuery('SELECT gift_image FROM gift_items WHERE id = $1', [req.params.id]);
+  if (!rows.length) return res.status(404).json({ error: 'الهدية غير موجودة' });
+  res.json({ media: rows[0].gift_image || null });
+});
+
 // Send gift to member on camera (via socket)
 app.post('/api/gifts/send', authMiddleware, asyncHandler(async (req, res) => {
   const { giftId, toId, sessionId } = req.body;
   const count = Math.min(Math.max(parseInt(req.body.count) || 1, 1), 10);
-  const gift = await db.execQuery("SELECT * FROM gift_items WHERE id = $1 AND status = 'active'", [giftId]);
+  const gift = await db.execQuery("SELECT id, name, emoji, coins, price, status, start_date, end_date, created_at, CASE WHEN gift_image IS NULL THEN NULL WHEN LENGTH(gift_image) > 150000 THEN NULL ELSE gift_image END AS gift_image, CASE WHEN gift_image IS NOT NULL AND LENGTH(gift_image) > 150000 THEN 1 ELSE 0 END AS media_large FROM gift_items WHERE id = $1 AND status = 'active'", [giftId]);
   if (!gift.length) return res.status(400).json({ error: 'الهدية غير متاحة' });
   const fromUser = await db.getUserById(req.user.id);
   const totalCoins = gift[0].coins * count;
@@ -2708,7 +2715,7 @@ async function botStartGifting(sessionId) {
   try {
     if (!globalThis.BOT_USER) return;
     if (botGiftTimer) { clearInterval(botGiftTimer); botGiftTimer = null; }
-    const giftRows = await db.execQuery("SELECT * FROM gift_items WHERE status = 'active' ORDER BY coins");
+    const giftRows = await db.execQuery("SELECT id, name, emoji, coins, price, status, start_date, end_date, created_at, CASE WHEN gift_image IS NULL THEN NULL WHEN LENGTH(gift_image) > 150000 THEN NULL ELSE gift_image END AS gift_image, CASE WHEN gift_image IS NOT NULL AND LENGTH(gift_image) > 150000 THEN 1 ELSE 0 END AS media_large FROM gift_items WHERE status = 'active' ORDER BY coins");
     botGiftCycle = giftRows || [];
     if (!botGiftCycle.length) return;
     let i = 0;

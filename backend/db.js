@@ -1175,7 +1175,7 @@ async function getDiwaniyaRestrictions(sessionId) {
 
 async function getGiftItems() {
   const now = Date.now();
-  const rows = await query("SELECT * FROM gift_items WHERE status = 'active' ORDER BY coins");
+  const rows = await query("SELECT id, name, emoji, coins, price, status, start_date, end_date, created_at, CASE WHEN gift_image IS NULL THEN NULL WHEN LENGTH(gift_image) > 150000 THEN NULL ELSE gift_image END AS gift_image, CASE WHEN gift_image IS NOT NULL AND LENGTH(gift_image) > 150000 THEN 1 ELSE 0 END AS media_large FROM gift_items WHERE status = 'active' ORDER BY coins");
   return rows.filter(g => {
     const s = g.start_date ? Date.parse(g.start_date) : null;
     const e = g.end_date ? Date.parse(g.end_date) : null;
@@ -1184,11 +1184,11 @@ async function getGiftItems() {
     return true;
   });
 }
-async function getAllGiftItems() { return query('SELECT * FROM gift_items ORDER BY coins'); }
+async function getAllGiftItems() { return query('SELECT id, name, emoji, coins, price, status, start_date, end_date, created_at, CASE WHEN gift_image IS NULL THEN NULL WHEN LENGTH(gift_image) > 150000 THEN NULL ELSE gift_image END AS gift_image, CASE WHEN gift_image IS NOT NULL AND LENGTH(gift_image) > 150000 THEN 1 ELSE 0 END AS media_large FROM gift_items ORDER BY coins'); }
 async function addGiftItem(name, emoji, coins, giftImage, price, startDate, endDate) {
   const id = uuidv4();
   await run('INSERT INTO gift_items (id, name, emoji, coins, price, gift_image, start_date, end_date) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)', [id, name, emoji || '🎁', parseInt(coins) || 10, parseInt(price) || 0, giftImage || null, startDate || null, endDate || null]);
-  return queryOne('SELECT * FROM gift_items WHERE id = $1', [id]);
+  return queryOne('SELECT id, name, emoji, coins, price, status, start_date, end_date, created_at, CASE WHEN gift_image IS NULL THEN NULL WHEN LENGTH(gift_image) > 150000 THEN NULL ELSE gift_image END AS gift_image, CASE WHEN gift_image IS NOT NULL AND LENGTH(gift_image) > 150000 THEN 1 ELSE 0 END AS media_large FROM gift_items WHERE id = $1', [id]);
 }
 async function updateGiftItem(id, data) {
   const { name, emoji, coins, price, status, gift_image, start_date, end_date } = data;
@@ -1200,7 +1200,7 @@ async function updateGiftItem(id, data) {
   if (gift_image !== undefined) await run('UPDATE gift_items SET gift_image = $1 WHERE id = $2', [gift_image, id]);
   if (start_date !== undefined) await run('UPDATE gift_items SET start_date = $1 WHERE id = $2', [start_date, id]);
   if (end_date !== undefined) await run('UPDATE gift_items SET end_date = $1 WHERE id = $2', [end_date, id]);
-  return queryOne('SELECT * FROM gift_items WHERE id = $1', [id]);
+  return queryOne('SELECT id, name, emoji, coins, price, status, start_date, end_date, created_at, CASE WHEN gift_image IS NULL THEN NULL WHEN LENGTH(gift_image) > 150000 THEN NULL ELSE gift_image END AS gift_image, CASE WHEN gift_image IS NOT NULL AND LENGTH(gift_image) > 150000 THEN 1 ELSE 0 END AS media_large FROM gift_items WHERE id = $1', [id]);
 }
 async function deleteGiftItem(id) { await run('DELETE FROM gift_items WHERE id = $1', [id]); return true; }
 
